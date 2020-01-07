@@ -1,0 +1,20 @@
+version: "3"
+services:
+  db:
+    image: mariadb
+    restart: always
+    command: "--innodb-buffer-pool-size=4294967296 --innodb-buffer-pool-instances=8"
+    # big setup
+    # command: "--innodb-buffer-pool-size=17179869184 --innodb-buffer-pool-instances=16"
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+    volumes:
+      - /var/lib/go-graphkb:/var/lib/mysql
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080

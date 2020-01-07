@@ -1,0 +1,7 @@
+port: 8090
+
+mariadb:
+  username: root
+  password: example
+  host:
+  database: graphkb
