@@ -1,7 +1,12 @@
 port: 8090
 
 mariadb:
-  username: root
-  password: example
+  username: graphkb
+  password: password
   host:
   database: graphkb
+
+sources:
+  csv:
+    schema: ./examples/example-schema.csv
+    data: ./examples/example-data.csv

@@ -27,21 +27,6 @@ var ConfigPath string
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
-	Sources = []sources.Source{}
-
-	for _, s := range Sources {
-		sources.Registry.Add(s)
-		g := s.Graph()
-
-		for _, a := range g.Assets() {
-			knowledge.SchemaRegistrySingleton.AddAssetType(a)
-		}
-
-		for _, r := range g.Relations() {
-			knowledge.SchemaRegistrySingleton.AddRelationType(r.Type)
-		}
-	}
 }
 
 func main() {
@@ -117,6 +102,27 @@ func onInit() {
 		viper.GetString("mariadb.password"),
 		viper.GetString("mariadb.host"),
 		dbName)
+
+	Sources = []sources.Source{
+		sources.NewCSVSource(),
+	}
+
+	for _, s := range Sources {
+		sources.Registry.Add(s)
+		g, err := s.Graph()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, a := range g.Assets() {
+			knowledge.SchemaRegistrySingleton.AddAssetType(a)
+		}
+
+		for _, r := range g.Relations() {
+			knowledge.SchemaRegistrySingleton.AddRelationType(r.Type)
+		}
+	}
 }
 
 func start(cmd *cobra.Command, args []string) {
@@ -179,6 +185,7 @@ func flush(cmd *cobra.Command, args []string) {
 	if err := Database.FlushAll(); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("Successul flush")
 }
 
 func getSource(cmd *cobra.Command, args []string) {
@@ -194,7 +201,11 @@ func getSource(cmd *cobra.Command, args []string) {
 	assets := make(map[string]bool)
 	relations := make(map[string]bool)
 	for _, s := range selectedSources {
-		g := s.Graph()
+		g, err := s.Graph()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		for _, a := range g.Assets() {
 			assets[string(a)] = true
 		}

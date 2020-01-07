@@ -56,7 +56,12 @@ func getSourceGraph(w http.ResponseWriter, r *http.Request) {
 	for _, sname := range sourceNames {
 		if sources.Registry.Exist(sname) {
 			s := sources.Registry.Get(sname)
-			sg.Merge(s.Graph())
+			g, err := s.Graph()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			sg.Merge(*g)
 		}
 	}
 	replyWithSourceGraph(w, &sg)

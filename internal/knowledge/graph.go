@@ -49,7 +49,7 @@ func NewGraph() *Graph {
 // AddAsset add an asset to the graph
 func (g *Graph) AddAsset(assetType AssetType, assetKey string) AssetKey {
 	if !SchemaRegistrySingleton.AssetExists(assetType) {
-		log.Fatal(fmt.Errorf("Asset type '%s' does not exist to add asset %s", assetType, assetKey))
+		log.Fatal(fmt.Errorf("Asset type '%s' does not exist in schema registry. Cannot add asset value '%s'", assetType, assetKey))
 	}
 	asset := Asset{Type: assetType, Key: assetKey}
 	g.assets[asset] = true
@@ -59,7 +59,7 @@ func (g *Graph) AddAsset(assetType AssetType, assetKey string) AssetKey {
 // AddRelation add a relation to the graph
 func (g *Graph) AddRelation(from AssetKey, relationType RelationKeyType, to AssetKey) Relation {
 	if !SchemaRegistrySingleton.RelationExists(relationType) {
-		log.Fatal(fmt.Errorf("Relation type '%s' does not exist", relationType))
+		log.Fatal(fmt.Errorf("Relation type '%s' does not exist in schema registry", relationType))
 	}
 	relation := Relation{
 		Type: relationType,

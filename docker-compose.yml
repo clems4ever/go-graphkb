@@ -10,6 +10,9 @@ services:
       - 3306:3306
     environment:
       MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: graphkb
+      MYSQL_USER: graphkb
+      MYSQL_PASSWORD: password
     volumes:
       - /var/lib/go-graphkb:/var/lib/mysql
 

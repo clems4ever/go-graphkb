@@ -1,0 +1,5 @@
+from_type,relation_type,to_type
+employee,is_in,team
+employee,is_manager_of,employee
+employee,work_at,office
+office,is_in,country
