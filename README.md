@@ -2,7 +2,7 @@
 
 go-graphkb is a Graph-oriented Knowledge Base written in Go.
 
-The knowledge base can then be queried using [openCypher](https://github.com/opencypher/openCypher)
+The Knowledge Base can be queried using [openCypher](https://github.com/opencypher/openCypher)
 and results can be visualized in the UI as shown below.
 
 ![go-graphkb ui](./docs/images/go-graphkb.png)
