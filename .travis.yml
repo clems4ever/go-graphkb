@@ -1,0 +1,8 @@
+language: go
+
+go:
+- 1.13.x
+
+script:
+- go test -v ./...
+- go build -o go-graphkb cmd/go-graphkb/main.go
