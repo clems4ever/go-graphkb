@@ -14,7 +14,7 @@ func NewObservableSource(s Source) ObservableSource {
 	}
 }
 
-func (os *ObservableSource) Start(e *knowledge.GraphEmitter) error {
+func (os *ObservableSource) Start(e *knowledge.GraphImporter) error {
 	return os.source.Start(e)
 }
 

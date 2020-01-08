@@ -4,6 +4,6 @@ import "github.com/clems4ever/go-graphkb/internal/knowledge"
 
 // Source represent a source of data
 type Source interface {
-	Start(emitter *knowledge.GraphEmitter) error
+	Start(emitter *knowledge.GraphImporter) error
 	Stop() error
 }

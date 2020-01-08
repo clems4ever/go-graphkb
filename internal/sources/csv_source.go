@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
@@ -17,15 +18,16 @@ type CSVSource struct {
 
 func NewCSVSource() *CSVSource {
 	csvSource := new(CSVSource)
-	csvSource.dataPath = viper.GetString("sources.csv.data")
+	csvSource.dataPath = viper.GetString("path")
+
+	if csvSource.dataPath == "" {
+		log.Fatal(fmt.Errorf("Unable to detect CSV file path in configuration. Check patch configuration is provided"))
+	}
+
 	return csvSource
 }
 
-func (cs *CSVSource) Name() string {
-	return "csv"
-}
-
-func (cs *CSVSource) Start(emitter *knowledge.GraphEmitter) error {
+func (cs *CSVSource) Start(importer *knowledge.GraphImporter) error {
 	file, err := os.Open(cs.dataPath)
 	if err != nil {
 		return err
@@ -34,12 +36,12 @@ func (cs *CSVSource) Start(emitter *knowledge.GraphEmitter) error {
 
 	r := csv.NewReader(file)
 
-	previousGraph, err := emitter.Read()
+	previousGraph, err := importer.ReadCurrentGraph()
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to read previous graph: %v", err)
 	}
 
-	tx := emitter.CreateCompleteGraphTransaction(previousGraph)
+	tx := importer.CreateTransaction(previousGraph)
 
 	header := true
 
@@ -66,8 +68,9 @@ func (cs *CSVSource) Start(emitter *knowledge.GraphEmitter) error {
 
 		tx.Relate(record[1], relationType, record[4])
 	}
-	tx.Commit()
-	return nil
+	_, err = tx.Commit()
+	fmt.Println("CSV data has been sent successfully")
+	return err
 }
 
 func (cs *CSVSource) Stop() error {

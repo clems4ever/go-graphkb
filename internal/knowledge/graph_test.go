@@ -47,6 +47,32 @@ func (s *GraphSuite) TestShouldTestGraphsAreDifferent() {
 	s.Assert().False(g2.Equal(g))
 }
 
+func (s *GraphSuite) TestShouldTestGraphsHasAsset() {
+	g := NewGraph()
+
+	ip1 := g.AddAsset("ip", "127.0.0.1")
+	ip2 := g.AddAsset("ip", "127.0.0.2")
+	g.AddRelation(ip1, "linked", ip2)
+
+	s.Assert().True(g.HasAsset(Asset(ip1)))
+	s.Assert().False(g.HasAsset(Asset{Type: "abc", Key: "abc"}))
+}
+
+func (s *GraphSuite) TestShouldTestGraphsHasRelation() {
+	g := NewGraph()
+
+	ip1 := g.AddAsset("ip", "127.0.0.1")
+	ip2 := g.AddAsset("ip", "127.0.0.2")
+	rel := g.AddRelation(ip1, "linked", ip2)
+
+	s.Assert().True(g.HasRelation(Relation(rel)))
+	s.Assert().False(g.HasRelation(Relation{
+		Type: "test",
+		From: AssetKey{Type: "test", Key: "test"},
+		To:   AssetKey{Type: "test", Key: "test"},
+	}))
+}
+
 func TestGraphSuite(t *testing.T) {
 	suite.Run(t, new(GraphSuite))
 }

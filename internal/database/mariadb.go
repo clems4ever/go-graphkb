@@ -444,7 +444,7 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.G
 }
 
 func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema schema.SchemaGraph) error {
-	b, err := schema.ToJSON()
+	b, err := json.Marshal(schema)
 	if err != nil {
 		return fmt.Errorf("Unable to json encode schema: %v", err)
 	}
@@ -470,7 +470,8 @@ func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.Sch
 	}
 
 	graph := schema.NewSchemaGraph()
-	if err := graph.FromJSON([]byte(rawJson)); err != nil {
+	err := json.Unmarshal([]byte(rawJson), &graph)
+	if err != nil {
 		return schema.NewSchemaGraph(), err
 	}
 

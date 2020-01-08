@@ -2,9 +2,6 @@ package importer
 
 import (
 	"fmt"
-	"log"
-
-	"github.com/clems4ever/go-graphkb/internal/database"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/spf13/viper"
@@ -14,35 +11,24 @@ type ImporterOptions struct {
 	CacheGraph bool
 }
 
-func Start(name string, source sources.Source, options *ImporterOptions) error {
-	dbName := viper.GetString("mariadb.database")
-	if dbName == "" {
-		return fmt.Errorf("Please provide database_name option in your configuration file")
+func Start(source sources.Source, options *ImporterOptions) error {
+	url := viper.GetString("graphkb.url")
+	if url == "" {
+		return fmt.Errorf("Please provide graphkb URL in configuration file")
 	}
-	mariaDatabase := database.NewMariaDB(
-		viper.GetString("mariadb.username"),
-		viper.GetString("mariadb.password"),
-		viper.GetString("mariadb.host"),
-		dbName)
+
+	authToken := viper.GetString("graphkb.auth_token")
+	if authToken == "" {
+		return fmt.Errorf("Please provide a graphkb auth token to communicate with GraphKB")
+	}
 
 	observableSource := sources.NewObservableSource(source)
+	api := knowledge.NewGraphAPI(url, authToken)
+	graphImporter := knowledge.NewGraphImporter(api)
 
-	eventBus := make(chan knowledge.SourceSubGraphUpdates)
-	listener := knowledge.NewSourceListener(mariaDatabase, mariaDatabase)
-
-	closeC := listener.Listen(eventBus)
-
-	if err := mariaDatabase.InitializeSchema(); err != nil {
-		log.Fatal(err)
+	if err := observableSource.Start(graphImporter); err != nil {
+		return fmt.Errorf("Unable to start importer: %v", err)
 	}
-
-	emitter := knowledge.NewGraphEmitter(name, eventBus, mariaDatabase)
-	if err := observableSource.Start(emitter); err != nil {
-		return err
-	}
-
-	close(eventBus)
-	<-closeC
 
 	return nil
 }

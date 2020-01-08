@@ -4,11 +4,11 @@ import "github.com/clems4ever/go-graphkb/internal/schema"
 
 // GraphBinder represent a graph builder which bind assets and relations to graph schema provided by the source
 type GraphBinder struct {
-	graph *SourceGraph
+	graph *Graph
 }
 
 // NewGraphBinder create an instance of graph binder
-func NewGraphBinder(graph *SourceGraph) *GraphBinder {
+func NewGraphBinder(graph *Graph) *GraphBinder {
 	return &GraphBinder{
 		graph: graph,
 	}
