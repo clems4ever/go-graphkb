@@ -1,6 +1,12 @@
 package knowledge
 
-import "github.com/clems4ever/go-graphkb/internal/schema"
+import (
+	"encoding/json"
+
+	"github.com/clems4ever/go-graphkb/internal/schema"
+
+	mapset "github.com/deckarep/golang-set"
+)
 
 // AssetKey represent the key of the asset
 type AssetKey struct {
@@ -31,22 +37,28 @@ type Relation RelationKey
 
 // Graph represent a Graph
 type Graph struct {
-	assets    map[Asset]bool
-	relations map[Relation]bool
+	assets    mapset.Set
+	relations mapset.Set
+}
+
+// GraphJSON is the json representation of a graph
+type GraphJSON struct {
+	Assets    []Asset    `json:"assets"`
+	Relations []Relation `json:"relations"`
 }
 
 // NewGraph create a graph
 func NewGraph() *Graph {
 	return &Graph{
-		assets:    make(map[Asset]bool),
-		relations: make(map[Relation]bool),
+		assets:    mapset.NewSet(),
+		relations: mapset.NewSet(),
 	}
 }
 
 // AddAsset add an asset to the graph
 func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) AssetKey {
 	asset := Asset{Type: assetType, Key: assetKey}
-	g.assets[asset] = true
+	g.assets.Add(asset)
 	return AssetKey(asset)
 }
 
@@ -57,15 +69,15 @@ func (g *Graph) AddRelation(from AssetKey, relationType schema.RelationKeyType, 
 		From: from,
 		To:   to,
 	}
-	g.relations[relation] = true
+	g.relations.Add(relation)
 	return relation
 }
 
 // Assets return the assets in the graph
 func (g *Graph) Assets() []Asset {
 	assets := make([]Asset, 0)
-	for a := range g.assets {
-		assets = append(assets, a)
+	for a := range g.assets.Iter() {
+		assets = append(assets, a.(Asset))
 	}
 	return assets
 }
@@ -73,74 +85,52 @@ func (g *Graph) Assets() []Asset {
 // Relations return the relations in the graph
 func (g *Graph) Relations() []Relation {
 	relations := make([]Relation, 0)
-	for r := range g.relations {
-		relations = append(relations, r)
+	for r := range g.relations.Iter() {
+		relations = append(relations, r.(Relation))
 	}
 	return relations
 }
 
 // HasAsset return true if the asset is in the graph, false otherwise.
 func (g *Graph) HasAsset(asset Asset) bool {
-	_, ok := g.assets[asset]
-	return ok
+	return g.assets.Contains(asset)
 }
 
 // HasRelation return true if the relation is in the graph, false otherwise.
 func (g *Graph) HasRelation(relation Relation) bool {
-	_, ok := g.relations[relation]
-	return ok
+	return g.relations.Contains(relation)
 }
 
 // Merge merge other graph into the current graph
 func (g *Graph) Merge(other *Graph) {
-	for a := range other.assets {
-		g.assets[a] = true
+	for a := range other.assets.Iter() {
+		g.assets.Add(a)
 	}
-	for r := range other.relations {
-		g.relations[r] = true
+	for r := range other.relations.Iter() {
+		g.relations.Add(r)
 	}
 }
 
 // Copy perform a deep copy of the graph
 func (g *Graph) Copy() *Graph {
 	graph := NewGraph()
-	for k, v := range g.assets {
-		graph.assets[k] = v
+	for v := range g.assets.Iter() {
+		graph.assets.Add(v)
 	}
-	for k, v := range g.relations {
-		graph.relations[k] = v
+	for v := range g.relations.Iter() {
+		graph.relations.Add(v)
 	}
 	return graph
 }
 
 // Equal return true if graphs are equal, otherwise return false
 func (g *Graph) Equal(other *Graph) bool {
-	if len(g.assets) != len(other.assets) {
+	if !g.assets.Equal(other.assets) {
 		return false
 	}
 
-	if len(g.relations) != len(other.relations) {
+	if !g.relations.Equal(other.relations) {
 		return false
-	}
-
-	for k, v := range g.assets {
-		v2, found := other.assets[k]
-		if !found {
-			return false
-		}
-		if v != v2 {
-			return false
-		}
-	}
-
-	for k, v := range g.relations {
-		v2, found := other.relations[k]
-		if !found {
-			return false
-		}
-		if v != v2 {
-			return false
-		}
 	}
 	return true
 }
@@ -157,4 +147,39 @@ func (g *Graph) ExtractSchema() schema.SchemaGraph {
 	}
 
 	return sg
+}
+
+func (sg *Graph) MarshalJSON() ([]byte, error) {
+	schemaJson := new(GraphJSON)
+	schemaJson.Assets = []Asset{}
+	schemaJson.Relations = []Relation{}
+
+	for v := range sg.assets.Iter() {
+		schemaJson.Assets = append(schemaJson.Assets, v.(Asset))
+	}
+
+	for e := range sg.relations.Iter() {
+		schemaJson.Relations = append(schemaJson.Relations, e.(Relation))
+	}
+
+	return json.Marshal(schemaJson)
+}
+
+func (sg *Graph) UnmarshalJSON(b []byte) error {
+	j := GraphJSON{}
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+
+	sg.assets = mapset.NewSet()
+	sg.relations = mapset.NewSet()
+
+	for _, v := range j.Assets {
+		sg.assets.Add(v)
+	}
+
+	for _, e := range j.Relations {
+		sg.relations.Add(e)
+	}
+	return nil
 }

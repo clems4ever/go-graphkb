@@ -6,64 +6,50 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
-// GraphUpdateTransaction represent a transaction for updating graph.
-type GraphUpdateTransaction struct {
-	eventBus chan SourceSubGraphUpdates
-
-	source  string
-	Updates GraphUpdatesBulk
+type GraphUpdateRequestBody struct {
+	Updates GraphUpdatesBulk   `json:"updates"`
+	Schema  schema.SchemaGraph `json:"schema"`
 }
 
-// Commit commit the transaction
-func (gut *GraphUpdateTransaction) Commit() {
-	gut.eventBus <- SourceSubGraphUpdates{
-		Updates: gut.Updates,
-		Source:  gut.source,
-	}
-}
+// Transaction represent a transaction generating updates by diffing the provided graph against
+// the previous version.
+type Transaction struct {
+	api *GraphAPI
 
-// CompleteGraphTransaction represent a transaction made of a complete graph. When committed this graph
-// will be diffed against the current version of the graph to generate updates that will be sent to the graph.
-type CompleteGraphTransaction struct {
-	GraphUpdateTransaction
+	currentGraph *Graph
 
-	currentGraph *SourceGraph
-	newGraph     *SourceGraph
-	binder       *GraphBinder
+	// The graph being updated
+	newGraph *Graph
+	binder   *GraphBinder
 
+	// Lock used when binding or relating assets
 	mutex sync.Mutex
 }
 
 // Relate create a relation between two assets
-func (cgt *CompleteGraphTransaction) Relate(from string, relationType schema.RelationType, to string) {
+func (cgt *Transaction) Relate(from string, relationType schema.RelationType, to string) {
 	cgt.mutex.Lock()
 	cgt.binder.Relate(from, relationType, to)
 	cgt.mutex.Unlock()
 }
 
 // Bind bind one asset to an asset type from the schema
-func (cgt *CompleteGraphTransaction) Bind(asset string, assetType schema.AssetType) {
+func (cgt *Transaction) Bind(asset string, assetType schema.AssetType) {
 	cgt.mutex.Lock()
 	cgt.binder.Bind(asset, assetType)
 	cgt.mutex.Unlock()
 }
 
 // Commit commit the transaction and gives ownership to the source for caching.
-func (cgt *CompleteGraphTransaction) Commit() *SourceGraph {
-	var currentGraph *Graph
-	if cgt.currentGraph != nil {
-		currentGraph = cgt.currentGraph.Graph
-	}
-	sg := cgt.newGraph.Graph.ExtractSchema()
+func (cgt *Transaction) Commit() (*Graph, error) {
+	sg := cgt.newGraph.ExtractSchema()
+	bulk := GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
 
-	bulk := GenerateGraphUpdatesBulk(currentGraph, cgt.newGraph.Graph)
-
-	cgt.eventBus <- SourceSubGraphUpdates{
-		Updates: *bulk,
-		Source:  cgt.source,
-		Schema:  sg,
+	if err := cgt.api.UpdateGraph(sg, *bulk); err != nil {
+		return nil, err
 	}
+
 	g := cgt.newGraph
-	cgt.newGraph = NewSourceGraph(cgt.source)
-	return g // give ownership of the transaction graph so that it can be cached if needed
+	cgt.newGraph = NewGraph()
+	return g, nil // give ownership of the transaction graph so that it can be cached if needed
 }

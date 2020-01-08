@@ -107,7 +107,18 @@ func flush(cmd *cobra.Command, args []string) {
 }
 
 func listen(cmd *cobra.Command, args []string) {
-	server.StartServer(Database, Database)
+	eventBus := make(chan knowledge.SourceSubGraphUpdates)
+	listener := knowledge.NewGraphUpdater(Database, Database)
+
+	listener.Listen(eventBus)
+
+	if err := Database.InitializeSchema(); err != nil {
+		log.Fatal(err)
+	}
+
+	server.StartServer(Database, Database, eventBus)
+
+	close(eventBus)
 }
 
 func read(cmd *cobra.Command, args []string) {

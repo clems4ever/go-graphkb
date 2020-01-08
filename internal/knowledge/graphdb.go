@@ -37,24 +37,6 @@ type Cursor interface {
 	Close() error
 }
 
-// EmptyCursor represent a cursor with no result
-type EmptyCursor struct{}
-
-// HasMore always return false in case of empty cursor
-func (ec *EmptyCursor) HasMore() bool {
-	return false
-}
-
-// Read read the cursor (should not be called in case of empty cursor)
-func (ec *EmptyCursor) Read(ctx context.Context, doc interface{}) error {
-	return fmt.Errorf("Empty cursor cannot be read")
-}
-
-// Close closes the cursor
-func (ec *EmptyCursor) Close() error {
-	return nil
-}
-
 type AssetWithID struct {
 	ID    string `json:"_id"`
 	Asset `json:",inline"`

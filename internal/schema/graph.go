@@ -82,7 +82,7 @@ func (sg *SchemaGraph) Equal(other SchemaGraph) bool {
 	return true
 }
 
-func (sg *SchemaGraph) ToJSON() ([]byte, error) {
+func (sg *SchemaGraph) MarshalJSON() ([]byte, error) {
 	schemaJson := new(SchemaGraphJSON)
 	schemaJson.Vertices = []AssetType{}
 	schemaJson.Edges = []RelationType{}
@@ -100,7 +100,7 @@ func (sg *SchemaGraph) ToJSON() ([]byte, error) {
 	return json.Marshal(schemaJson)
 }
 
-func (sg *SchemaGraph) FromJSON(b []byte) error {
+func (sg *SchemaGraph) UnmarshalJSON(b []byte) error {
 	j := SchemaGraphJSON{}
 	if err := json.Unmarshal(b, &j); err != nil {
 		return err

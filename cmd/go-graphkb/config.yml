@@ -7,5 +7,4 @@ mariadb:
   database: graphkb
 
 sources:
-  csv:
-    data: ./examples/example-data.csv
+  csv-employees: token_auth_for_csv_importer

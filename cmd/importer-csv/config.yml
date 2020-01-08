@@ -1,0 +1,5 @@
+graphkb:
+  url: "http://localhost:8090"
+  auth_token: "token_auth_for_csv_importer"
+
+path: "../../examples/example-data.csv"

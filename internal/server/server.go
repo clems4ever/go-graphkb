@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,7 +19,7 @@ import (
 )
 
 func replyWithSourceGraph(w http.ResponseWriter, sg *schema.SchemaGraph) {
-	responseJSON, err := sg.ToJSON()
+	responseJSON, err := json.Marshal(sg)
 	if err != nil {
 		replyWithInternalError(w, err)
 		return
@@ -35,6 +36,14 @@ func replyWithInternalError(w http.ResponseWriter, err error) {
 	_, werr := w.Write([]byte(err.Error()))
 	if werr != nil {
 		fmt.Println(err)
+	}
+}
+
+func replyWithUnauthorized(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusUnauthorized)
+	_, werr := w.Write([]byte("Unauthorized"))
+	if werr != nil {
+		fmt.Println(werr)
 	}
 }
 
@@ -61,6 +70,7 @@ func getSourceGraph(db schema.Persistor) http.HandlerFunc {
 		for _, sname := range sourceNames {
 			if !utils.IsStringInSlice(sname, availableSourceNames) {
 				w.WriteHeader(http.StatusBadRequest)
+				fmt.Println("Source is not available")
 				return
 			}
 			g, err := db.LoadSchema(context.Background(), sname)
@@ -74,15 +84,9 @@ func getSourceGraph(db schema.Persistor) http.HandlerFunc {
 	}
 }
 
-func listSources(db schema.Persistor) http.HandlerFunc {
+func listSources(db schema.Persistor, sourceNames []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sourceNames, err := db.ListSources(r.Context())
-		if err != nil {
-			replyWithInternalError(w, err)
-			return
-		}
-
-		err = json.NewEncoder(w).Encode(sourceNames)
+		err := json.NewEncoder(w).Encode(sourceNames)
 		if err != nil {
 			replyWithInternalError(w, err)
 		}
@@ -145,6 +149,7 @@ func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 
 		if requestBody.Query == "" {
 			w.WriteHeader(http.StatusBadRequest)
+			fmt.Println("Empty query parameter")
 			_, err = w.Write([]byte("Empty query parameter"))
 			if err != nil {
 				replyWithInternalError(w, err)
@@ -219,6 +224,93 @@ func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 	}
 }
 
+type GraphSnapshotRequestBody struct {
+	Token string `json:"token"`
+}
+
+func isTokenValid(r *http.Request) (bool, string) {
+	token, ok := r.URL.Query()["token"]
+
+	if !ok || len(token) != 1 {
+		return false, ""
+	}
+
+	sourceToToken := viper.GetStringMap("sources")
+
+	found := false
+	sourceName := ""
+
+	for sn, t := range sourceToToken {
+		if v, ok := t.(string); ok && v == token[0] {
+			found = true
+			sourceName = sn
+			break
+		}
+	}
+
+	if !found {
+		return false, ""
+	}
+
+	return true, sourceName
+}
+
+func getGraphRead(graphDB knowledge.GraphDB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ok, source := isTokenValid(r)
+		if !ok {
+			replyWithUnauthorized(w)
+			return
+		}
+
+		g := knowledge.NewGraph()
+		if err := graphDB.ReadGraph(source, g); err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		gJson, err := json.Marshal(g)
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		if _, err := w.Write(gJson); err != nil {
+			replyWithInternalError(w, err)
+		}
+	}
+}
+
+func postGraphUpdates(graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ok, source := isTokenValid(r)
+		if !ok {
+			replyWithUnauthorized(w)
+			return
+		}
+
+		requestBody := knowledge.GraphUpdateRequestBody{}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		// TODO(c.michaud): verify compatibility of the schema with graph updates
+
+		graphUpdatesC <- knowledge.SourceSubGraphUpdates{
+			Updates: requestBody.Updates,
+			Schema:  requestBody.Schema,
+			Source:  source,
+		}
+
+		_, err := bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+	}
+}
+
 // Secret is the secret provider function for basic auth
 func Secret(user, realm string) string {
 	if user == "admin" {
@@ -228,10 +320,18 @@ func Secret(user, realm string) string {
 }
 
 // StartServer start the web server
-func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor) {
+func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
+	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
+
+	sourcesToToken := viper.GetStringMap("sources")
+	sources := []string{}
+	for s := range sourcesToToken {
+		sources = append(sources, s)
+	}
+
 	r := mux.NewRouter()
 
-	listSourcesHandler := listSources(schemaPersistor)
+	listSourcesHandler := listSources(schemaPersistor, sources)
 	getSourceGraphHandler := getSourceGraph(schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database)
@@ -254,6 +354,10 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor) {
 	r.HandleFunc("/api/sources", listSourcesHandler).Methods("GET")
 	r.HandleFunc("/api/schema", getSourceGraphHandler).Methods("GET")
 	r.HandleFunc("/api/database", getDatabaseDetailsHandler).Methods("GET")
+
+	r.HandleFunc("/api/graph/read", getGraphRead(database)).Methods("GET")
+	r.HandleFunc("/api/graph/update", postGraphUpdates(graphUpdatesC)).Methods("POST")
+
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 

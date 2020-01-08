@@ -2,10 +2,10 @@ package knowledge
 
 // GraphUpdatesBulk represent a bulk of asset and relation updates to perform on the graph
 type GraphUpdatesBulk struct {
-	AssetUpserts     []Asset
-	AssetRemovals    []Asset
-	RelationUpserts  []Relation
-	RelationRemovals []Relation
+	AssetUpserts     []Asset    `json:"asset_upserts"`
+	AssetRemovals    []Asset    `json:"asset_removals"`
+	RelationUpserts  []Relation `json:"relation_upserts"`
+	RelationRemovals []Relation `json:"relation_removals"`
 }
 
 // NewGraphUpdatesBulk create an instance of graph updates
