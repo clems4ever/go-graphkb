@@ -2,6 +2,8 @@ package knowledge
 
 import (
 	"sync"
+
+	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
 // GraphUpdateTransaction represent a transaction for updating graph.
@@ -33,30 +35,33 @@ type CompleteGraphTransaction struct {
 }
 
 // Relate create a relation between two assets
-func (cgt *CompleteGraphTransaction) Relate(from string, relationType RelationType, to string) {
+func (cgt *CompleteGraphTransaction) Relate(from string, relationType schema.RelationType, to string) {
 	cgt.mutex.Lock()
 	cgt.binder.Relate(from, relationType, to)
 	cgt.mutex.Unlock()
 }
 
 // Bind bind one asset to an asset type from the schema
-func (cgt *CompleteGraphTransaction) Bind(asset string, assetType AssetType) {
+func (cgt *CompleteGraphTransaction) Bind(asset string, assetType schema.AssetType) {
 	cgt.mutex.Lock()
 	cgt.binder.Bind(asset, assetType)
 	cgt.mutex.Unlock()
 }
 
-// Commit commit the transaction
+// Commit commit the transaction and gives ownership to the source for caching.
 func (cgt *CompleteGraphTransaction) Commit() *SourceGraph {
 	var currentGraph *Graph
 	if cgt.currentGraph != nil {
 		currentGraph = cgt.currentGraph.Graph
 	}
+	sg := cgt.newGraph.Graph.ExtractSchema()
+
 	bulk := GenerateGraphUpdatesBulk(currentGraph, cgt.newGraph.Graph)
 
 	cgt.eventBus <- SourceSubGraphUpdates{
 		Updates: *bulk,
 		Source:  cgt.source,
+		Schema:  sg,
 	}
 	g := cgt.newGraph
 	cgt.newGraph = NewSourceGraph(cgt.source)

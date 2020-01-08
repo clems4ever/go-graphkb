@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/query"
+	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
 type GraphQueryResult struct {
@@ -39,11 +40,6 @@ type Cursor interface {
 // EmptyCursor represent a cursor with no result
 type EmptyCursor struct{}
 
-// Count always return 0 in case of empty cursor
-func (ec *EmptyCursor) Count() int64 {
-	return 0
-}
-
 // HasMore always return false in case of empty cursor
 func (ec *EmptyCursor) HasMore() bool {
 	return false
@@ -69,10 +65,10 @@ func (a AssetWithID) String() string {
 }
 
 type RelationWithID struct {
-	ID   string          `json:"_id"`
-	From string          `json:"from_id"`
-	To   string          `json:"to_id"`
-	Type RelationKeyType `json:"type"`
+	ID   string                 `json:"_id"`
+	From string                 `json:"from_id"`
+	To   string                 `json:"to_id"`
+	Type schema.RelationKeyType `json:"type"`
 }
 
 func (r RelationWithID) String() string {

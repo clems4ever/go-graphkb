@@ -8,5 +8,4 @@ mariadb:
 
 sources:
   csv:
-    schema: ./examples/example-schema.csv
     data: ./examples/example-data.csv

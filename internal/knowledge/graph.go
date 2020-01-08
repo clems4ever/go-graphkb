@@ -1,21 +1,18 @@
 package knowledge
 
-import (
-	"fmt"
-	"log"
-)
+import "github.com/clems4ever/go-graphkb/internal/schema"
 
 // AssetKey represent the key of the asset
 type AssetKey struct {
-	Type AssetType `json:"type"`
-	Key  string    `json:"key"`
+	Type schema.AssetType `json:"type"`
+	Key  string           `json:"key"`
 }
 
 // Asset represent the asset with details
 type Asset AssetKey
 
 // NewAsset create a new asset from type and key
-func NewAsset(assetType AssetType, assetKey string) Asset {
+func NewAsset(assetType schema.AssetType, assetKey string) Asset {
 	return Asset{
 		Type: assetType,
 		Key:  assetKey,
@@ -24,9 +21,9 @@ func NewAsset(assetType AssetType, assetKey string) Asset {
 
 // RelationKey a relation key of the KB
 type RelationKey struct {
-	Type RelationKeyType `json:"type"`
-	From AssetKey        `json:"from"`
-	To   AssetKey        `json:"to"`
+	Type schema.RelationKeyType `json:"type"`
+	From AssetKey               `json:"from"`
+	To   AssetKey               `json:"to"`
 }
 
 // Relation represent the relation with details
@@ -47,20 +44,14 @@ func NewGraph() *Graph {
 }
 
 // AddAsset add an asset to the graph
-func (g *Graph) AddAsset(assetType AssetType, assetKey string) AssetKey {
-	if !SchemaRegistrySingleton.AssetExists(assetType) {
-		log.Fatal(fmt.Errorf("Asset type '%s' does not exist in schema registry. Cannot add asset value '%s'", assetType, assetKey))
-	}
+func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) AssetKey {
 	asset := Asset{Type: assetType, Key: assetKey}
 	g.assets[asset] = true
 	return AssetKey(asset)
 }
 
 // AddRelation add a relation to the graph
-func (g *Graph) AddRelation(from AssetKey, relationType RelationKeyType, to AssetKey) Relation {
-	if !SchemaRegistrySingleton.RelationExists(relationType) {
-		log.Fatal(fmt.Errorf("Relation type '%s' does not exist in schema registry", relationType))
-	}
+func (g *Graph) AddRelation(from AssetKey, relationType schema.RelationKeyType, to AssetKey) Relation {
 	relation := Relation{
 		Type: relationType,
 		From: from,
@@ -152,4 +143,18 @@ func (g *Graph) Equal(other *Graph) bool {
 		}
 	}
 	return true
+}
+
+func (g *Graph) ExtractSchema() schema.SchemaGraph {
+	sg := schema.NewSchemaGraph()
+
+	for _, a := range g.Assets() {
+		sg.AddAsset(string(a.Type))
+	}
+
+	for _, r := range g.Relations() {
+		sg.AddRelation(r.From.Type, string(r.Type), r.To.Type)
+	}
+
+	return sg
 }

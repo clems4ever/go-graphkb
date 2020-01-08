@@ -3,19 +3,12 @@ package knowledge
 import (
 	"testing"
 
+	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/stretchr/testify/suite"
 )
 
 type SourceGraphSuite struct {
 	suite.Suite
-}
-
-func (s *SourceGraphSuite) SetupSuite() {
-	SchemaRegistrySingleton = *NewSchemaRegistry()
-	SchemaRegistrySingleton.AddAssetType("source")
-	SchemaRegistrySingleton.AddRelationType("observed")
-	SchemaRegistrySingleton.AddAssetType("ip")
-	SchemaRegistrySingleton.AddRelationType("linked")
 }
 
 func (s *SourceGraphSuite) TestShouldHaveSourceInEmptyGraph() {
@@ -37,13 +30,13 @@ func (s *SourceGraphSuite) TestShouldHaveObservedLinksTowardAllAssets() {
 	linkRelation := sourceGraph.AddRelation(ip1, "linked", ip2)
 
 	sourceObservedIP1Relation := Relation{
-		Type: RelationKeyType("observed"),
+		Type: schema.RelationKeyType("observed"),
 		From: AssetKey(source),
 		To:   ip1,
 	}
 
 	sourceObservedIP2Relation := Relation{
-		Type: RelationKeyType("observed"),
+		Type: schema.RelationKeyType("observed"),
 		From: AssetKey(source),
 		To:   ip2,
 	}

@@ -14,26 +14,6 @@ func NewObservableSource(s Source) ObservableSource {
 	}
 }
 
-func (os *ObservableSource) Name() string {
-	return os.source.Name()
-}
-
-func (os *ObservableSource) Graph() (*knowledge.SchemaGraph, error) {
-	sg, err := os.source.Graph()
-	if err != nil {
-		return nil, err
-	}
-
-	source := sg.AddAsset("source")
-	for _, a := range sg.Assets() {
-		if a == source {
-			continue
-		}
-		sg.AddRelation(source, "observed", a)
-	}
-	return sg, nil
-}
-
 func (os *ObservableSource) Start(e *knowledge.GraphEmitter) error {
 	return os.source.Start(e)
 }
