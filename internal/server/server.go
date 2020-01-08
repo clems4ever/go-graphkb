@@ -364,7 +364,8 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
 	bindInterface := fmt.Sprintf(":%d", viper.GetInt32("port"))
 	fmt.Printf("Listening on %s\n", bindInterface)
 
-	err := http.ListenAndServe(bindInterface, r)
+	err := http.ListenAndServeTLS(bindInterface, viper.GetString("tls_cert"),
+		viper.GetString("tls_key"), r)
 	if err != nil {
 		log.Fatal(err)
 	}
