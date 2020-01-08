@@ -2,11 +2,14 @@ package knowledge
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/clems4ever/go-graphkb/internal/schema"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/spf13/viper"
 )
 
 // GraphEmitter an emitter of full source graph
@@ -14,13 +17,21 @@ type GraphAPI struct {
 	// GraphKB URL and auth token
 	url       string
 	authToken string
+
+	client *http.Client
 }
 
 // NewGraphEmitter create an emitter of graph
 func NewGraphAPI(url string, authToken string) *GraphAPI {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: viper.GetBool("graphkb.skip_verify")},
+	}
+	client := &http.Client{Transport: tr}
+
 	return &GraphAPI{
 		url:       url,
 		authToken: authToken,
+		client:    client,
 	}
 }
 
@@ -33,7 +44,7 @@ func (gapi *GraphAPI) ReadCurrentGraph() (*Graph, error) {
 		return nil, err
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := gapi.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +83,7 @@ func (gapi *GraphAPI) UpdateGraph(sg schema.SchemaGraph, updates GraphUpdatesBul
 		return err
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := gapi.client.Do(req)
 	if err != nil {
 		return err
 	}

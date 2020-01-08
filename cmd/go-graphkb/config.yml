@@ -1,4 +1,6 @@
 port: 8090
+tls_key: keys/server.key
+tls_cert: keys/server.crt
 
 mariadb:
   username: graphkb
