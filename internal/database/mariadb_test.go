@@ -1,10 +1,11 @@
 // +build integration
 
-package knowledge
+package database
 
 import (
 	"testing"
 
+	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,13 +16,6 @@ type MariaDBSuite struct {
 }
 
 func (s *MariaDBSuite) SetupSuite() {
-	SchemaRegistrySingleton = *NewSchemaRegistry()
-	SchemaRegistrySingleton.AddAssetType("source")
-	SchemaRegistrySingleton.AddRelationType("observed")
-	SchemaRegistrySingleton.AddAssetType("ip")
-	SchemaRegistrySingleton.AddAssetType("hostname")
-	SchemaRegistrySingleton.AddRelationType("linked")
-
 	s.database = NewMariaDB("root", "example", "", "test_db")
 }
 
@@ -34,12 +28,12 @@ func (s *MariaDBSuite) SetupTest() {
 }
 
 func (s *MariaDBSuite) TestShouldRemoveAssetIfThereIsNoMoreEdge() {
-	sourceGraph1 := NewSourceGraph("mysource")
+	sourceGraph1 := knowledge.NewSourceGraph("mysource")
 	ip1 := sourceGraph1.AddAsset("ip", "127.0.0.1")
 	ip2 := sourceGraph1.AddAsset("ip", "192.168.0.1")
 	sourceGraph1.AddRelation(ip1, "linked", ip2)
 
-	bulkCreation := GenerateGraphUpdatesBulk(
+	bulkCreation := knowledge.GenerateGraphUpdatesBulk(
 		nil,
 		sourceGraph1.Graph)
 
@@ -55,9 +49,9 @@ func (s *MariaDBSuite) TestShouldRemoveAssetIfThereIsNoMoreEdge() {
 	s.Require().Equal(int64(3), relationCount)
 
 	// Create new graph which is a subset of graph 1
-	sourceGraph2 := NewSourceGraph("mysource")
+	sourceGraph2 := knowledge.NewSourceGraph("mysource")
 	sourceGraph2.AddAsset("ip", "127.0.0.1")
-	bulkRemoval := GenerateGraphUpdatesBulk(sourceGraph1.Graph, sourceGraph2.Graph)
+	bulkRemoval := knowledge.GenerateGraphUpdatesBulk(sourceGraph1.Graph, sourceGraph2.Graph)
 
 	err = s.database.UpdateGraph("mysource", bulkRemoval)
 	s.Require().NoError(err)
@@ -72,7 +66,7 @@ func (s *MariaDBSuite) TestShouldRemoveAssetIfThereIsNoMoreEdge() {
 }
 
 func (s *MariaDBSuite) TestShouldWriteAndReadBackGraph() {
-	sourceGraph := NewSourceGraph("mysource")
+	sourceGraph := knowledge.NewSourceGraph("mysource")
 	ip1 := sourceGraph.AddAsset("ip", "127.0.0.1")
 	ip2 := sourceGraph.AddAsset("ip", "192.168.0.1")
 	sourceGraph.AddRelation(ip1, "linked", ip2)
@@ -84,12 +78,12 @@ func (s *MariaDBSuite) TestShouldWriteAndReadBackGraph() {
 	s.Assert().Len(sourceGraph.Assets(), 5)
 	s.Assert().Len(sourceGraph.Relations(), 7)
 
-	bulk := GenerateGraphUpdatesBulk(nil, sourceGraph.Graph)
+	bulk := knowledge.GenerateGraphUpdatesBulk(nil, sourceGraph.Graph)
 
 	err := s.database.UpdateGraph("mysource", bulk)
 	s.Require().NoError(err)
 
-	newGraph := NewGraph()
+	newGraph := knowledge.NewGraph()
 	err = s.database.ReadGraph("mysource", newGraph)
 	s.Require().NoError(err)
 

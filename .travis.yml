@@ -6,3 +6,4 @@ go:
 script:
 - go test -v ./...
 - go build -o go-graphkb cmd/go-graphkb/main.go
+- go build -o source-csv cmd/source-csv/main.go

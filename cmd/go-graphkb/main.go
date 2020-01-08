@@ -4,23 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 
+	"github.com/clems4ever/go-graphkb/internal/database"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/server"
-	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// Sources repository of sources
-var Sources []sources.Source
-
 // Database the selected database
-var Database knowledge.GraphDB
+var Database *database.MariaDB
 
 // ConfigPath string
 var ConfigPath string
@@ -32,12 +26,6 @@ func init() {
 func main() {
 	rootCmd := &cobra.Command{
 		Use: "go-graphkb [opts]",
-	}
-
-	startCmd := &cobra.Command{
-		Use:  "start",
-		Run:  start,
-		Args: cobra.MaximumNArgs(1),
 	}
 
 	listenCmd := &cobra.Command{
@@ -61,12 +49,6 @@ func main() {
 		Args: cobra.ExactArgs(1),
 	}
 
-	sourceCmd := &cobra.Command{
-		Use:  "source [source]",
-		Run:  getSource,
-		Args: cobra.ExactArgs(1),
-	}
-
 	queryCmd := &cobra.Command{
 		Use:  "query [query]",
 		Run:  queryFunc,
@@ -77,7 +59,7 @@ func main() {
 
 	cobra.OnInitialize(onInit)
 
-	rootCmd.AddCommand(startCmd, cleanCmd, sourceCmd, listenCmd, countCmd, readCmd, queryCmd)
+	rootCmd.AddCommand(cleanCmd, listenCmd, countCmd, readCmd, queryCmd)
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
@@ -97,75 +79,11 @@ func onInit() {
 	if dbName == "" {
 		log.Fatal("Please provide database_name option in your configuration file")
 	}
-	Database = knowledge.NewMariaDB(
+	Database = database.NewMariaDB(
 		viper.GetString("mariadb.username"),
 		viper.GetString("mariadb.password"),
 		viper.GetString("mariadb.host"),
 		dbName)
-
-	Sources = []sources.Source{
-		sources.NewCSVSource(),
-	}
-
-	for _, s := range Sources {
-		sources.Registry.Add(s)
-		g, err := s.Graph()
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, a := range g.Assets() {
-			knowledge.SchemaRegistrySingleton.AddAssetType(a)
-		}
-
-		for _, r := range g.Relations() {
-			knowledge.SchemaRegistrySingleton.AddRelationType(r.Type)
-		}
-	}
-}
-
-func start(cmd *cobra.Command, args []string) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	eventBus := make(chan knowledge.SourceSubGraphUpdates)
-	listener := knowledge.NewSourceListener(Database)
-
-	if err := Database.InitializeSchema(); err != nil {
-		log.Fatal(err)
-	}
-
-	// Start kb listening
-	go listener.Listen(eventBus)
-
-	var selectedSources []sources.Source
-
-	// if argument is provided, we select the source
-	if len(args) == 1 {
-		for _, s := range Sources {
-			if s.Name() == args[0] {
-				selectedSources = []sources.Source{s}
-				break
-			}
-		}
-		if len(selectedSources) == 0 {
-			log.Fatal(fmt.Sprintf("Unable to find source with name %s", args[0]))
-		}
-
-	} else {
-		selectedSources = Sources
-	}
-
-	for _, source := range selectedSources {
-		emitter := knowledge.NewGraphEmitter(source.Name(), eventBus, Database)
-		err := source.Start(emitter)
-		if err != nil {
-			fmt.Printf("[ERROR] %s\n", err)
-		}
-	}
-
-	wg.Wait()
 }
 
 func count(cmd *cobra.Command, args []string) {
@@ -188,53 +106,8 @@ func flush(cmd *cobra.Command, args []string) {
 	fmt.Println("Successul flush")
 }
 
-func getSource(cmd *cobra.Command, args []string) {
-	sourceName := args[0]
-
-	selectedSources := []sources.Source{}
-	for _, s := range Sources {
-		if s.Name() == sourceName {
-			selectedSources = append(selectedSources, s)
-		}
-	}
-
-	assets := make(map[string]bool)
-	relations := make(map[string]bool)
-	for _, s := range selectedSources {
-		g, err := s.Graph()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		for _, a := range g.Assets() {
-			assets[string(a)] = true
-		}
-
-		for _, r := range g.Relations() {
-			t := fmt.Sprintf("%s_%s_%s", r.FromType, r.Type, r.ToType)
-			relations[t] = true
-		}
-	}
-
-	assetsSlice := make([]string, 0)
-	relationsSlice := make([]string, 0)
-	for a := range assets {
-		assetsSlice = append(assetsSlice, fmt.Sprintf("\t%s", a))
-	}
-	for r := range relations {
-		relationsSlice = append(relationsSlice, fmt.Sprintf("\t%s", r))
-	}
-
-	sort.Strings(assetsSlice)
-	sort.Strings(relationsSlice)
-
-	fmt.Printf("assets -> \n%s\nrelations -> \n%s\n",
-		strings.Join(assetsSlice, "\n"),
-		strings.Join(relationsSlice, "\n"))
-}
-
 func listen(cmd *cobra.Command, args []string) {
-	server.StartServer(Database)
+	server.StartServer(Database, Database)
 }
 
 func read(cmd *cobra.Command, args []string) {

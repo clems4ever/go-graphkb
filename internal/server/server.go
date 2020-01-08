@@ -11,24 +11,21 @@ import (
 
 	auth "github.com/abbot/go-http-auth"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
-	"github.com/clems4ever/go-graphkb/internal/sources"
+	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 )
 
-type response struct {
-	Vertices []knowledge.AssetType    `json:"vertices"`
-	Edges    []knowledge.RelationType `json:"edges"`
-}
-
-func replyWithSourceGraph(w http.ResponseWriter, sg *knowledge.SchemaGraph) {
-	responseJSON := response{
-		Vertices: sg.Assets(),
-		Edges:    sg.Relations(),
-	}
-	err := json.NewEncoder(w).Encode(responseJSON)
+func replyWithSourceGraph(w http.ResponseWriter, sg *schema.SchemaGraph) {
+	responseJSON, err := sg.ToJSON()
 	if err != nil {
-		fmt.Println(err)
+		replyWithInternalError(w, err)
+		return
+	}
+
+	if _, err := w.Write(responseJSON); err != nil {
+		replyWithInternalError(w, err)
 	}
 }
 
@@ -41,41 +38,58 @@ func replyWithInternalError(w http.ResponseWriter, err error) {
 	}
 }
 
-func getSourceGraph(w http.ResponseWriter, r *http.Request) {
-	sourceNames := sources.Registry.GetAllNames()
-	sourcesParams, ok := r.URL.Query()["sources"]
-
-	if ok && len(sourcesParams) > 0 {
-		sourceNames = make([]string, 0)
-		for _, s := range sourcesParams {
-			sourceNames = append(sourceNames, strings.Split(s, ",")...)
+func getSourceGraph(db schema.Persistor) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		availableSourceNames, err := db.ListSources(context.Background())
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
 		}
-	}
+		sourcesParams, ok := r.URL.Query()["sources"]
+		var sourceNames []string
 
-	sg := knowledge.NewSchemaGraph()
-	for _, sname := range sourceNames {
-		if sources.Registry.Exist(sname) {
-			s := sources.Registry.Get(sname)
-			g, err := s.Graph()
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+		if ok && len(sourcesParams) > 0 {
+			sourceNames = make([]string, 0)
+			for _, s := range sourcesParams {
+				sourceNames = append(sourceNames, strings.Split(s, ",")...)
+			}
+		} else {
+			sourceNames = availableSourceNames
+		}
+
+		sg := schema.NewSchemaGraph()
+		for _, sname := range sourceNames {
+			if !utils.IsStringInSlice(sname, availableSourceNames) {
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			sg.Merge(*g)
+			g, err := db.LoadSchema(context.Background(), sname)
+			if err != nil {
+				replyWithInternalError(w, err)
+				return
+			}
+			sg.Merge(g)
+		}
+		replyWithSourceGraph(w, &sg)
+	}
+}
+
+func listSources(db schema.Persistor) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sourceNames, err := db.ListSources(r.Context())
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		err = json.NewEncoder(w).Encode(sourceNames)
+		if err != nil {
+			replyWithInternalError(w, err)
 		}
 	}
-	replyWithSourceGraph(w, &sg)
 }
 
-func listSources(w http.ResponseWriter, r *http.Request) {
-	sourceNames := sources.Registry.GetAllNames()
-	err := json.NewEncoder(w).Encode(sourceNames)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-func getDatabaseDetails(database knowledge.GraphDB) func(w http.ResponseWriter, r *http.Request) {
+func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type DatabaseDetailsResponse struct {
 			AssetsCount    int64 `json:"assets_count"`
@@ -105,7 +119,7 @@ func getDatabaseDetails(database knowledge.GraphDB) func(w http.ResponseWriter, 
 	}
 }
 
-func postQuery(database knowledge.GraphDB) func(w http.ResponseWriter, r *http.Request) {
+func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type QueryRequestBody struct {
 			Query string `json:"q"`
@@ -214,11 +228,11 @@ func Secret(user, realm string) string {
 }
 
 // StartServer start the web server
-func StartServer(database knowledge.GraphDB) {
+func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor) {
 	r := mux.NewRouter()
 
-	listSourcesHandler := listSources
-	getSourceGraphHandler := getSourceGraph
+	listSourcesHandler := listSources(schemaPersistor)
+	getSourceGraphHandler := getSourceGraph(schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database)
 

@@ -10,13 +10,6 @@ type SourceUpdatesSuite struct {
 	suite.Suite
 }
 
-func (s *SourceUpdatesSuite) SetupSuite() {
-	SchemaRegistrySingleton = *NewSchemaRegistry()
-	SchemaRegistrySingleton.AddAssetType("ip")
-	SchemaRegistrySingleton.AddAssetType("hostname")
-	SchemaRegistrySingleton.AddRelationType("linked")
-}
-
 func (s *SourceUpdatesSuite) TestShouldUpsertForCreatingGraph() {
 	g := NewGraph()
 	ip1 := g.AddAsset("ip", "127.0.0.1")

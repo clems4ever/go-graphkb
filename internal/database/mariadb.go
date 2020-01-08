@@ -1,4 +1,4 @@
-package knowledge
+package database
 
 import (
 	"context"
@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/cheggaaa/pb"
+	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/query"
+	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/golang-collections/go-datastructures/queue"
@@ -27,8 +29,8 @@ type MariaDB struct {
 
 // SourceRelation represent a relation coming from a source
 type SourceRelation struct {
-	Relation `json:",inline"`
-	Source   string `json:"source"`
+	knowledge.Relation `json:",inline"`
+	Source             string `json:"source"`
 }
 
 // NewMariaDB create an instance of mariadb
@@ -56,7 +58,12 @@ PARTITION BY KEY (type) PARTITIONS 20`)
 
 	// type must be part of the primary key to be a partition key
 	_, err = m.db.QueryContext(context.Background(), `
-CREATE TABLE IF NOT EXISTS relations (id VARCHAR(64) NOT NULL, from_id VARCHAR(64) NOT NULL, to_id VARCHAR(64) NOT NULL, type VARCHAR(64) NOT NULL, source VARCHAR(64) NOT NULL,
+CREATE TABLE IF NOT EXISTS relations (
+	id VARCHAR(64) NOT NULL,
+	from_id VARCHAR(64) NOT NULL,
+	to_id VARCHAR(64) NOT NULL,
+	type VARCHAR(64) NOT NULL,
+	source VARCHAR(64) NOT NULL,
 CONSTRAINT pk_relation PRIMARY KEY (id, type),
 INDEX type_idx (type),
 INDEX from_idx (from_id),
@@ -65,6 +72,18 @@ INDEX left_relation_idx (from_id, type),
 INDEX right_relation_idx (to_id, type),
 INDEX full_relation_idx (type, from_id, to_id))
 PARTITION BY KEY (type) PARTITIONS 20`)
+	if err != nil {
+		return err
+	}
+
+	// Create the table storing the schema graphs
+	_, err = m.db.QueryContext(context.Background(), `
+CREATE TABLE IF NOT EXISTS graph_schema (
+	id INTEGER AUTO_INCREMENT NOT NULL,
+	source_name VARCHAR(64) NOT NULL,
+	graph TEXT NOT NULL,
+	timestamp TIMESTAMP,
+CONSTRAINT pk_schema PRIMARY KEY (id))`)
 	if err != nil {
 		return err
 	}
@@ -102,7 +121,7 @@ func isUnknownTableError(err error) bool {
 	return ok && driverErr.Number == 1051
 }
 
-func (m *MariaDB) upsertAssets(assets []Asset, hasher *Hasher) (int64, error) {
+func (m *MariaDB) upsertAssets(assets []knowledge.Asset, hasher *Hasher) (int64, error) {
 	if len(assets) == 0 {
 		return 0, nil
 	}
@@ -122,8 +141,8 @@ func (m *MariaDB) upsertAssets(assets []Asset, hasher *Hasher) (int64, error) {
 			log.Fatal(fmt.Errorf("Unable to prepare asset insertion query: %v", err))
 		}
 		for _, aC := range assetChunk {
-			a := aC.(Asset)
-			_, err = q.ExecContext(context.Background(), hasher.Hash(AssetKey(a)), a.Type, a.Key)
+			a := aC.(knowledge.Asset)
+			_, err = q.ExecContext(context.Background(), hasher.Hash(knowledge.AssetKey(a)), a.Type, a.Key)
 			if err != nil {
 				if isDuplicateEntryError(err) {
 					bar.Increment()
@@ -146,7 +165,7 @@ func (m *MariaDB) upsertAssets(assets []Asset, hasher *Hasher) (int64, error) {
 	return insertedCount, nil
 }
 
-func (m *MariaDB) upsertRelations(source string, relations []Relation, hasher *Hasher) (int64, error) {
+func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation, hasher *Hasher) (int64, error) {
 	if len(relations) == 0 {
 		return 0, nil
 	}
@@ -170,7 +189,7 @@ func (m *MariaDB) upsertRelations(source string, relations []Relation, hasher *H
 		}
 
 		for _, rC := range relationChunk {
-			r := rC.(Relation)
+			r := rC.(knowledge.Relation)
 			rel := SourceRelation{
 				Relation: r,
 				Source:   source,
@@ -197,7 +216,7 @@ func (m *MariaDB) upsertRelations(source string, relations []Relation, hasher *H
 	return insertedCount, nil
 }
 
-func (m *MariaDB) removeRelations(source string, relations []Relation, hasher *Hasher) (int64, error) {
+func (m *MariaDB) removeRelations(source string, relations []knowledge.Relation, hasher *Hasher) (int64, error) {
 	if len(relations) == 0 {
 		return 0, nil
 	}
@@ -240,7 +259,7 @@ func (m *MariaDB) removeRelations(source string, relations []Relation, hasher *H
 	return removedCount, err
 }
 
-func (m *MariaDB) removeAssets(source string, assets []Asset, hasher *Hasher) (int64, error) {
+func (m *MariaDB) removeAssets(source string, assets []knowledge.Asset, hasher *Hasher) (int64, error) {
 	if len(assets) == 0 {
 		return 0, nil
 	}
@@ -260,7 +279,7 @@ func (m *MariaDB) removeAssets(source string, assets []Asset, hasher *Hasher) (i
 	bar := pb.StartNew(len(assets))
 	removedCount := int64(0)
 	for _, a := range assets {
-		h := hasher.Hash(AssetKey(a))
+		h := hasher.Hash(knowledge.AssetKey(a))
 		_, err = stmt.ExecContext(context.Background(), h, h, h, source)
 		if err != nil {
 			return 0, fmt.Errorf("Unable to delete asset %v: %v", a, err)
@@ -278,7 +297,7 @@ func (m *MariaDB) removeAssets(source string, assets []Asset, hasher *Hasher) (i
 }
 
 // UpdateGraph update graph with bulk of operations
-func (m *MariaDB) UpdateGraph(source string, bulk *GraphUpdatesBulk) error {
+func (m *MariaDB) UpdateGraph(source string, bulk *knowledge.GraphUpdatesBulk) error {
 	hasher := Hasher{cache: make(map[interface{}]string)}
 	count, err := m.upsertAssets(bulk.AssetUpserts, &hasher)
 	if err != nil {
@@ -306,7 +325,7 @@ func (m *MariaDB) UpdateGraph(source string, bulk *GraphUpdatesBulk) error {
 }
 
 // ReadGraph read source subgraph
-func (m *MariaDB) ReadGraph(source string, graph *Graph) error {
+func (m *MariaDB) ReadGraph(source string, graph *knowledge.Graph) error {
 	fmt.Printf("Start reading graph of source %s\n", source)
 
 	now := time.Now()
@@ -327,17 +346,17 @@ WHERE relations.source = ?
 		if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
 			return err
 		}
-		fromAsset := Asset{
-			Type: AssetType(FromType),
+		fromAsset := knowledge.Asset{
+			Type: schema.AssetType(FromType),
 			Key:  FromKey,
 		}
-		toAsset := Asset{
-			Type: AssetType(ToType),
+		toAsset := knowledge.Asset{
+			Type: schema.AssetType(ToType),
 			Key:  ToKey,
 		}
 		from := graph.AddAsset(fromAsset.Type, fromAsset.Key)
 		to := graph.AddAsset(toAsset.Type, toAsset.Key)
-		graph.AddRelation(from, RelationKeyType(Type), to)
+		graph.AddRelation(from, schema.RelationKeyType(Type), to)
 	}
 
 	elapsed := time.Since(now)
@@ -355,6 +374,13 @@ func (m *MariaDB) FlushAll() error {
 	}
 
 	_, err = m.db.ExecContext(context.Background(), "DROP TABLE relations")
+	if err != nil {
+		if !isUnknownTableError(err) {
+			return err
+		}
+	}
+
+	_, err = m.db.ExecContext(context.Background(), "DROP TABLE graph_schema")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			return err
@@ -394,8 +420,8 @@ func (m *MariaDB) Close() error {
 }
 
 // Query the database with provided intermediate query representation
-func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*GraphQueryResult, error) {
-	sql, err := NewSQLQueryTranslator().Translate(query)
+func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.GraphQueryResult, error) {
+	sql, err := knowledge.NewSQLQueryTranslator().Translate(query)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +433,7 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*GraphQueryR
 		return nil, err
 	}
 
-	res := new(GraphQueryResult)
+	res := new(knowledge.GraphQueryResult)
 	res.Cursor = &MariaDBCursor{
 		Rows:        rows,
 		Projections: sql.ProjectionTypes,
@@ -417,10 +443,62 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*GraphQueryR
 	return res, nil
 }
 
+func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema schema.SchemaGraph) error {
+	b, err := schema.ToJSON()
+	if err != nil {
+		return fmt.Errorf("Unable to json encode schema: %v", err)
+	}
+
+	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (source_name, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
+		sourceName, string(b))
+	if err != nil {
+		return fmt.Errorf("Unable to save schema in DB: %v", err)
+	}
+
+	return nil
+}
+
+func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.SchemaGraph, error) {
+	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE source_name = ? ORDER BY id DESC LIMIT 1", sourceName)
+	var rawJson string
+	if err := row.Scan(&rawJson); err != nil {
+		if err == sql.ErrNoRows {
+			return schema.NewSchemaGraph(), nil
+		} else {
+			return schema.NewSchemaGraph(), err
+		}
+	}
+
+	graph := schema.NewSchemaGraph()
+	if err := graph.FromJSON([]byte(rawJson)); err != nil {
+		return schema.NewSchemaGraph(), err
+	}
+
+	return graph, nil
+}
+
+func (m *MariaDB) ListSources(ctx context.Context) ([]string, error) {
+	rows, err := m.db.QueryContext(ctx, "SELECT DISTINCT source_name FROM graph_schema")
+
+	if err != nil {
+		return nil, fmt.Errorf("Unable to read sources from database: %v", err)
+	}
+
+	sources := make([]string, 0)
+	for rows.Next() {
+		var source string
+		if err := rows.Scan(&source); err != nil {
+			return nil, err
+		}
+		sources = append(sources, source)
+	}
+	return sources, nil
+}
+
 type MariaDBCursor struct {
 	*sql.Rows
 
-	Projections []Projection
+	Projections []knowledge.Projection
 }
 
 func (mc *MariaDBCursor) HasMore() bool {
@@ -468,32 +546,32 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 
 	for i, pt := range mc.Projections {
 		switch pt.ExpressionType {
-		case NodeExprType:
+		case knowledge.NodeExprType:
 			items, err := q.Get(3)
 			if err != nil {
 				return nil
 			}
-			a := AssetWithID{
+			a := knowledge.AssetWithID{
 				ID: fmt.Sprintf("%v", reflect.ValueOf(items[0])),
-				Asset: Asset{
-					Type: AssetType(fmt.Sprintf("%v", reflect.ValueOf(items[2]))),
+				Asset: knowledge.Asset{
+					Type: schema.AssetType(fmt.Sprintf("%v", reflect.ValueOf(items[2]))),
 					Key:  fmt.Sprintf("%v", reflect.ValueOf(items[1])),
 				},
 			}
 			output[i] = a
-		case EdgeExprType:
+		case knowledge.EdgeExprType:
 			items, err := q.Get(5)
 			if err != nil {
 				return nil
 			}
-			r := RelationWithID{
+			r := knowledge.RelationWithID{
 				ID:   fmt.Sprintf("%v", reflect.ValueOf(items[0])),
 				From: fmt.Sprintf("%v", reflect.ValueOf(items[1])),
 				To:   fmt.Sprintf("%v", reflect.ValueOf(items[2])),
-				Type: RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[3]))),
+				Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[3]))),
 			}
 			output[i] = r
-		case PropertyExprType:
+		case knowledge.PropertyExprType:
 			items, err := q.Get(1)
 			if err != nil {
 				return nil

@@ -10,13 +10,6 @@ type GraphSuite struct {
 	suite.Suite
 }
 
-func (s *GraphSuite) SetupSuite() {
-	SchemaRegistrySingleton = *NewSchemaRegistry()
-	SchemaRegistrySingleton.AddAssetType("ip")
-	SchemaRegistrySingleton.AddAssetType("hostname")
-	SchemaRegistrySingleton.AddRelationType("linked")
-}
-
 func (s *GraphSuite) TestShouldTestGraphsAreEqual() {
 	g := NewGraph()
 
