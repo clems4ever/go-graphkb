@@ -1,11 +1,11 @@
-port: 8090
-tls_key: keys/server.key
-tls_cert: keys/server.crt
+port: 8080
+# tls_key: cmd/go-graphkb/keys/server.key
+# tls_cert: cmd/go-graphkb/keys/server.crt
 
 mariadb:
   username: graphkb
   password: password
-  host:
+  host: db
   database: graphkb
 
 sources:

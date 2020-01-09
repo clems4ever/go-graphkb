@@ -364,8 +364,15 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
 	bindInterface := fmt.Sprintf(":%d", viper.GetInt32("port"))
 	fmt.Printf("Listening on %s\n", bindInterface)
 
-	err := http.ListenAndServeTLS(bindInterface, viper.GetString("tls_cert"),
-		viper.GetString("tls_key"), r)
+	var err error
+	if viper.GetString("tls_cert") != "" {
+		fmt.Println("Server is using TLS, the connection is secure")
+		err = http.ListenAndServeTLS(bindInterface, viper.GetString("tls_cert"),
+			viper.GetString("tls_key"), r)
+	} else {
+		fmt.Println("[WARNING] Server is NOT using TLS, the connection is not secure")
+		err = http.ListenAndServe(bindInterface, r)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
