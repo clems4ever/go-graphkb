@@ -311,6 +311,20 @@ func postGraphUpdates(graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.H
 	}
 }
 
+func flushDatabase(graphDB knowledge.GraphDB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := graphDB.FlushAll(); err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		if err := graphDB.InitializeSchema(); err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+	}
+}
+
 // Secret is the secret provider function for basic auth
 func Secret(user, realm string) string {
 	if user == "admin" {
@@ -335,6 +349,7 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
 	getSourceGraphHandler := getSourceGraph(schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database)
+	flushDatabaseHandler := flushDatabase(database)
 
 	if viper.GetString("password") != "" {
 		authenticator := auth.NewBasicAuthenticator("example.com", Secret)
@@ -349,11 +364,14 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
 		getSourceGraphHandler = AuthMiddleware(getSourceGraphHandler)
 		getDatabaseDetailsHandler = AuthMiddleware(getDatabaseDetailsHandler)
 		postQueryHandler = AuthMiddleware(postQueryHandler)
+		flushDatabaseHandler = AuthMiddleware(flushDatabaseHandler)
 	}
 
 	r.HandleFunc("/api/sources", listSourcesHandler).Methods("GET")
 	r.HandleFunc("/api/schema", getSourceGraphHandler).Methods("GET")
 	r.HandleFunc("/api/database", getDatabaseDetailsHandler).Methods("GET")
+
+	r.HandleFunc("/api/admin/flush", flushDatabaseHandler).Methods("POST")
 
 	r.HandleFunc("/api/graph/read", getGraphRead(database)).Methods("GET")
 	r.HandleFunc("/api/graph/update", postGraphUpdates(graphUpdatesC)).Methods("POST")
