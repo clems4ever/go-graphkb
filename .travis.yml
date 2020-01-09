@@ -1,10 +1,18 @@
 language: go
 
 go:
-- 1.13.x
+  - 1.13.x
 
 script:
-- go test -v ./...
-- pushd web && npm ci && npm run build && popd
-- go build -o go-graphkb cmd/go-graphkb/main.go
-- go build -o importer-csv cmd/importer-csv/main.go
+  - .travis/run.sh
+
+before_deploy:
+  - echo Deploying GraphKB $TRAVIS_TAG to GitHub Releases
+deploy:
+  provider: releases
+  api_key: "$GITHUB_API_KEY"
+  file_glob: true
+  file: "graphkb-$TRAVIS_TAG.tar.gz"
+  skip_cleanup: true
+  on:
+    tags: true
