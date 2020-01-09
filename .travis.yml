@@ -7,6 +7,7 @@ script:
   - .travis/run.sh
 
 before_deploy:
+  - tar cvf graphkb-$TRAVIS_TAG.tar.gz web/build go-graphkb importer-csv
   - echo Deploying GraphKB $TRAVIS_TAG to GitHub Releases
 deploy:
   provider: releases
