@@ -3,4 +3,4 @@ graphkb:
   auth_token: "token_auth_for_csv_importer"
   skip_verify: true
 
-path: "../../examples/example-data.csv"
+path: "./examples/example-data.csv"
