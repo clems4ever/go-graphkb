@@ -15,3 +15,8 @@
 # vendor/
 
 .vscode
+
+# Release artifacts
+*.tar.gz
+go-graphkb
+importer-csv
