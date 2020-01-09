@@ -1,5 +1,5 @@
 graphkb:
-  url: "https://localhost:8090"
+  url: "http://localhost:8080"
   auth_token: "token_auth_for_csv_importer"
   skip_verify: true
 

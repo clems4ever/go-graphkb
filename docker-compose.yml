@@ -13,11 +13,40 @@ services:
       MYSQL_DATABASE: graphkb
       MYSQL_USER: graphkb
       MYSQL_PASSWORD: password
-    volumes:
-      - /var/lib/go-graphkb:/var/lib/mysql
+    ## Uncomment to persist database on host disk
+    # volumes:
+    #   - /var/lib/go-graphkb:/var/lib/mysql
 
   adminer:
     image: adminer
     restart: always
+    ports:
+      - 8090:8080
+
+  frontend:
+    build:
+      context: docker
+      dockerfile: Dockerfile.frontend
+      args:
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+    command: "sh -c 'npm ci && npm run start'"
+    working_dir: "/app"
+    volumes:
+      - ./web:/app
+    ports:
+      - 3000:3000
+
+  graphkb:
+    build:
+      context: docker
+      dockerfile: Dockerfile.graphkb
+      args:
+        USER_ID: ${USER_ID}
+        GROUP_ID: ${GROUP_ID}
+    entrypoint: "./scripts/graphkb-entrypoint.sh"
+    working_dir: "/app"
+    volumes:
+      - .:/app
     ports:
       - 8080:8080

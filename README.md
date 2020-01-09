@@ -21,7 +21,7 @@ Run the following commands
     go run cmd/go-graphkb/main.go start
 
     # In another terminal start the web server with the following
-    # command to acces the web UI at http://127.0.0.1:8090
+    # command to acces the web UI at http://127.0.0.1:3000
     go run cmd/go-graphkb/main.go listen
 
 
