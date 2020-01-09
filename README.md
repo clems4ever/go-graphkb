@@ -12,17 +12,14 @@ and results can be visualized in the UI as shown below.
 
 Run the following commands
 
-    # Spin up a mariadb in few seconds with
+    # Spin up GraphKB in few seconds with (wait 15 seconds for mariadb to start).
     docker-compose up -d
 
-    # Wait a few seconds for the db to be ready before
-    # inserting the example data available in examples/
-    # with the following command.
-    go run cmd/go-graphkb/main.go start
+    # Insert the example data available in examples/ directory
+    # with the following command:
+    go run cmd/importer-csv/main.go --config cmd/importer-csv/config.yml
 
-    # In another terminal start the web server with the following
-    # command to acces the web UI at http://127.0.0.1:3000
-    go run cmd/go-graphkb/main.go listen
+Then visit the web UI accessible at http://127.0.0.1:8080.
 
 
 ## LICENSE
