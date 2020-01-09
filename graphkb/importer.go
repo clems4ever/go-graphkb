@@ -1,4 +1,4 @@
-package importer
+package graphkb
 
 import (
 	"fmt"
