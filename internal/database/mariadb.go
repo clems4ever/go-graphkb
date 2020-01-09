@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS assets (
 	id INT NOT NULL AUTO_INCREMENT,
 	value VARCHAR(255) NOT NULL,
 	type VARCHAR(64) NOT NULL,
+	start_date TIMESTAMP NOT NULL,
+	end_date TIMESTAMP,
 
 	CONSTRAINT pk_asset PRIMARY KEY (id),
 	UNIQUE unique_asset_idx (type, value),
@@ -67,6 +69,8 @@ CREATE TABLE IF NOT EXISTS relations (
 	to_id INT NOT NULL,
 	type VARCHAR(64) NOT NULL,
 	source VARCHAR(64) NOT NULL,
+	start_date TIMESTAMP NOT NULL,
+	end_date TIMESTAMP,
 
 	CONSTRAINT pk_relation PRIMARY KEY (id),
 	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
@@ -179,13 +183,13 @@ func (m *MariaDB) upsertAssets(assets []knowledge.Asset, registry *AssetRegistry
 	for _, assetChunk := range assetChunks {
 		tx, err := m.db.Begin()
 		if err != nil {
-			log.Fatal(err)
+			return 0, err
 		}
 
 		insertQuery, err := tx.PrepareContext(context.Background(), `
-INSERT INTO assets (type, value) VALUES (?, ?)`)
+INSERT INTO assets (type, value, start_date, end_date) VALUES (?, ?, CURRENT_TIMESTAMP(), NULL)`)
 		if err != nil {
-			log.Fatal(fmt.Errorf("Unable to prepare asset insertion query: %v", err))
+			return 0, fmt.Errorf("Unable to prepare asset insertion query: %v", err)
 		}
 
 		for _, aC := range assetChunk {
@@ -207,7 +211,7 @@ INSERT INTO assets (type, value) VALUES (?, ?)`)
 
 		err = tx.Commit()
 		if err != nil {
-			log.Fatal(err)
+			return 0, err
 		}
 	}
 	return insertedCount, nil
@@ -226,13 +230,13 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 	for _, relationChunk := range relationChunks {
 		tx, err := m.db.Begin()
 		if err != nil {
-			log.Fatal(err)
+			return 0, err
 		}
 
 		q, err := tx.PrepareContext(context.Background(),
-			"INSERT INTO relations (from_id, to_id, type, source) VALUES (?, ?, ?, ?)")
+			"INSERT INTO relations (from_id, to_id, type, source, start_date, end_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), NULL)")
 		if err != nil {
-			log.Fatal(fmt.Errorf("Unable to prepare relation insertion query: %v", err))
+			return 0, fmt.Errorf("Unable to prepare relation insertion query: %v", err)
 		}
 		defer q.Close()
 
@@ -256,14 +260,14 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 					bar.Increment()
 					continue
 				}
-				log.Fatal(fmt.Errorf("Unable to insert relation %v (%d -> %d): %v", r, idxFrom, idxTo, err))
+				return 0, fmt.Errorf("Unable to insert relation %v (%d -> %d): %v", r, idxFrom, idxTo, err)
 			}
 			bar.Increment()
 			insertedCount++
 		}
 
 		if err := tx.Commit(); err != nil {
-			log.Fatal(err)
+			return 0, err
 		}
 	}
 	bar.Finish()
