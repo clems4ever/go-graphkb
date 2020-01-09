@@ -7,7 +7,7 @@ import (
 )
 
 type GraphUpdateRequestBody struct {
-	Updates GraphUpdatesBulk   `json:"updates"`
+	Updates *GraphUpdatesBulk  `json:"updates"`
 	Schema  schema.SchemaGraph `json:"schema"`
 }
 

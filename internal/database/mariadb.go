@@ -15,6 +15,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
+	mapset "github.com/deckarep/golang-set"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/golang-collections/go-datastructures/queue"
 )
@@ -43,7 +44,7 @@ func NewMariaDB(username string, password string, host string, databaseName stri
 // InitializeSchema initialize the schema of the database
 func (m *MariaDB) InitializeSchema() error {
 	// type must be part of the primary key to be a partition key
-	_, err := m.db.QueryContext(context.Background(), `
+	q, err := m.db.QueryContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS assets (
 	id INT NOT NULL AUTO_INCREMENT,
 	value VARCHAR(255) NOT NULL,
@@ -56,9 +57,10 @@ CREATE TABLE IF NOT EXISTS assets (
 	if err != nil {
 		return err
 	}
+	defer q.Close()
 
 	// type must be part of the primary key to be a partition key
-	_, err = m.db.QueryContext(context.Background(), `
+	q, err = m.db.QueryContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS relations (
 	id INT NOT NULL AUTO_INCREMENT,
 	from_id INT NOT NULL,
@@ -69,21 +71,20 @@ CREATE TABLE IF NOT EXISTS relations (
 	CONSTRAINT pk_relation PRIMARY KEY (id),
 	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
 	CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
-
-	INDEX full_relation_type_from_to_idx (type, from_id, to_id),
-	INDEX full_relation_type_to_from_idx (type, to_id, from_id),
-
-	INDEX full_relation_from_type_to_idx (from_id, type, to_id),
-	INDEX full_relation_from_to_type_idx (from_id, to_id, type),
 	
-	INDEX full_relation_to_from_type_idx (to_id, from_id, type),
-	INDEX full_relation_to_type_from_idx (to_id, type, from_id))`)
+	INDEX full_relation_type_from_to_idx (type, from_id, to_id),
+    INDEX full_relation_type_to_from_idx (type, to_id, from_id),
+    INDEX full_relation_from_type_to_idx (from_id, type, to_id),
+    INDEX full_relation_from_to_type_idx (from_id, to_id, type),
+    INDEX full_relation_to_from_type_idx (to_id, from_id, type),
+    INDEX full_relation_to_type_from_idx (to_id, type, from_id))`)
 	if err != nil {
 		return err
 	}
+	defer q.Close()
 
 	// Create the table storing the schema graphs
-	_, err = m.db.QueryContext(context.Background(), `
+	q, err = m.db.QueryContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS graph_schema (
 	id INTEGER AUTO_INCREMENT NOT NULL,
 	source_name VARCHAR(64) NOT NULL,
@@ -93,48 +94,22 @@ CONSTRAINT pk_schema PRIMARY KEY (id))`)
 	if err != nil {
 		return err
 	}
-
+	defer q.Close()
 	return nil
 }
 
 // AssetIDResolver store ID assets in a cache
-type AssetIDResolver struct {
+type AssetRegistry struct {
 	cache map[knowledge.AssetKey]int64
-	db    *sql.DB
 }
 
-func (c *AssetIDResolver) Set(a knowledge.AssetKey, idx int64) {
-	c.cache[a] = idx
+func (ar *AssetRegistry) Set(a knowledge.AssetKey, idx int64) {
+	ar.cache[a] = idx
 }
 
-func (c *AssetIDResolver) Get(a knowledge.AssetKey) (int64, bool, error) {
-	idx, ok := c.cache[a]
-
-	if ok {
-		return idx, true, nil
-	}
-
-	if !ok {
-		q, err := c.db.PrepareContext(context.Background(), `
-SELECT id FROM assets WHERE type = ? AND value = ?`)
-		if err != nil {
-			return 0, false, fmt.Errorf("Unable to prepare asset select query: %v", err)
-		}
-
-		res, err := q.QueryContext(context.Background(), a.Type, a.Key)
-		if err != nil {
-			return 0, false, err
-		}
-
-		for res.Next() {
-			if err := res.Scan(&idx); err != nil {
-				return 0, false, err
-			}
-			c.cache[a] = idx
-			return idx, true, nil
-		}
-	}
-	return 0, false, nil
+func (ar *AssetRegistry) Get(a knowledge.AssetKey) (int64, bool) {
+	idx, ok := ar.cache[a]
+	return idx, ok
 }
 
 func isDuplicateEntryError(err error) bool {
@@ -147,15 +122,60 @@ func isUnknownTableError(err error) bool {
 	return ok && driverErr.Number == 1051
 }
 
-func (m *MariaDB) upsertAssets(assets []knowledge.Asset, assetResolver *AssetIDResolver) (int64, error) {
+func (m *MariaDB) resolveAssets(assets []knowledge.AssetKey, registry *AssetRegistry) error {
+	bar := pb.StartNew(len(assets))
+	defer bar.Finish()
+
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ?")
+	if err != nil {
+		return err
+	}
+
+	for _, a := range assets {
+		q, err := stmt.QueryContext(context.Background(), a.Type, a.Key)
+		if err != nil {
+			return err
+		}
+		defer q.Close()
+
+		for q.Next() {
+			var idx int64
+			if err := q.Scan(&idx); err != nil {
+				return err
+			}
+			registry.Set(knowledge.AssetKey(a), idx)
+		}
+
+		bar.Increment()
+	}
+	return tx.Commit()
+}
+
+func (m *MariaDB) upsertAssets(assets []knowledge.Asset, registry *AssetRegistry) (int64, error) {
 	if len(assets) == 0 {
 		return 0, nil
 	}
-	bar := pb.StartNew(len(assets))
+
+	unresolved := []knowledge.Asset{}
+	for _, a := range assets {
+		_, ok := registry.Get(knowledge.AssetKey(a))
+		if !ok {
+			unresolved = append(unresolved, a)
+		}
+	}
+
+	bar := pb.StartNew(len(unresolved))
+	defer bar.Finish()
 	insertedCount := int64(0)
 
-	assetChunks := utils.ChunkSlice(assets, 10000).([][]interface{})
+	assetChunks := utils.ChunkSlice(unresolved, 10000).([][]interface{})
 
+	// A chunk of assets to store in a transaction
 	for _, assetChunk := range assetChunks {
 		tx, err := m.db.Begin()
 		if err != nil {
@@ -163,7 +183,7 @@ func (m *MariaDB) upsertAssets(assets []knowledge.Asset, assetResolver *AssetIDR
 		}
 
 		insertQuery, err := tx.PrepareContext(context.Background(), `
-REPLACE INTO assets (type, value) VALUES (?, ?)`)
+INSERT INTO assets (type, value) VALUES (?, ?)`)
 		if err != nil {
 			log.Fatal(fmt.Errorf("Unable to prepare asset insertion query: %v", err))
 		}
@@ -171,28 +191,18 @@ REPLACE INTO assets (type, value) VALUES (?, ?)`)
 		for _, aC := range assetChunk {
 			a := aC.(knowledge.Asset)
 
-			_, found, err := assetResolver.Get(knowledge.AssetKey(a))
+			res, err := insertQuery.ExecContext(context.Background(), a.Type, a.Key)
+			if err != nil {
+				return 0, fmt.Errorf("Unable to insert asset %v: %v", a, err)
+			}
+			idx, err := res.LastInsertId()
 			if err != nil {
 				return 0, err
 			}
+			registry.Set(knowledge.AssetKey(a), idx)
 
-			if !found {
-				res, err := insertQuery.ExecContext(context.Background(), a.Type, a.Key)
-				if err != nil {
-					if !isDuplicateEntryError(err) {
-						log.Fatal(fmt.Errorf("Unable to insert asset %v: %v", a, err))
-						return 0, err
-					}
-				}
-				idx, err := res.LastInsertId()
-				if err != nil {
-					return 0, err
-				}
-				assetResolver.Set(knowledge.AssetKey(a), idx)
-
-				atomic.AddInt64(&insertedCount, 1)
-				bar.Increment()
-			}
+			atomic.AddInt64(&insertedCount, 1)
+			bar.Increment()
 		}
 
 		err = tx.Commit()
@@ -200,19 +210,18 @@ REPLACE INTO assets (type, value) VALUES (?, ?)`)
 			log.Fatal(err)
 		}
 	}
-
-	bar.Finish()
 	return insertedCount, nil
 }
 
-func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation, assetResolver *AssetIDResolver) (int64, error) {
+func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation, registry *AssetRegistry) (int64, error) {
 	if len(relations) == 0 {
 		return 0, nil
 	}
 	bar := pb.StartNew(len(relations))
+	defer bar.Finish()
 	insertedCount := int64(0)
 
-	relationChunks := utils.ChunkSlice(relations, 1000).([][]interface{})
+	relationChunks := utils.ChunkSlice(relations, 10000).([][]interface{})
 
 	for _, relationChunk := range relationChunks {
 		tx, err := m.db.Begin()
@@ -225,24 +234,17 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 		if err != nil {
 			log.Fatal(fmt.Errorf("Unable to prepare relation insertion query: %v", err))
 		}
+		defer q.Close()
 
 		for _, rC := range relationChunk {
 			r := rC.(knowledge.Relation)
-			idxFrom, ok, err := assetResolver.Get(r.From)
-			if err != nil {
-				return 0, err
-			}
-
+			idxFrom, ok := registry.Get(r.From)
 			if !ok {
 				fmt.Printf("[WARNING] ID of asset %v (from) has not been found in cache\n", r.From)
 				continue
 			}
 
-			idxTo, ok, err := assetResolver.Get(r.To)
-			if err != nil {
-				return 0, err
-			}
-
+			idxTo, ok := registry.Get(r.To)
 			if !ok {
 				fmt.Printf("[WARNING] ID of asset %v (to) has not been found in cache\n", r.To)
 				continue
@@ -254,7 +256,7 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 					bar.Increment()
 					continue
 				}
-				log.Fatal(fmt.Errorf("Unable to insert relation %v: %v", r, err))
+				log.Fatal(fmt.Errorf("Unable to insert relation %v (%d -> %d): %v", r, idxFrom, idxTo, err))
 			}
 			bar.Increment()
 			insertedCount++
@@ -288,6 +290,7 @@ WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ?`)
 	if err != nil {
 		return 0, 0, err
 	}
+	defer stmt.Close()
 
 	for _, r := range relations {
 		rel := SourceRelation{
@@ -316,10 +319,6 @@ AND id NOT IN (select to_id from relations)`)
 		return 0, 0, err
 	}
 
-	if err != nil {
-		return 0, 0, err
-	}
-
 	removedAssetsCount, err := res.RowsAffected()
 	if err != nil {
 		return 0, 0, err
@@ -334,24 +333,54 @@ AND id NOT IN (select to_id from relations)`)
 
 // UpdateGraph update graph with bulk of operations
 func (m *MariaDB) UpdateGraph(source string, bulk *knowledge.GraphUpdatesBulk) error {
-	cache := AssetIDResolver{cache: make(map[knowledge.AssetKey]int64), db: m.db}
+	registry := AssetRegistry{cache: make(map[knowledge.AssetKey]int64)}
+	now := time.Now()
 
-	count, err := m.upsertAssets(bulk.AssetUpserts, &cache)
-	if err != nil {
-		return err
+	assetKeysSet := mapset.NewSet()
+	for _, a := range bulk.GetAssetUpserts() {
+		assetKeysSet.Add(knowledge.AssetKey(a))
 	}
-	fmt.Printf("%d assets inserted\n", count)
-	count, err = m.upsertRelations(source, bulk.RelationUpserts, &cache)
-	if err != nil {
-		return err
+	for _, r := range bulk.GetRelationUpserts() {
+		assetKeysSet.Add(r.From)
+		assetKeysSet.Add(r.To)
 	}
-	fmt.Printf("%d relations inserted\n", count)
 
-	relCount, assetsCount, err := m.removeRelations(source, bulk.RelationRemovals)
+	assetKeys := []knowledge.AssetKey{}
+	for a := range assetKeysSet.Iter() {
+		assetKeys = append(assetKeys, a.(knowledge.AssetKey))
+	}
+
+	fmt.Println("Start resolving assets")
+	err := m.resolveAssets(assetKeys, &registry)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%d assets removed\n%d relations removed\n", assetsCount, relCount)
+
+	fmt.Println("Start upserting assets")
+	count, err := m.upsertAssets(bulk.GetAssetUpserts(), &registry)
+	if err != nil {
+		return err
+	}
+
+	nowAssetInsert := time.Now()
+	fmt.Printf("%d assets inserted in %fs\n", count, nowAssetInsert.Sub(now).Seconds())
+
+	fmt.Println("Start upserting relations")
+	count, err = m.upsertRelations(source, bulk.GetRelationUpserts(), &registry)
+	if err != nil {
+		return err
+	}
+	nowRelationInsert := time.Now()
+	fmt.Printf("%d relations inserted in %fs\n", count, nowRelationInsert.Sub(nowAssetInsert).Seconds())
+
+	relCount, assetsCount, err := m.removeRelations(source, bulk.GetRelationRemovals())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%d assets removed and %d relations removed in %fs\n",
+		assetsCount,
+		relCount,
+		time.Since(nowRelationInsert).Seconds())
 	return nil
 }
 
@@ -515,6 +544,7 @@ func (m *MariaDB) ListSources(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read sources from database: %v", err)
 	}
+	defer rows.Close()
 
 	sources := make([]string, 0)
 	for rows.Next() {

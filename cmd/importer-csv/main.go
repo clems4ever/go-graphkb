@@ -98,7 +98,14 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use: "source-csv [opts]",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := graphkb.Start(NewCSVSource(), nil); err != nil {
+
+			options := graphkb.ImporterOptions{
+				URL:        viper.GetString("graphkb.url"),
+				AuthToken:  viper.GetString("graphkb.auth_token"),
+				SkipVerify: viper.GetBool("graphkb.skip_verify"),
+			}
+
+			if err := graphkb.Start(NewCSVSource(), options); err != nil {
 				log.Fatal(err)
 			}
 		},

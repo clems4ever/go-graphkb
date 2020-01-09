@@ -1,7 +1,21 @@
 package knowledge
 
+import (
+	"encoding/json"
+
+	mapset "github.com/deckarep/golang-set"
+)
+
 // GraphUpdatesBulk represent a bulk of asset and relation updates to perform on the graph
 type GraphUpdatesBulk struct {
+	assetUpserts     mapset.Set
+	assetRemovals    mapset.Set
+	relationUpserts  mapset.Set
+	relationRemovals mapset.Set
+}
+
+// GraphUpdatesBulkJSON represent a bulk in JSON form
+type GraphUpdatesBulkJSON struct {
 	AssetUpserts     []Asset    `json:"asset_upserts"`
 	AssetRemovals    []Asset    `json:"asset_removals"`
 	RelationUpserts  []Relation `json:"relation_upserts"`
@@ -11,51 +25,137 @@ type GraphUpdatesBulk struct {
 // NewGraphUpdatesBulk create an instance of graph updates
 func NewGraphUpdatesBulk() *GraphUpdatesBulk {
 	return &GraphUpdatesBulk{
-		AssetUpserts:     make([]Asset, 0),
-		AssetRemovals:    make([]Asset, 0),
-		RelationUpserts:  make([]Relation, 0),
-		RelationRemovals: make([]Relation, 0),
+		assetUpserts:     mapset.NewSet(),
+		assetRemovals:    mapset.NewSet(),
+		relationUpserts:  mapset.NewSet(),
+		relationRemovals: mapset.NewSet(),
 	}
+}
+
+func (gub *GraphUpdatesBulk) Clear() {
+	gub.assetUpserts.Clear()
+	gub.assetRemovals.Clear()
+	gub.relationUpserts.Clear()
+	gub.relationRemovals.Clear()
+}
+
+func (gub *GraphUpdatesBulk) GetAssetUpserts() []Asset {
+	assets := []Asset{}
+	for v := range gub.assetUpserts.Iter() {
+		assets = append(assets, v.(Asset))
+	}
+	return assets
+}
+
+func (gub *GraphUpdatesBulk) HasAssetUpsert(asset Asset) bool {
+	return gub.assetUpserts.Contains(asset)
 }
 
 // UpsertAsset create an operation to upsert an asset
 func (gub *GraphUpdatesBulk) UpsertAsset(asset Asset) {
-	gub.AssetUpserts = append(gub.AssetUpserts, asset)
+	gub.assetUpserts.Add(asset)
 }
 
 // UpsertAssets append multiple assets to upsert
-func (gub *GraphUpdatesBulk) UpsertAssets(asset ...Asset) {
-	gub.AssetUpserts = append(gub.AssetUpserts, asset...)
+func (gub *GraphUpdatesBulk) UpsertAssets(assets ...Asset) {
+	for _, a := range assets {
+		gub.assetUpserts.Add(a)
+	}
+}
+
+func (gub *GraphUpdatesBulk) GetAssetRemovals() []Asset {
+	assets := []Asset{}
+	for v := range gub.assetRemovals.Iter() {
+		assets = append(assets, v.(Asset))
+	}
+	return assets
+}
+
+func (gub *GraphUpdatesBulk) HasAssetRemoval(asset Asset) bool {
+	return gub.assetRemovals.Contains(asset)
 }
 
 // RemoveAsset create an operation to remove an asset
 func (gub *GraphUpdatesBulk) RemoveAsset(asset Asset) {
-	gub.AssetRemovals = append(gub.AssetRemovals, asset)
+	gub.assetRemovals.Add(asset)
 }
 
 // RemoveAssets create multiple asset removal operations
-func (gub *GraphUpdatesBulk) RemoveAssets(asset ...Asset) {
-	gub.AssetRemovals = append(gub.AssetRemovals, asset...)
+func (gub *GraphUpdatesBulk) RemoveAssets(assets ...Asset) {
+	for _, a := range assets {
+		gub.assetRemovals.Add(a)
+	}
+}
+
+func (gub *GraphUpdatesBulk) GetRelationUpserts() []Relation {
+	relations := []Relation{}
+	for v := range gub.relationUpserts.Iter() {
+		relations = append(relations, v.(Relation))
+	}
+	return relations
+}
+
+func (gub *GraphUpdatesBulk) HasRelationUpsert(relation Relation) bool {
+	return gub.relationUpserts.Contains(relation)
 }
 
 // UpsertRelation create an operation to upsert an relation
 func (gub *GraphUpdatesBulk) UpsertRelation(relation Relation) {
-	gub.RelationUpserts = append(gub.RelationUpserts, relation)
+	gub.relationUpserts.Add(relation)
 }
 
 // UpsertRelations create multiple relation upsert operations
-func (gub *GraphUpdatesBulk) UpsertRelations(relation ...Relation) {
-	gub.RelationUpserts = append(gub.RelationUpserts, relation...)
+func (gub *GraphUpdatesBulk) UpsertRelations(relations ...Relation) {
+	for _, r := range relations {
+		gub.relationUpserts.Add(r)
+	}
+}
+
+func (gub *GraphUpdatesBulk) GetRelationRemovals() []Relation {
+	relations := []Relation{}
+	for v := range gub.relationRemovals.Iter() {
+		relations = append(relations, v.(Relation))
+	}
+	return relations
+}
+
+func (gub *GraphUpdatesBulk) HasRelationRemoval(relation Relation) bool {
+	return gub.relationRemovals.Contains(relation)
 }
 
 // RemoveRelation create an operation to remove a relation
 func (gub *GraphUpdatesBulk) RemoveRelation(relation Relation) {
-	gub.RelationRemovals = append(gub.RelationRemovals, relation)
+	gub.relationRemovals.Add(relation)
 }
 
 // RemoveRelations create multiple relation removal operations
-func (gub *GraphUpdatesBulk) RemoveRelations(relation ...Relation) {
-	gub.RelationRemovals = append(gub.RelationRemovals, relation...)
+func (gub *GraphUpdatesBulk) RemoveRelations(relations ...Relation) {
+	for _, r := range relations {
+		gub.relationRemovals.Add(r)
+	}
+}
+
+func (gub *GraphUpdatesBulk) MarshalJSON() ([]byte, error) {
+	j := &GraphUpdatesBulkJSON{}
+	j.AssetUpserts = gub.GetAssetUpserts()
+	j.AssetRemovals = gub.GetAssetRemovals()
+	j.RelationUpserts = gub.GetRelationUpserts()
+	j.RelationRemovals = gub.GetRelationRemovals()
+	return json.Marshal(j)
+}
+
+func (gub *GraphUpdatesBulk) UnmarshalJSON(bytes []byte) error {
+	j := GraphUpdatesBulkJSON{}
+	if err := json.Unmarshal(bytes, &j); err != nil {
+		return err
+	}
+
+	*gub = *NewGraphUpdatesBulk()
+	gub.UpsertAssets(j.AssetUpserts...)
+	gub.UpsertRelations(j.RelationUpserts...)
+	gub.RemoveAssets(j.AssetRemovals...)
+	gub.RemoveRelations(j.RelationRemovals...)
+	return nil
 }
 
 // GenerateGraphUpdatesBulk generate a graph update bulk by taking the difference between new graph
@@ -98,5 +198,6 @@ func GenerateGraphUpdatesBulk(previousGraph *Graph, newGraph *Graph) *GraphUpdat
 			bulk.RemoveRelation(r)
 		}
 	}
+
 	return bulk
 }

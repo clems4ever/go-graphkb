@@ -298,7 +298,7 @@ func postGraphUpdates(graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.H
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 
 		graphUpdatesC <- knowledge.SourceSubGraphUpdates{
-			Updates: requestBody.Updates,
+			Updates: *requestBody.Updates,
 			Schema:  requestBody.Schema,
 			Source:  source,
 		}
