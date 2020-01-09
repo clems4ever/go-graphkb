@@ -19,7 +19,7 @@ Run the following commands
     # with the following command:
     go run cmd/importer-csv/main.go --config cmd/importer-csv/config.yml
 
-Then visit the web UI accessible at http://127.0.0.1:8080.
+Then visit the web UI accessible at http://127.0.0.1:3000.
 
 
 ## LICENSE
