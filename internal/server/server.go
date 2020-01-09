@@ -35,7 +35,7 @@ func replyWithInternalError(w http.ResponseWriter, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	_, werr := w.Write([]byte(err.Error()))
 	if werr != nil {
-		fmt.Println(err)
+		fmt.Println(werr)
 	}
 }
 

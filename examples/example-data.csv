@@ -4,6 +4,7 @@ employee,Charlie,is_in,team,Team-a
 employee,Alice,is_in,team,Team-b
 employee,Harry,is_in,team,Team-b
 employee,John,is_in,team,Team-c
+employee,David,is_in,team,Team-c
 employee,James,is_in,team,Team-b
 employee,John,work_at,office,Building-1
 employee,Alice,work_at,office,Building-1

@@ -68,6 +68,7 @@ func (cs *CSVSource) Start(importer *knowledge.GraphImporter) error {
 
 		tx.Relate(record[1], relationType, record[4])
 	}
+
 	_, err = tx.Commit()
 	fmt.Println("CSV data has been sent successfully")
 	return err
