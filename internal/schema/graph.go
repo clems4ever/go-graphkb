@@ -83,7 +83,7 @@ func (sg *SchemaGraph) Equal(other SchemaGraph) bool {
 }
 
 func (sg *SchemaGraph) MarshalJSON() ([]byte, error) {
-	schemaJson := new(SchemaGraphJSON)
+	schemaJson := SchemaGraphJSON{}
 	schemaJson.Vertices = []AssetType{}
 	schemaJson.Edges = []RelationType{}
 

@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	"github.com/clems4ever/go-graphkb/internal/schema"
-	"github.com/spf13/viper"
 )
 
 // GraphEmitter an emitter of full source graph
@@ -22,9 +21,9 @@ type GraphAPI struct {
 }
 
 // NewGraphEmitter create an emitter of graph
-func NewGraphAPI(url string, authToken string) *GraphAPI {
+func NewGraphAPI(url, authToken string, skipVerify bool) *GraphAPI {
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: viper.GetBool("graphkb.skip_verify")},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipVerify},
 	}
 	client := &http.Client{Transport: tr}
 
@@ -69,7 +68,7 @@ func (gapi *GraphAPI) ReadCurrentGraph() (*Graph, error) {
 
 func (gapi *GraphAPI) UpdateGraph(sg schema.SchemaGraph, updates GraphUpdatesBulk) error {
 	requestBody := GraphUpdateRequestBody{}
-	requestBody.Updates = updates
+	requestBody.Updates = &updates
 	requestBody.Schema = sg
 
 	b, err := json.Marshal(requestBody)

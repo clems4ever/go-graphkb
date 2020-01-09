@@ -19,13 +19,13 @@ func (s *SourceUpdatesSuite) TestShouldUpsertForCreatingGraph() {
 
 	bulk := GenerateGraphUpdatesBulk(nil, g)
 
-	s.Require().Len(bulk.AssetUpserts, 2)
-	s.Require().Len(bulk.RelationUpserts, 1)
-	s.Require().Len(bulk.AssetRemovals, 0)
-	s.Require().Len(bulk.RelationRemovals, 0)
+	s.Require().Len(bulk.GetAssetUpserts(), 2)
+	s.Require().Len(bulk.GetRelationUpserts(), 1)
+	s.Require().Len(bulk.GetAssetRemovals(), 0)
+	s.Require().Len(bulk.GetRelationRemovals(), 0)
 
-	s.Assert().ElementsMatch(bulk.AssetUpserts, []Asset{Asset(ip2), Asset(ip1)})
-	s.Assert().ElementsMatch(bulk.RelationUpserts, []Relation{rel})
+	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip2), Asset(ip1)})
+	s.Assert().ElementsMatch(bulk.GetRelationUpserts(), []Relation{rel})
 }
 
 func (s *SourceUpdatesSuite) TestShouldUpsertAssets() {
@@ -41,12 +41,12 @@ func (s *SourceUpdatesSuite) TestShouldUpsertAssets() {
 
 	bulk := GenerateGraphUpdatesBulk(g1, g2)
 
-	s.Require().Len(bulk.AssetUpserts, 2)
-	s.Require().Len(bulk.RelationUpserts, 0)
-	s.Require().Len(bulk.AssetRemovals, 0)
-	s.Require().Len(bulk.RelationRemovals, 0)
+	s.Require().Len(bulk.GetAssetUpserts(), 2)
+	s.Require().Len(bulk.GetRelationUpserts(), 0)
+	s.Require().Len(bulk.GetAssetRemovals(), 0)
+	s.Require().Len(bulk.GetRelationRemovals(), 0)
 
-	s.Assert().ElementsMatch(bulk.AssetUpserts, []Asset{Asset(ip3), Asset(ip4)})
+	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip3), Asset(ip4)})
 }
 
 func (s *SourceUpdatesSuite) TestShouldUpsertRelations() {
@@ -63,13 +63,13 @@ func (s *SourceUpdatesSuite) TestShouldUpsertRelations() {
 
 	bulk := GenerateGraphUpdatesBulk(g1, g2)
 
-	s.Require().Len(bulk.AssetUpserts, 1)
-	s.Require().Len(bulk.RelationUpserts, 2)
-	s.Require().Len(bulk.AssetRemovals, 0)
-	s.Require().Len(bulk.RelationRemovals, 0)
+	s.Require().Len(bulk.GetAssetUpserts(), 1)
+	s.Require().Len(bulk.GetRelationUpserts(), 2)
+	s.Require().Len(bulk.GetAssetRemovals(), 0)
+	s.Require().Len(bulk.GetRelationRemovals(), 0)
 
-	s.Assert().ElementsMatch(bulk.AssetUpserts, []Asset{Asset(ip3)})
-	s.Assert().ElementsMatch(bulk.RelationUpserts, []Relation{r1, r2})
+	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip3)})
+	s.Assert().ElementsMatch(bulk.GetRelationUpserts(), []Relation{r1, r2})
 }
 
 func (s *SourceUpdatesSuite) TestShouldRemoveGraph() {
@@ -80,13 +80,13 @@ func (s *SourceUpdatesSuite) TestShouldRemoveGraph() {
 
 	bulk := GenerateGraphUpdatesBulk(g1, nil)
 
-	s.Require().Len(bulk.AssetUpserts, 0)
-	s.Require().Len(bulk.RelationUpserts, 0)
-	s.Require().Len(bulk.AssetRemovals, 2)
-	s.Require().Len(bulk.RelationRemovals, 1)
+	s.Require().Len(bulk.GetAssetUpserts(), 0)
+	s.Require().Len(bulk.GetRelationUpserts(), 0)
+	s.Require().Len(bulk.GetAssetRemovals(), 2)
+	s.Require().Len(bulk.GetRelationRemovals(), 1)
 
-	s.Assert().ElementsMatch(bulk.AssetRemovals, []Asset{Asset(ip1), Asset(ip2)})
-	s.Assert().ElementsMatch(bulk.RelationRemovals, []Relation{r})
+	s.Assert().ElementsMatch(bulk.GetAssetRemovals(), []Asset{Asset(ip1), Asset(ip2)})
+	s.Assert().ElementsMatch(bulk.GetRelationRemovals(), []Relation{r})
 }
 
 func (s *SourceUpdatesSuite) TestShouldGenerateBulkOfSubgraph() {
@@ -100,13 +100,13 @@ func (s *SourceUpdatesSuite) TestShouldGenerateBulkOfSubgraph() {
 
 	bulk := GenerateGraphUpdatesBulk(g1, g2)
 
-	s.Require().Len(bulk.AssetUpserts, 0)
-	s.Require().Len(bulk.RelationUpserts, 0)
-	s.Require().Len(bulk.AssetRemovals, 1)
-	s.Require().Len(bulk.RelationRemovals, 1)
+	s.Require().Len(bulk.GetAssetUpserts(), 0)
+	s.Require().Len(bulk.GetRelationUpserts(), 0)
+	s.Require().Len(bulk.GetAssetRemovals(), 1)
+	s.Require().Len(bulk.GetRelationRemovals(), 1)
 
-	s.Assert().ElementsMatch(bulk.AssetRemovals, []Asset{Asset(ip2)})
-	s.Assert().ElementsMatch(bulk.RelationRemovals, []Relation{r})
+	s.Assert().ElementsMatch(bulk.GetAssetRemovals(), []Asset{Asset(ip2)})
+	s.Assert().ElementsMatch(bulk.GetRelationRemovals(), []Relation{r})
 }
 
 func (s *SourceUpdatesSuite) TestShouldGenerateBulkForMixedAdditionsAndRemovals() {
@@ -122,15 +122,15 @@ func (s *SourceUpdatesSuite) TestShouldGenerateBulkForMixedAdditionsAndRemovals(
 
 	bulk := GenerateGraphUpdatesBulk(g1, g2)
 
-	s.Require().Len(bulk.AssetUpserts, 1)
-	s.Require().Len(bulk.RelationUpserts, 1)
-	s.Require().Len(bulk.AssetRemovals, 1)
-	s.Require().Len(bulk.RelationRemovals, 1)
+	s.Require().Len(bulk.GetAssetUpserts(), 1)
+	s.Require().Len(bulk.GetRelationUpserts(), 1)
+	s.Require().Len(bulk.GetAssetRemovals(), 1)
+	s.Require().Len(bulk.GetRelationRemovals(), 1)
 
-	s.Assert().ElementsMatch(bulk.AssetUpserts, []Asset{Asset(ip3)})
-	s.Assert().ElementsMatch(bulk.RelationUpserts, []Relation{r2})
-	s.Assert().ElementsMatch(bulk.AssetRemovals, []Asset{Asset(ip2)})
-	s.Assert().ElementsMatch(bulk.RelationRemovals, []Relation{r})
+	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip3)})
+	s.Assert().ElementsMatch(bulk.GetRelationUpserts(), []Relation{r2})
+	s.Assert().ElementsMatch(bulk.GetAssetRemovals(), []Asset{Asset(ip2)})
+	s.Assert().ElementsMatch(bulk.GetRelationRemovals(), []Relation{r})
 }
 
 func TestGraphUpdatesSuite(t *testing.T) {

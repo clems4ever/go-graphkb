@@ -20,3 +20,5 @@
 *.tar.gz
 go-graphkb
 importer-csv
+
+.config.yml

@@ -31,7 +31,7 @@ func (sl *GraphUpdater) appendObservedRelations(source string, updates *GraphUpd
 	observedRelationsToRemove := []Relation{}
 	observedRelationsToAdd := []Relation{}
 
-	for _, a := range updates.AssetUpserts {
+	for _, a := range updates.GetAssetUpserts() {
 		observedRelationsToAdd = append(observedRelationsToAdd, Relation{
 			Type: "observed",
 			From: AssetKey(assetsToAdd[0]),
@@ -39,7 +39,7 @@ func (sl *GraphUpdater) appendObservedRelations(source string, updates *GraphUpd
 		})
 	}
 
-	for _, a := range updates.AssetRemovals {
+	for _, a := range updates.GetAssetRemovals() {
 		observedRelationsToRemove = append(observedRelationsToRemove, Relation{
 			Type: "observed",
 			From: AssetKey(assetsToAdd[0]),
@@ -47,9 +47,9 @@ func (sl *GraphUpdater) appendObservedRelations(source string, updates *GraphUpd
 		})
 	}
 
-	updates.AssetUpserts = append(updates.AssetUpserts, assetsToAdd...)
-	updates.RelationUpserts = append(updates.RelationUpserts, observedRelationsToAdd...)
-	updates.RelationRemovals = append(updates.RelationRemovals, observedRelationsToRemove...)
+	updates.UpsertAssets(assetsToAdd...)
+	updates.UpsertRelations(observedRelationsToAdd...)
+	updates.RemoveRelations(observedRelationsToRemove...)
 }
 
 func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) error {
@@ -85,8 +85,15 @@ func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
 
 	sl.appendObservedRelations(updates.Source, &updates.Updates)
 
+	fmt.Printf("Start updating the graph with:\n"+
+		"\t%d assets to insert\n"+
+		"\t%d assets to remove\n"+
+		"\t%d relations to add\n"+
+		"\t%d relations to remove\n",
+		len(updates.Updates.GetAssetUpserts()), len(updates.Updates.GetAssetRemovals()),
+		len(updates.Updates.GetRelationUpserts()), len(updates.Updates.GetAssetRemovals()))
 	if err := sl.graphDB.UpdateGraph(updates.Source, &updates.Updates); err != nil {
-		fmt.Printf("[ERROR] Unable to write schema in graph DB: %v\n", err)
+		fmt.Printf("[ERROR] Unable to write data in graph DB: %v\n", err)
 		return err
 	}
 	return nil
