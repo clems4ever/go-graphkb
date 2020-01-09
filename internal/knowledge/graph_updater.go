@@ -85,6 +85,13 @@ func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
 
 	sl.appendObservedRelations(updates.Source, &updates.Updates)
 
+	fmt.Printf("Start updating the graph with:\n"+
+		"\t%d assets to insert\n"+
+		"\t%d assets to remove\n"+
+		"\t%d relations to add\n"+
+		"\t%d relations to remove\n",
+		len(updates.Updates.AssetUpserts), len(updates.Updates.AssetRemovals),
+		len(updates.Updates.RelationUpserts), len(updates.Updates.AssetRemovals))
 	if err := sl.graphDB.UpdateGraph(updates.Source, &updates.Updates); err != nil {
 		fmt.Printf("[ERROR] Unable to write schema in graph DB: %v\n", err)
 		return err
