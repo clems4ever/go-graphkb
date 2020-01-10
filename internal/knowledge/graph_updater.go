@@ -86,9 +86,9 @@ func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
 	sl.appendObservedRelations(updates.Source, &updates.Updates)
 
 	fmt.Printf("Start updating the graph with:\n"+
-		"\t%d assets to insert\n"+
+		"\t%d assets to upsert\n"+
 		"\t%d assets to remove\n"+
-		"\t%d relations to add\n"+
+		"\t%d relations to upsert\n"+
 		"\t%d relations to remove\n",
 		len(updates.Updates.GetAssetUpserts()), len(updates.Updates.GetAssetRemovals()),
 		len(updates.Updates.GetRelationUpserts()), len(updates.Updates.GetAssetRemovals()))
