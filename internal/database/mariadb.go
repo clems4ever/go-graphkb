@@ -486,6 +486,12 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.G
 		return nil, err
 	}
 
+	deadline, ok := ctx.Deadline()
+	// If there is a deadline, we make sure the query stops right after it has been reached.
+	if ok {
+		// Query can take 35 seconds max before being aborted...
+		sql.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sql.Query)
+	}
 	fmt.Println(sql.Query)
 
 	rows, err := m.db.QueryContext(ctx, sql.Query)
@@ -499,7 +505,6 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.G
 		Projections: sql.ProjectionTypes,
 	}
 	res.Projections = sql.ProjectionTypes
-
 	return res, nil
 }
 

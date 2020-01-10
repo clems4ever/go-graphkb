@@ -153,15 +153,15 @@ func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 		}
 
 		querier := knowledge.NewQuerier(database)
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		res, err := querier.Query(ctx, requestBody.Query)
-
 		if err != nil {
 			replyWithInternalError(w, err)
 			return
 		}
+		defer res.Cursor.Close()
 
 		columns := make([]ColumnType, 0)
 		for _, p := range res.Projections {
