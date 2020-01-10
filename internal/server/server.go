@@ -334,7 +334,8 @@ func Secret(user, realm string) string {
 }
 
 // StartServer start the web server
-func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
+func StartServer(listenInterface string, database knowledge.GraphDB,
+	schemaPersistor schema.Persistor,
 	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
 
 	sourcesToToken := viper.GetStringMap("sources")
@@ -379,17 +380,16 @@ func StartServer(database knowledge.GraphDB, schemaPersistor schema.Persistor,
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 
-	bindInterface := fmt.Sprintf(":%d", viper.GetInt32("port"))
-	fmt.Printf("Listening on %s\n", bindInterface)
+	fmt.Printf("Listening on %s\n", listenInterface)
 
 	var err error
 	if viper.GetString("tls_cert") != "" {
 		fmt.Println("Server is using TLS, the connection is secure")
-		err = http.ListenAndServeTLS(bindInterface, viper.GetString("tls_cert"),
+		err = http.ListenAndServeTLS(listenInterface, viper.GetString("tls_cert"),
 			viper.GetString("tls_key"), r)
 	} else {
 		fmt.Println("[WARNING] Server is NOT using TLS, the connection is not secure")
-		err = http.ListenAndServe(bindInterface, r)
+		err = http.ListenAndServe(listenInterface, r)
 	}
 	if err != nil {
 		log.Fatal(err)

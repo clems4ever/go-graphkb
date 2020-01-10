@@ -19,11 +19,14 @@ var Database *database.MariaDB
 // ConfigPath string
 var ConfigPath string
 
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
-
 func main() {
+	// Display the code line where log.Fatal appeared for troubleshooting
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// Also read env variables prefixed with GRAPHKB_.
+	viper.SetEnvPrefix("GRAPHKB")
+	viper.AutomaticEnv()
+
 	rootCmd := &cobra.Command{
 		Use: "go-graphkb [opts]",
 	}
@@ -116,7 +119,9 @@ func listen(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	server.StartServer(Database, Database, eventBus)
+	listenInterface := viper.GetString("listen")
+
+	server.StartServer(listenInterface, Database, Database, eventBus)
 
 	close(eventBus)
 }
