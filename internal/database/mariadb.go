@@ -49,8 +49,6 @@ CREATE TABLE IF NOT EXISTS assets (
 	id INT NOT NULL AUTO_INCREMENT,
 	value VARCHAR(255) NOT NULL,
 	type VARCHAR(64) NOT NULL,
-	start_date TIMESTAMP NOT NULL,
-	end_date TIMESTAMP,
 
 	CONSTRAINT pk_asset PRIMARY KEY (id),
 	UNIQUE unique_asset_idx (type, value),
@@ -69,8 +67,6 @@ CREATE TABLE IF NOT EXISTS relations (
 	to_id INT NOT NULL,
 	type VARCHAR(64) NOT NULL,
 	source VARCHAR(64) NOT NULL,
-	start_date TIMESTAMP NOT NULL,
-	end_date TIMESTAMP,
 
 	CONSTRAINT pk_relation PRIMARY KEY (id),
 	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
@@ -187,7 +183,7 @@ func (m *MariaDB) upsertAssets(assets []knowledge.Asset, registry *AssetRegistry
 		}
 
 		insertQuery, err := tx.PrepareContext(context.Background(), `
-INSERT INTO assets (type, value, start_date, end_date) VALUES (?, ?, CURRENT_TIMESTAMP(), NULL)`)
+INSERT INTO assets (type, value) VALUES (?, ?)`)
 		if err != nil {
 			return 0, fmt.Errorf("Unable to prepare asset insertion query: %v", err)
 		}
@@ -234,7 +230,7 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 		}
 
 		q, err := tx.PrepareContext(context.Background(),
-			"INSERT INTO relations (from_id, to_id, type, source, start_date, end_date) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), NULL)")
+			"INSERT INTO relations (from_id, to_id, type, source) VALUES (?, ?, ?, ?)")
 		if err != nil {
 			return 0, fmt.Errorf("Unable to prepare relation insertion query: %v", err)
 		}
