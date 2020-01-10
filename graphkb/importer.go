@@ -22,11 +22,10 @@ func Start(source sources.Source, options ImporterOptions) error {
 		return fmt.Errorf("Please provide a graphkb auth token to communicate with GraphKB")
 	}
 
-	observableSource := sources.NewObservableSource(source)
 	api := knowledge.NewGraphAPI(options.URL, options.AuthToken, options.SkipVerify)
 	graphImporter := knowledge.NewGraphImporter(api)
 
-	if err := observableSource.Start(graphImporter); err != nil {
+	if err := source.Start(graphImporter); err != nil {
 		return fmt.Errorf("Unable to start importer: %v", err)
 	}
 
