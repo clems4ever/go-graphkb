@@ -40,11 +40,12 @@ func (q *Querier) Query(ctx context.Context, cypherQuery string) (*QuerierResult
 	s.Execution = MeasureDuration(func() {
 		res, err = q.GraphDB.Query(ctx, queryIL)
 	})
-	fmt.Printf("Found results in %dms\n", s.Execution/time.Millisecond)
 
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Found results in %dms\n", s.Execution/time.Millisecond)
 
 	result := &QuerierResult{
 		Cursor:      res.Cursor,
