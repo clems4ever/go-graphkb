@@ -529,7 +529,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 		return fmt.Errorf("Unable to json encode schema: %v", err)
 	}
 
-	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (source_name, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
+	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (importer, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
 		sourceName, string(b))
 	if err != nil {
 		return fmt.Errorf("Unable to save schema in DB: %v", err)
@@ -540,7 +540,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 
 // LoadSchema load the schema graph of the source from DB
 func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.SchemaGraph, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE source_name = ? ORDER BY id DESC LIMIT 1", sourceName)
+	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE importer = ? ORDER BY id DESC LIMIT 1", sourceName)
 	var rawJSON string
 	if err := row.Scan(&rawJSON); err != nil {
 		if err == sql.ErrNoRows {
