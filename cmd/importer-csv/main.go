@@ -100,9 +100,9 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			options := graphkb.ImporterOptions{
-				URL:        viper.GetString("graphkb.url"),
-				AuthToken:  viper.GetString("graphkb.auth_token"),
-				SkipVerify: viper.GetBool("graphkb.skip_verify"),
+				URL:        viper.GetString("graphkb_url"),
+				AuthToken:  viper.GetString("graphkb_auth_token"),
+				SkipVerify: viper.GetBool("graphkb_skip_verify"),
 			}
 
 			if err := graphkb.Start(NewCSVSource(), options); err != nil {
