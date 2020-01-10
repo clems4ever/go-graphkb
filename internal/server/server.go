@@ -47,13 +47,8 @@ func replyWithUnauthorized(w http.ResponseWriter) {
 	}
 }
 
-func getSourceGraph(db schema.Persistor) http.HandlerFunc {
+func getSourceGraph(availableSourceNames []string, db schema.Persistor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		availableSourceNames, err := db.ListSources(context.Background())
-		if err != nil {
-			replyWithInternalError(w, err)
-			return
-		}
 		sourcesParams, ok := r.URL.Query()["sources"]
 		var sourceNames []string
 
@@ -70,7 +65,7 @@ func getSourceGraph(db schema.Persistor) http.HandlerFunc {
 		for _, sname := range sourceNames {
 			if !utils.IsStringInSlice(sname, availableSourceNames) {
 				w.WriteHeader(http.StatusBadRequest)
-				fmt.Println("Source is not available")
+				fmt.Printf("Source %s is not available", sname)
 				return
 			}
 			g, err := db.LoadSchema(context.Background(), sname)
@@ -347,7 +342,7 @@ func StartServer(listenInterface string, database knowledge.GraphDB,
 	r := mux.NewRouter()
 
 	listSourcesHandler := listSources(schemaPersistor, sources)
-	getSourceGraphHandler := getSourceGraph(schemaPersistor)
+	getSourceGraphHandler := getSourceGraph(sources, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database)
 	flushDatabaseHandler := flushDatabase(database)
