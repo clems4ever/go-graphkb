@@ -80,14 +80,14 @@ func onInit() {
 
 	fmt.Println("Using config file:", viper.ConfigFileUsed())
 
-	dbName := viper.GetString("mariadb.database")
+	dbName := viper.GetString("mariadb_database")
 	if dbName == "" {
 		log.Fatal("Please provide database_name option in your configuration file")
 	}
 	Database = database.NewMariaDB(
-		viper.GetString("mariadb.username"),
-		viper.GetString("mariadb.password"),
-		viper.GetString("mariadb.host"),
+		viper.GetString("mariadb_username"),
+		viper.GetString("mariadb_password"),
+		viper.GetString("mariadb_host"),
 		dbName)
 }
 
@@ -121,9 +121,9 @@ func listen(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	listenInterface := viper.GetString("listen")
+	listenInterface := viper.GetString("server_listen")
 
-	server.StartServer(listenInterface, Database, Database, eventBus)
+	server.StartServer(listenInterface, Database, Database, Database, eventBus)
 
 	close(eventBus)
 }

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/clems4ever/go-graphkb/internal/importers"
+
 	auth "github.com/abbot/go-http-auth"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
@@ -47,23 +49,32 @@ func replyWithUnauthorized(w http.ResponseWriter) {
 	}
 }
 
-func getSourceGraph(availableSourceNames []string, db schema.Persistor) http.HandlerFunc {
+func getSourceGraph(registry importers.Registry, db schema.Persistor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sourcesParams, ok := r.URL.Query()["sources"]
-		var sourceNames []string
+		importers := []string{}
+		availableImporters := []string{}
+
+		importerToToken, err := registry.ListImporters(r.Context())
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+		for k := range importerToToken {
+			availableImporters = append(availableImporters, k)
+		}
 
 		if ok && len(sourcesParams) > 0 {
-			sourceNames = make([]string, 0)
 			for _, s := range sourcesParams {
-				sourceNames = append(sourceNames, strings.Split(s, ",")...)
+				importers = append(importers, strings.Split(s, ",")...)
 			}
 		} else {
-			sourceNames = availableSourceNames
+			importers = availableImporters
 		}
 
 		sg := schema.NewSchemaGraph()
-		for _, sname := range sourceNames {
-			if !utils.IsStringInSlice(sname, availableSourceNames) {
+		for _, sname := range importers {
+			if !utils.IsStringInSlice(sname, availableImporters) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Printf("Source %s is not available", sname)
 				return
@@ -79,9 +90,20 @@ func getSourceGraph(availableSourceNames []string, db schema.Persistor) http.Han
 	}
 }
 
-func listSources(db schema.Persistor, sourceNames []string) http.HandlerFunc {
+func listImporters(registry importers.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := json.NewEncoder(w).Encode(sourceNames)
+		importersToToken, err := registry.ListImporters(r.Context())
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
+		importers := []string{}
+		for k := range importersToToken {
+			importers = append(importers, k)
+		}
+
+		err = json.NewEncoder(w).Encode(importers)
 		if err != nil {
 			replyWithInternalError(w, err)
 		}
@@ -219,40 +241,36 @@ func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 	}
 }
 
-type GraphSnapshotRequestBody struct {
-	Token string `json:"token"`
-}
-
-func isTokenValid(r *http.Request) (bool, string) {
+func isTokenValid(registry importers.Registry, r *http.Request) (bool, string, error) {
 	token, ok := r.URL.Query()["token"]
 
 	if !ok || len(token) != 1 {
-		return false, ""
+		return false, "", fmt.Errorf("Unable to detect token query parameter")
 	}
 
-	sourceToToken := viper.GetStringMap("sources")
+	importerToToken, err := registry.ListImporters(r.Context())
 
-	found := false
-	sourceName := ""
+	if err != nil {
+		return false, "", err
+	}
 
-	for sn, t := range sourceToToken {
-		if v, ok := t.(string); ok && v == token[0] {
-			found = true
-			sourceName = sn
-			break
+	for sn, t := range importerToToken {
+		if t == token[0] {
+			return true, sn, nil
 		}
 	}
 
-	if !found {
-		return false, ""
-	}
-
-	return true, sourceName
+	return false, "", nil
 }
 
-func getGraphRead(graphDB knowledge.GraphDB) http.HandlerFunc {
+func getGraphRead(registry importers.Registry, graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ok, source := isTokenValid(r)
+		ok, source, err := isTokenValid(registry, r)
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
 		if !ok {
 			replyWithUnauthorized(w)
 			return
@@ -264,21 +282,26 @@ func getGraphRead(graphDB knowledge.GraphDB) http.HandlerFunc {
 			return
 		}
 
-		gJson, err := json.Marshal(g)
+		gJSON, err := json.Marshal(g)
 		if err != nil {
 			replyWithInternalError(w, err)
 			return
 		}
 
-		if _, err := w.Write(gJson); err != nil {
+		if _, err := w.Write(gJSON); err != nil {
 			replyWithInternalError(w, err)
 		}
 	}
 }
 
-func postGraphUpdates(graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
+func postGraphUpdates(registry importers.Registry, graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ok, source := isTokenValid(r)
+		ok, source, err := isTokenValid(registry, r)
+		if err != nil {
+			replyWithInternalError(w, err)
+			return
+		}
+
 		if !ok {
 			replyWithUnauthorized(w)
 			return
@@ -298,7 +321,7 @@ func postGraphUpdates(graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.H
 			Source:  source,
 		}
 
-		_, err := bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
+		_, err = bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
 		if err != nil {
 			replyWithInternalError(w, err)
 			return
@@ -329,20 +352,16 @@ func Secret(user, realm string) string {
 }
 
 // StartServer start the web server
-func StartServer(listenInterface string, database knowledge.GraphDB,
+func StartServer(listenInterface string,
+	database knowledge.GraphDB,
 	schemaPersistor schema.Persistor,
+	importersRegistry importers.Registry,
 	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
-
-	sourcesToToken := viper.GetStringMap("sources")
-	sources := []string{}
-	for s := range sourcesToToken {
-		sources = append(sources, s)
-	}
 
 	r := mux.NewRouter()
 
-	listSourcesHandler := listSources(schemaPersistor, sources)
-	getSourceGraphHandler := getSourceGraph(sources, schemaPersistor)
+	listImportersHandler := listImporters(importersRegistry)
+	getSourceGraphHandler := getSourceGraph(importersRegistry, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database)
 	flushDatabaseHandler := flushDatabase(database)
@@ -356,32 +375,32 @@ func StartServer(listenInterface string, database knowledge.GraphDB,
 			})
 		}
 
-		listSourcesHandler = AuthMiddleware(listSourcesHandler)
+		listImportersHandler = AuthMiddleware(listImportersHandler)
 		getSourceGraphHandler = AuthMiddleware(getSourceGraphHandler)
 		getDatabaseDetailsHandler = AuthMiddleware(getDatabaseDetailsHandler)
 		postQueryHandler = AuthMiddleware(postQueryHandler)
 		flushDatabaseHandler = AuthMiddleware(flushDatabaseHandler)
 	}
 
-	r.HandleFunc("/api/sources", listSourcesHandler).Methods("GET")
+	r.HandleFunc("/api/sources", listImportersHandler).Methods("GET")
 	r.HandleFunc("/api/schema", getSourceGraphHandler).Methods("GET")
 	r.HandleFunc("/api/database", getDatabaseDetailsHandler).Methods("GET")
 
 	r.HandleFunc("/api/admin/flush", flushDatabaseHandler).Methods("POST")
 
-	r.HandleFunc("/api/graph/read", getGraphRead(database)).Methods("GET")
-	r.HandleFunc("/api/graph/update", postGraphUpdates(graphUpdatesC)).Methods("POST")
+	r.HandleFunc("/api/graph/read", getGraphRead(importersRegistry, database)).Methods("GET")
+	r.HandleFunc("/api/graph/update", postGraphUpdates(importersRegistry, graphUpdatesC)).Methods("POST")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 
 	var err error
-	if viper.GetString("tls_cert") != "" {
+	if viper.GetString("server_tls_cert") != "" {
 		fmt.Printf("Listening on %s with TLS enabled, the connection is secure\n", listenInterface)
-		err = http.ListenAndServeTLS(listenInterface, viper.GetString("tls_cert"),
-			viper.GetString("tls_key"), r)
+		err = http.ListenAndServeTLS(listenInterface, viper.GetString("server_tls_cert"),
+			viper.GetString("server_tls_key"), r)
 	} else {
-		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `tls_cert` option to setup a certificate\n",
+		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate\n",
 			listenInterface)
 		err = http.ListenAndServe(listenInterface, r)
 	}

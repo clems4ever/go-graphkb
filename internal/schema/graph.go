@@ -82,24 +82,26 @@ func (sg *SchemaGraph) Equal(other SchemaGraph) bool {
 	return true
 }
 
+// MarshalJSON marshal the schema graph into json format
 func (sg *SchemaGraph) MarshalJSON() ([]byte, error) {
-	schemaJson := SchemaGraphJSON{}
-	schemaJson.Vertices = []AssetType{}
-	schemaJson.Edges = []RelationType{}
+	schemaJSON := SchemaGraphJSON{}
+	schemaJSON.Vertices = []AssetType{}
+	schemaJSON.Edges = []RelationType{}
 
 	for v := range sg.Vertices.Iter() {
 		vertice := v.(AssetType)
-		schemaJson.Vertices = append(schemaJson.Vertices, vertice)
+		schemaJSON.Vertices = append(schemaJSON.Vertices, vertice)
 	}
 
 	for e := range sg.Edges.Iter() {
 		edge := e.(RelationType)
-		schemaJson.Edges = append(schemaJson.Edges, edge)
+		schemaJSON.Edges = append(schemaJSON.Edges, edge)
 	}
 
-	return json.Marshal(schemaJson)
+	return json.Marshal(schemaJSON)
 }
 
+// UnmarshalJSON unmarshal the schema graph from json payload
 func (sg *SchemaGraph) UnmarshalJSON(b []byte) error {
 	j := SchemaGraphJSON{}
 	if err := json.Unmarshal(b, &j); err != nil {

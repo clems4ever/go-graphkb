@@ -3,18 +3,20 @@ package graphkb
 import (
 	"fmt"
 
+	"github.com/clems4ever/go-graphkb/internal/importers"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
-	"github.com/clems4ever/go-graphkb/internal/sources"
 )
 
+// ImporterOptions options for configuring importer
 type ImporterOptions struct {
 	URL        string
 	AuthToken  string
 	SkipVerify bool
 }
 
-func Start(source sources.Source, options ImporterOptions) error {
+// Start the importer with provided options
+func Start(source importers.Importer, options ImporterOptions) error {
 	if options.URL == "" {
 		return fmt.Errorf("Please provide graphkb URL in configuration file")
 	}
@@ -32,6 +34,7 @@ func Start(source sources.Source, options ImporterOptions) error {
 	return nil
 }
 
+// CreateRelation helper function for creating a relation
 func CreateRelation(fromType schema.AssetType, relation, toType schema.AssetType) RelationType {
 	return schema.RelationType{
 		FromType: fromType,
@@ -40,6 +43,7 @@ func CreateRelation(fromType schema.AssetType, relation, toType schema.AssetType
 	}
 }
 
+// CreateAsset helper function for creating an asset
 func CreateAsset(fromType string) AssetType {
 	return schema.AssetType(fromType)
 }

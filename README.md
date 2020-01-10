@@ -13,7 +13,7 @@ and results can be visualized in the UI as shown below.
 Run the following commands
 
     # Spin up GraphKB in few seconds with (wait 15 seconds for mariadb to start).
-    docker-compose up -d
+    source bootstrap.sh && docker-compose up -d
 
     # Insert the example data available in examples/ directory
     # with the following command:
