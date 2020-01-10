@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/database"
@@ -25,6 +26,7 @@ func main() {
 
 	// Also read env variables prefixed with GRAPHKB_.
 	viper.SetEnvPrefix("GRAPHKB")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	rootCmd := &cobra.Command{
