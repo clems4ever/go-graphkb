@@ -375,15 +375,14 @@ func StartServer(listenInterface string, database knowledge.GraphDB,
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 
-	fmt.Printf("Listening on %s\n", listenInterface)
-
 	var err error
 	if viper.GetString("tls_cert") != "" {
-		fmt.Println("Server is using TLS, the connection is secure")
+		fmt.Printf("Listening on %s with TLS enabled, the connection is secure\n", listenInterface)
 		err = http.ListenAndServeTLS(listenInterface, viper.GetString("tls_cert"),
 			viper.GetString("tls_key"), r)
 	} else {
-		fmt.Println("[WARNING] Server is NOT using TLS, the connection is not secure")
+		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `tls_cert` option to setup a certificate\n",
+			listenInterface)
 		err = http.ListenAndServe(listenInterface, r)
 	}
 	if err != nil {
