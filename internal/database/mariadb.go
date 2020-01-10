@@ -87,10 +87,26 @@ CREATE TABLE IF NOT EXISTS relations (
 	q, err = m.db.QueryContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS graph_schema (
 	id INTEGER AUTO_INCREMENT NOT NULL,
-	source_name VARCHAR(64) NOT NULL,
+	importer VARCHAR(64) NOT NULL,
 	graph TEXT NOT NULL,
 	timestamp TIMESTAMP,
-CONSTRAINT pk_schema PRIMARY KEY (id))`)
+	
+	CONSTRAINT pk_schema PRIMARY KEY (id))`)
+	if err != nil {
+		return err
+	}
+	defer q.Close()
+
+	// Create the table storing importers tokens
+	q, err = m.db.QueryContext(context.Background(), `
+CREATE TABLE IF NOT EXISTS importers (
+	id INTEGER AUTO_INCREMENT NOT NULL,
+	name VARCHAR(64) NOT NULL,
+	auth_token VARCHAR(64) NOT NULL,
+
+	CONSTRAINT pk_importer PRIMARY KEY (id),
+	UNIQUE unique_importer_idx (name, auth_token)
+)`)
 	if err != nil {
 		return err
 	}
@@ -98,15 +114,17 @@ CONSTRAINT pk_schema PRIMARY KEY (id))`)
 	return nil
 }
 
-// AssetIDResolver store ID assets in a cache
+// AssetRegistry store ID of assets in a cache
 type AssetRegistry struct {
 	cache map[knowledge.AssetKey]int64
 }
 
+// Set id of an asset
 func (ar *AssetRegistry) Set(a knowledge.AssetKey, idx int64) {
 	ar.cache[a] = idx
 }
 
+// Get id of an asset
 func (ar *AssetRegistry) Get(a knowledge.AssetKey) (int64, bool) {
 	idx, ok := ar.cache[a]
 	return idx, ok
@@ -286,19 +304,15 @@ func (m *MariaDB) removeRelations(source string, relations []knowledge.Relation)
 DELETE r FROM relations r
 INNER JOIN assets a ON r.from_id = a.id
 INNER JOIN assets b ON r.to_id = b.id
-WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ?`)
+WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? AND r.source = ?`)
 	if err != nil {
 		return 0, 0, err
 	}
 	defer stmt.Close()
 
 	for _, r := range relations {
-		rel := SourceRelation{
-			Relation: r,
-			Source:   source,
-		}
 		res, err := stmt.ExecContext(context.Background(),
-			rel.From.Type, rel.From.Key, rel.To.Type, rel.To.Key, rel.Type)
+			r.From.Type, r.From.Key, r.To.Type, r.To.Key, r.Type, source)
 		if err != nil {
 			return 0, 0, fmt.Errorf("Unable to detete relation %v: %v", r, err)
 		}
@@ -508,6 +522,7 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.G
 	return res, nil
 }
 
+// SaveSchema save the schema graph in database
 func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema schema.SchemaGraph) error {
 	b, err := json.Marshal(schema)
 	if err != nil {
@@ -523,19 +538,19 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 	return nil
 }
 
+// LoadSchema load the schema graph of the source from DB
 func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.SchemaGraph, error) {
 	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE source_name = ? ORDER BY id DESC LIMIT 1", sourceName)
-	var rawJson string
-	if err := row.Scan(&rawJson); err != nil {
+	var rawJSON string
+	if err := row.Scan(&rawJSON); err != nil {
 		if err == sql.ErrNoRows {
 			return schema.NewSchemaGraph(), nil
-		} else {
-			return schema.NewSchemaGraph(), err
 		}
+		return schema.NewSchemaGraph(), err
 	}
 
 	graph := schema.NewSchemaGraph()
-	err := json.Unmarshal([]byte(rawJson), &graph)
+	err := json.Unmarshal([]byte(rawJSON), &graph)
 	if err != nil {
 		return schema.NewSchemaGraph(), err
 	}
@@ -543,35 +558,40 @@ func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.Sch
 	return graph, nil
 }
 
-func (m *MariaDB) ListSources(ctx context.Context) ([]string, error) {
-	rows, err := m.db.QueryContext(ctx, "SELECT DISTINCT source_name FROM graph_schema")
+// ListImporters list importers with their authentication tokens
+func (m *MariaDB) ListImporters(ctx context.Context) (map[string]string, error) {
+	rows, err := m.db.QueryContext(ctx, "SELECT name, auth_token FROM importers")
 
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read sources from database: %v", err)
 	}
 	defer rows.Close()
 
-	sources := make([]string, 0)
+	importers := make(map[string]string)
 	for rows.Next() {
-		var source string
-		if err := rows.Scan(&source); err != nil {
+		var importerName string
+		var authToken string
+		if err := rows.Scan(&importerName, &authToken); err != nil {
 			return nil, err
 		}
-		sources = append(sources, source)
+		importers[importerName] = authToken
 	}
-	return sources, nil
+	return importers, nil
 }
 
+// MariaDBCursor is a cursor of data retrieved by MariaDB
 type MariaDBCursor struct {
 	*sql.Rows
 
 	Projections []knowledge.Projection
 }
 
+// HasMore tells whether there are more data to retrieve from the cursor
 func (mc *MariaDBCursor) HasMore() bool {
 	return mc.Rows.Next()
 }
 
+// Read read one more item from the cursor
 func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 	var err error
 	var fArr []string
@@ -650,6 +670,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 	return nil
 }
 
+// Close the cursor
 func (mc *MariaDBCursor) Close() error {
 	return mc.Rows.Close()
 }

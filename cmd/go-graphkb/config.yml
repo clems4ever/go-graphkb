@@ -1,12 +1,8 @@
-listen: :8080
-# tls_key: cmd/go-graphkb/keys/server.key
-# tls_cert: cmd/go-graphkb/keys/server.crt
+server_listen: :8080
+# server_tls_key: cmd/go-graphkb/keys/server.key
+# server_tls_cert: cmd/go-graphkb/keys/server.crt
 
-mariadb:
-  username: graphkb
-  password: password
-  host: db
-  database: graphkb
-
-sources:
-  csv-employees: token_auth_for_csv_importer
+mariadb_username: graphkb
+mariadb_password: password
+mariadb_host: db
+mariadb_database: graphkb

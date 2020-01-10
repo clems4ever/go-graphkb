@@ -1,9 +1,9 @@
-package sources
+package importers
 
 import "github.com/clems4ever/go-graphkb/internal/knowledge"
 
-// Source represent a source of data
-type Source interface {
+// Importer represent an importer of data
+type Importer interface {
 	Start(emitter *knowledge.GraphImporter) error
 	Stop() error
 }
