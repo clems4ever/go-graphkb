@@ -123,7 +123,7 @@ func listen(cmd *cobra.Command, args []string) {
 
 	listenInterface := viper.GetString("server_listen")
 
-	server.StartServer(listenInterface, Database, Database, Database, eventBus)
+	server.StartServer(listenInterface, Database, Database, Database, Database, eventBus)
 
 	close(eventBus)
 }
@@ -142,7 +142,7 @@ func queryFunc(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	q := knowledge.NewQuerier(Database)
+	q := knowledge.NewQuerier(Database, Database)
 
 	r, err := q.Query(ctx, args[0])
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/cheggaaa/pb"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
-	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	mapset "github.com/deckarep/golang-set"
@@ -107,6 +106,23 @@ CREATE TABLE IF NOT EXISTS importers (
 	CONSTRAINT pk_importer PRIMARY KEY (id),
 	UNIQUE unique_importer_idx (name, auth_token)
 )`)
+	if err != nil {
+		return err
+	}
+	defer q.Close()
+
+	// Create the table storing importers tokens
+	q, err = m.db.QueryContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS query_history (
+			id INTEGER AUTO_INCREMENT NOT NULL,
+			timestamp TIMESTAMP,
+			query_cypher TEXT NOT NULL,
+			query_sql TEXT NOT NULL,
+			execution_time_ms INT,
+			status ENUM('SUCCESS', 'FAILURE'),
+			error TEXT,
+			CONSTRAINT pk_history PRIMARY KEY (id)
+		)`)
 	if err != nil {
 		return err
 	}
@@ -494,12 +510,7 @@ func (m *MariaDB) Close() error {
 }
 
 // Query the database with provided intermediate query representation
-func (m *MariaDB) Query(ctx context.Context, query *query.QueryCypher) (*knowledge.GraphQueryResult, error) {
-	sql, err := knowledge.NewSQLQueryTranslator().Translate(query)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*knowledge.GraphQueryResult, error) {
 	deadline, ok := ctx.Deadline()
 	// If there is a deadline, we make sure the query stops right after it has been reached.
 	if ok {
@@ -520,6 +531,24 @@ func (m *MariaDB) Query(ctx context.Context, query *query.QueryCypher) (*knowled
 	}
 	res.Projections = sql.ProjectionTypes
 	return res, nil
+}
+
+func (m *MariaDB) SaveSuccessfulQuery(ctx context.Context, cypher, sql string, duration time.Duration) error {
+	_, err := m.db.ExecContext(ctx, "INSERT INTO query_history (id, timestamp, query_cypher, query_sql, status, execution_time_ms) VALUES (NULL, CURRENT_TIMESTAMP(), ?, ?, 'SUCCESS', ?)",
+		cypher, sql, duration)
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (m *MariaDB) SaveFailedQuery(ctx context.Context, cypher, sql string, err error) error {
+	_, inErr := m.db.ExecContext(ctx, "INSERT INTO query_history (id, timestamp, query_cypher, query_sql, status, error) VALUES (NULL, CURRENT_TIMESTAMP(), ?, ?, 'FAILURE', ?)",
+		cypher, sql, err.Error())
+	if inErr != nil {
+		return inErr
+	}
+	return nil
 }
 
 // SaveSchema save the schema graph in database

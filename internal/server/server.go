@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/clems4ever/go-graphkb/internal/history"
 	"github.com/clems4ever/go-graphkb/internal/importers"
 
 	auth "github.com/abbot/go-http-auth"
@@ -140,7 +141,7 @@ func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 	}
 }
 
-func postQuery(database knowledge.GraphDB) http.HandlerFunc {
+func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type QueryRequestBody struct {
 			Query string `json:"q"`
@@ -174,7 +175,7 @@ func postQuery(database knowledge.GraphDB) http.HandlerFunc {
 			return
 		}
 
-		querier := knowledge.NewQuerier(database)
+		querier := knowledge.NewQuerier(database, queryHistorizer)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -356,6 +357,7 @@ func StartServer(listenInterface string,
 	database knowledge.GraphDB,
 	schemaPersistor schema.Persistor,
 	importersRegistry importers.Registry,
+	queryHistorizer history.Historizer,
 	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
 
 	r := mux.NewRouter()
@@ -363,7 +365,7 @@ func StartServer(listenInterface string,
 	listImportersHandler := listImporters(importersRegistry)
 	getSourceGraphHandler := getSourceGraph(importersRegistry, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
-	postQueryHandler := postQuery(database)
+	postQueryHandler := postQuery(database, queryHistorizer)
 	flushDatabaseHandler := flushDatabase(database)
 
 	if viper.GetString("password") != "" {
