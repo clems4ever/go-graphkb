@@ -9,11 +9,6 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/parser"
 )
 
-// QueryIL a struct holding the query intermediate representation
-type QueryIL struct {
-	QueryCypher
-}
-
 // ParsingError represent a parsing error
 type ParsingError struct {
 	Line    int
@@ -41,8 +36,8 @@ func (pel *ParsingErrorListener) SyntaxError(recognizer antlr.Recognizer, offend
 	})
 }
 
-// TransformCypher transform an openCypher query into a QueryIL.
-func TransformCypher(query string) (*QueryIL, error) {
+// TransformCypher transform an openCypher query into a QueryCypher.
+func TransformCypher(query string) (*QueryCypher, error) {
 	is := antlr.NewInputStream(query)
 	lexer := parser.NewCypherLexer(is)
 	stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
@@ -52,7 +47,7 @@ func TransformCypher(query string) (*QueryIL, error) {
 	p.AddErrorListener(pel)
 
 	l := NewCypherVisitor()
-	queryIL := l.Visit(p.OC_Cypher())
+	queryCypher := l.Visit(p.OC_Cypher())
 
 	if len(pel.Errors) > 0 {
 		errStr := []string{}
@@ -62,8 +57,8 @@ func TransformCypher(query string) (*QueryIL, error) {
 		return nil, fmt.Errorf("Parsing errors detected: %s", strings.Join(errStr, ", "))
 	}
 
-	switch v := queryIL.(type) {
-	case QueryIL:
+	switch v := queryCypher.(type) {
+	case QueryCypher:
 		return &v, nil
 	case error:
 		return nil, v
@@ -80,8 +75,7 @@ type BaseCypherVisitor struct {
 
 // NewCypherVisitor create a visitor for cypher
 func NewCypherVisitor() *BaseCypherVisitor {
-	l := new(BaseCypherVisitor)
-	return l
+	return new(BaseCypherVisitor)
 }
 
 // VariableType represent a variable type
@@ -108,14 +102,7 @@ func (cl *BaseCypherVisitor) AppendErrors(err ...error) {
 
 // Visit the AST
 func (cl *BaseCypherVisitor) Visit(tree antlr.ParseTree) interface{} {
-	q := QueryIL{}
-	switch v := tree.Accept(cl).(type) {
-	case QueryCypher:
-		q.QueryCypher = v
-	case error:
-		return v
-	}
-	return q
+	return tree.Accept(cl)
 }
 
 // QueryCypher the representation of the query in IL
@@ -539,8 +526,8 @@ func (cl *BaseCypherVisitor) VisitOC_StringOperatorExpression(c *parser.OC_Strin
 }
 
 type QueryPropertyOrLabelsExpression struct {
-	Atom            QueryAtom
-	PropertyLookups []string
+	Atom         QueryAtom
+	PropertyKeys []string
 }
 
 func (cl *BaseCypherVisitor) VisitOC_PropertyOrLabelsExpression(c *parser.OC_PropertyOrLabelsExpressionContext) interface{} {
@@ -549,10 +536,14 @@ func (cl *BaseCypherVisitor) VisitOC_PropertyOrLabelsExpression(c *parser.OC_Pro
 
 	propLookups := make([]string, 0)
 	for i := range c.AllOC_PropertyLookup() {
-		propLookups = append(propLookups, c.OC_PropertyLookup(i).GetText())
+		propLookups = append(propLookups, c.OC_PropertyLookup(i).Accept(cl).(string))
 	}
-	q.PropertyLookups = propLookups
+	q.PropertyKeys = propLookups
 	return q
+}
+
+func (cl *BaseCypherVisitor) VisitOC_PropertyLookup(c *parser.OC_PropertyLookupContext) interface{} {
+	return c.OC_PropertyKeyName().GetText()
 }
 
 type QueryAtom struct {

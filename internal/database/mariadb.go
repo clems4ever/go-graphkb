@@ -494,7 +494,7 @@ func (m *MariaDB) Close() error {
 }
 
 // Query the database with provided intermediate query representation
-func (m *MariaDB) Query(ctx context.Context, query *query.QueryIL) (*knowledge.GraphQueryResult, error) {
+func (m *MariaDB) Query(ctx context.Context, query *query.QueryCypher) (*knowledge.GraphQueryResult, error) {
 	sql, err := knowledge.NewSQLQueryTranslator().Translate(query)
 	if err != nil {
 		return nil, err

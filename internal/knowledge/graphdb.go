@@ -27,7 +27,7 @@ type GraphDB interface {
 	CountAssets() (int64, error)
 	CountRelations() (int64, error)
 
-	Query(ctx context.Context, query *query.QueryIL) (*GraphQueryResult, error)
+	Query(ctx context.Context, query *query.QueryCypher) (*GraphQueryResult, error)
 }
 
 // Cursor is a cursor over the results
