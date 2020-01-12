@@ -10,8 +10,12 @@ type ProjectionVisitor struct {
 	QueryGraph *QueryGraph
 
 	Aggregation    bool
-	ExpressionType ExpressionType
 	TypeAndIndex   TypeAndIndex
+	ExpressionType ExpressionType
+
+	funcInvoc  bool
+	etype      ExpressionType
+	properties []string
 }
 
 // ParseExpression return whether the expression require aggregation
@@ -26,6 +30,7 @@ func (pv *ProjectionVisitor) ParseExpression(q *query.QueryExpression) error {
 func (pv *ProjectionVisitor) OnEnterFunctionInvocation(name string) error {
 	if name == "COUNT" {
 		pv.Aggregation = true
+		pv.funcInvoc = true
 	} else {
 		return fmt.Errorf("Function %s is not supported", name)
 	}
@@ -40,12 +45,28 @@ func (pv *ProjectionVisitor) OnVariable(name string) error {
 
 	switch typeAndIndex.Type {
 	case NodeType:
-		pv.ExpressionType = NodeExprType
+		pv.etype = NodeExprType
 	case RelationType:
-		pv.ExpressionType = EdgeExprType
+		pv.etype = EdgeExprType
 	default:
-		pv.ExpressionType = PropertyExprType
+		pv.etype = PropertyExprType
 	}
 	pv.TypeAndIndex = typeAndIndex
+	return nil
+}
+
+func (pv *ProjectionVisitor) OnVariablePropertiesPath(properties []string) error {
+	pv.properties = properties
+	return nil
+}
+
+func (pv *ProjectionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
+	if len(pv.properties) > 0 || pv.funcInvoc {
+		pv.ExpressionType = PropertyExprType
+	} else {
+		pv.ExpressionType = pv.etype
+	}
+	pv.properties = nil
+	pv.funcInvoc = false
 	return nil
 }

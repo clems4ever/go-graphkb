@@ -105,10 +105,7 @@ func (sev *SQLExpressionVisitor) OnExitParenthesizedExpression() error {
 
 func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
 	if sev.variableName != nil {
-		path := "*"
-		if len(sev.propertiesPath) > 0 {
-			path = strings.Join(sev.propertiesPath, ".")
-		}
+		var properties []string
 		typeAndIndex, err := sev.queryGraph.FindVariable(*sev.variableName)
 		if err != nil {
 			return err
@@ -118,12 +115,22 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 		switch typeAndIndex.Type {
 		case NodeType:
 			alias = "a"
+			properties = []string{"id", "value", "type"}
 		case RelationType:
 			alias = "r"
+			properties = []string{"from_id", "to_id", "type"}
 		}
 		alias += fmt.Sprintf("%d", typeAndIndex.Index)
+		if len(sev.propertiesPath) > 0 {
+			properties = []string{strings.Join(sev.propertiesPath, ".")}
+		}
 
-		sev.propertyLabelsExpression = fmt.Sprintf("%s.%s", alias, path)
+		projection := []string{}
+		for _, p := range properties {
+			projection = append(projection, fmt.Sprintf("%s.%s", alias, p))
+		}
+
+		sev.propertyLabelsExpression = strings.Join(projection, ", ")
 		sev.variableName = nil
 		sev.propertiesPath = nil
 	} else if sev.stringLiteral != nil {

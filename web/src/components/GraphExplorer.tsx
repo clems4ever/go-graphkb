@@ -36,6 +36,10 @@ function uniqBy<T>(a: T[], key: (v: T) => string): T[] {
     })
 }
 
+function relationKey(r: Relation): string {
+    return `${r.from_id}-${r.type}-${r.to_id}`;
+}
+
 export default function (props: Props) {
     const [nodes, setNodes] = useState([] as D3Node[]);
     const [edges, setEdges] = useState([] as D3Link[]);
@@ -70,7 +74,7 @@ export default function (props: Props) {
                 }
             }
             assets = uniqBy(assets, a => a._id);
-            relations = uniqBy(relations, r => r._id);
+            relations = uniqBy(relations, relationKey);
         }
 
         const selectedAssets = assets.slice(0, maxEdges);
@@ -88,7 +92,7 @@ export default function (props: Props) {
         }
 
         const d3nodes = selectedAssets.map(a => ({ id: a._id, label: a.key, asset: a } as D3Node));
-        const d3edges = selectedRelations.map(r => ({ id: r._id, label: r.type, source: r.from_id, target: r.to_id, relation: r } as D3Link));
+        const d3edges = selectedRelations.map(r => ({ id: relationKey(r), label: r.type, source: r.from_id, target: r.to_id, relation: r } as D3Link));
         setNodes(d3nodes);
         setEdges(d3edges);
     }, [result, setNodes, setEdges]);

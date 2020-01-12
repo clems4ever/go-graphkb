@@ -647,15 +647,14 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			}
 			output[i] = a
 		case knowledge.EdgeExprType:
-			items, err := q.Get(5)
+			items, err := q.Get(3)
 			if err != nil {
 				return nil
 			}
 			r := knowledge.RelationWithID{
-				ID:   fmt.Sprintf("%v", reflect.ValueOf(items[0])),
-				From: fmt.Sprintf("%v", reflect.ValueOf(items[1])),
-				To:   fmt.Sprintf("%v", reflect.ValueOf(items[2])),
-				Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[3]))),
+				From: fmt.Sprintf("%v", reflect.ValueOf(items[0])),
+				To:   fmt.Sprintf("%v", reflect.ValueOf(items[1])),
+				Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[2]))),
 			}
 			output[i] = r
 		case knowledge.PropertyExprType:

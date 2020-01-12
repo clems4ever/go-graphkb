@@ -69,9 +69,113 @@ func BuildAndOrExpression(tree AndOrExpression) (string, error) {
 	return "", nil
 }
 
+func CrossProductExpressions(and1 []AndOrExpression, and2 []AndOrExpression) []AndOrExpression {
+	outExpr := []AndOrExpression{}
+	for i := range and1 {
+		for j := range and2 {
+			children := AndOrExpression{
+				And:      true,
+				Children: []AndOrExpression{and1[i], and2[j]},
+			}
+			outExpr = append(outExpr, children)
+		}
+	}
+	return outExpr
+}
+
+// UnwindOrExpressions in order to transform query with or relations into a union
+// query which is more performant, an AndOrExpression is transformed into a list of AndExpressions
+func UnwindOrExpressions(tree AndOrExpression) ([]AndOrExpression, error) {
+	if tree.Expression != "" {
+		child := AndOrExpression{Children: []AndOrExpression{tree}, And: true}
+		return []AndOrExpression{child}, nil
+	} else if !tree.And {
+		exprs := []AndOrExpression{}
+		for i := range tree.Children {
+			nestedExpressions, err := UnwindOrExpressions(tree.Children[i])
+			if err != nil {
+				return nil, err
+			}
+			exprs = append(exprs, nestedExpressions...)
+		}
+		return exprs, nil
+	} else if tree.And {
+		exprs := []AndOrExpression{}
+		for i := range tree.Children {
+			expr, err := UnwindOrExpressions(tree.Children[i])
+			if err != nil {
+				return nil, err
+			}
+
+			if len(exprs) == 0 {
+				exprs = append(exprs, expr...)
+			} else {
+				exprs = CrossProductExpressions(exprs, expr)
+			}
+		}
+		return exprs, nil
+	}
+	return nil, fmt.Errorf("Unable to detect kind of node")
+}
+
 func (sqt *SQLQueryTranslator) buildSQLSelect(
+	distinct bool, projections []string, projectionTypes []Projection, fromTables []string,
+	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
+	var sqlQuery string
+
+	andExpressions, err := UnwindOrExpressions(whereExpressions)
+	if err != nil {
+		return "", err
+	}
+
+	if len(andExpressions) > 1 {
+		singleQueries := []string{}
+		for _, where := range andExpressions {
+			singleQuery, err := sqt.buildSingleSQLSelect(false, projections, fromTables, where, nil, 0, 0)
+			if err != nil {
+				return "", err
+			}
+			singleQueries = append(singleQueries, fmt.Sprintf("(%s)", singleQuery))
+		}
+		if distinct {
+			sqlQuery = strings.Join(singleQueries, "\nUNION\n")
+		} else {
+			sqlQuery = strings.Join(singleQueries, "\nUNION ALL\n")
+		}
+
+		if len(groupBy) > 0 {
+			groupByProjections := []string{}
+			for i := range groupBy {
+				groupByProjections = append(groupByProjections, projections[groupBy[i]])
+			}
+
+			sqlQuery = fmt.Sprintf("SELECT %s FROM\n(%s)\nGROUP BY %s",
+				strings.Join(projections, ", "), sqlQuery, strings.Join(groupByProjections, ","))
+		}
+
+		if limit > 0 {
+			sqlQuery += fmt.Sprintf("\nLIMIT %d", limit)
+		}
+
+		if offset > 0 {
+			sqlQuery += fmt.Sprintf("\nOFFSET %d", offset)
+		}
+
+	} else {
+		and := AndOrExpression{And: true, Children: andExpressions}
+		singleQuery, err := sqt.buildSingleSQLSelect(distinct, projections, fromTables, and, groupBy, limit, offset)
+		if err != nil {
+			return "", err
+		}
+		sqlQuery = singleQuery
+	}
+
+	return sqlQuery, nil
+}
+
+func (sqt *SQLQueryTranslator) buildSingleSQLSelect(
 	distinct bool, projections []string, fromTables []string,
-	whereExpressions AndOrExpression, groupBy []string, limit int, offset int) (string, error) {
+	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
 
 	projectionsStr := ""
 	if distinct {
@@ -92,7 +196,11 @@ func (sqt *SQLQueryTranslator) buildSQLSelect(
 	}
 
 	if len(groupBy) > 0 {
-		sqlQuery += fmt.Sprintf("\nGROUP BY %s", strings.Join(groupBy, ", "))
+		groupByProjection := make([]string, len(groupBy))
+		for i := range groupBy {
+			groupByProjection[i] = projections[groupBy[i]]
+		}
+		sqlQuery += fmt.Sprintf("\nGROUP BY %s", strings.Join(groupByProjection, ", "))
 	}
 
 	if limit > 0 {
@@ -154,10 +262,10 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	projectionTypes := make([]Projection, 0)
 	from := make([]string, 0)
 
-	unaggregatedProjectionItems := make([]string, 0)
+	unaggregatedProjectionItems := []int{}
 	aggregationRequired := false
 
-	for _, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems {
+	for i, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems {
 		projectionVisitor := ProjectionVisitor{QueryGraph: &sqt.QueryGraph}
 		err := projectionVisitor.ParseExpression(&p.Expression)
 		if err != nil {
@@ -170,7 +278,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		}
 
 		if !projectionVisitor.Aggregation {
-			unaggregatedProjectionItems = append(unaggregatedProjectionItems, projection)
+			unaggregatedProjectionItems = append(unaggregatedProjectionItems, i)
 		} else {
 			aggregationRequired = true
 		}
@@ -197,17 +305,23 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 			})
 		}
 
-		// Append assets constraints
-		andExpressions.Children = append(andExpressions.Children, typesConstraints)
+		if len(typesConstraints.Children) > 0 {
+			// Append assets constraints
+			andExpressions.Children = append(andExpressions.Children, typesConstraints)
+		}
 	}
 	for i, r := range sqt.QueryGraph.Relations {
 		alias := fmt.Sprintf("r%d", i)
 		from = append(from, fmt.Sprintf("relations %s", alias))
 
+		typesConstraints := AndOrExpression{And: false}
 		for _, label := range r.Labels {
-			andExpressions.Children = append(andExpressions.Children, AndOrExpression{
+			typesConstraints.Children = append(typesConstraints.Children, AndOrExpression{
 				Expression: fmt.Sprintf("%s.type = '%s'", alias, label),
 			})
+		}
+		if len(typesConstraints.Children) > 0 {
+			andExpressions.Children = append(andExpressions.Children, typesConstraints)
 		}
 
 		out := AndOrExpression{
@@ -280,7 +394,6 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 				}
 				andExpressions.Children = append(andExpressions.Children, orExpression)
 			}
-
 		}
 	}
 
@@ -309,11 +422,14 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		offset = int(skipVisitor.Skip)
 	}
 
-	andExpressions.Children = append(andExpressions.Children, filterExpressions)
+	if len(filterExpressions.Children) > 0 {
+		andExpressions.Children = append(andExpressions.Children, filterExpressions)
+	}
 
 	sqlQuery, err := sqt.buildSQLSelect(
 		query.QuerySinglePartQuery.ProjectionBody.Distinct,
 		projections,
+		projectionTypes,
 		from,
 		andExpressions,
 		unaggregatedProjectionItems,
