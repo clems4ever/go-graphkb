@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/clems4ever/go-graphkb/internal/history"
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
 
 type Querier struct {
-	GraphDB GraphDB
+	GraphDB    GraphDB
+	historizer history.Historizer
 }
 
 type QuerierResult struct {
@@ -18,31 +20,53 @@ type QuerierResult struct {
 	Statistics  Statistics
 }
 
-func NewQuerier(db GraphDB) *Querier {
-	return &Querier{GraphDB: db}
+func NewQuerier(db GraphDB, historizer history.Historizer) *Querier {
+	return &Querier{GraphDB: db, historizer: historizer}
 }
 
 func (q *Querier) Query(ctx context.Context, queryString string) (*QuerierResult, error) {
+	qr, sql, err := q.queryInternal(ctx, queryString)
+	if err != nil {
+		saveErr := q.historizer.SaveFailedQuery(ctx, queryString, sql, err)
+		if saveErr != nil {
+			return nil, fmt.Errorf("Unable to save query error in database: %v", saveErr)
+		}
+		return nil, err
+	}
+
+	saveErr := q.historizer.SaveSuccessfulQuery(ctx, queryString, sql, qr.Statistics.Execution/time.Millisecond)
+	if saveErr != nil {
+		return nil, fmt.Errorf("Unable to save query history in database: %v", saveErr)
+	}
+	return qr, nil
+}
+
+func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*QuerierResult, string, error) {
 	s := Statistics{}
 
 	var err error
 	var queryCypher *query.QueryCypher
 
 	s.Parsing = MeasureDuration(func() {
-		queryCypher, err = query.TransformCypher(queryString)
+		queryCypher, err = query.TransformCypher(cypherQuery)
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+
+	translation, err := NewSQLQueryTranslator().Translate(queryCypher)
+	if err != nil {
+		return nil, "", err
 	}
 
 	var res *GraphQueryResult
 	s.Execution = MeasureDuration(func() {
-		res, err = q.GraphDB.Query(ctx, queryCypher)
+		res, err = q.GraphDB.Query(ctx, *translation)
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, translation.Query, err
 	}
 
 	fmt.Printf("Found results in %dms\n", s.Execution/time.Millisecond)
@@ -52,7 +76,7 @@ func (q *Querier) Query(ctx context.Context, queryString string) (*QuerierResult
 		Projections: res.Projections,
 		Statistics:  s,
 	}
-	return result, nil
+	return result, translation.Query, nil
 }
 
 type Statistics struct {

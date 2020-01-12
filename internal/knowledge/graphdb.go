@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
@@ -27,7 +26,7 @@ type GraphDB interface {
 	CountAssets() (int64, error)
 	CountRelations() (int64, error)
 
-	Query(ctx context.Context, query *query.QueryCypher) (*GraphQueryResult, error)
+	Query(ctx context.Context, query SQLTranslation) (*GraphQueryResult, error)
 }
 
 // Cursor is a cursor over the results
