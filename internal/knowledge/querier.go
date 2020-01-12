@@ -22,14 +22,14 @@ func NewQuerier(db GraphDB) *Querier {
 	return &Querier{GraphDB: db}
 }
 
-func (q *Querier) Query(ctx context.Context, cypherQuery string) (*QuerierResult, error) {
+func (q *Querier) Query(ctx context.Context, queryString string) (*QuerierResult, error) {
 	s := Statistics{}
 
 	var err error
-	var queryIL *query.QueryIL
+	var queryCypher *query.QueryCypher
 
 	s.Parsing = MeasureDuration(func() {
-		queryIL, err = query.TransformCypher(cypherQuery)
+		queryCypher, err = query.TransformCypher(queryString)
 	})
 
 	if err != nil {
@@ -38,7 +38,7 @@ func (q *Querier) Query(ctx context.Context, cypherQuery string) (*QuerierResult
 
 	var res *GraphQueryResult
 	s.Execution = MeasureDuration(func() {
-		res, err = q.GraphDB.Query(ctx, queryIL)
+		res, err = q.GraphDB.Query(ctx, queryCypher)
 	})
 
 	if err != nil {

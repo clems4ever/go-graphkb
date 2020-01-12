@@ -13,6 +13,40 @@ func IsStringInSlice(s string, slice []string) bool {
 	return false
 }
 
+func AreStringSlicesEqual(s1 []string, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	for i := range s1 {
+		if s1[i] != s2[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func AreStringSliceElementsEqual(s1 []string, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	for i := range s1 {
+		el1 := s1[i]
+		found := false
+		for j := range s2 {
+			if el1 == s2[j] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
 func ChunkSlice(s interface{}, chunkSize int) interface{} {
 	if reflect.ValueOf(s).Kind() != reflect.Slice {
 		log.Fatal("ChunkSlice only work on slices")
