@@ -52,6 +52,14 @@ func TestShouldBuildExpression(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			require.NoError(t, err)
+			_, _, err = qg.PushRelation(query.QueryRelationshipPattern{
+				RelationshipDetail: &query.QueryRelationshipDetail{
+					Variable: "r",
+				},
+			}, 0, 0)
+			require.NoError(t, err)
+
 			expr := CypherToExpr(tc.Cypher)
 
 			sql, err := ep.Build(&expr)
@@ -116,7 +124,11 @@ var testCases = []ExpressionTestCase{
 	},
 	ExpressionTestCase{
 		Cypher: "a",
-		SQL:    "a0.*",
+		SQL:    "a0.id, a0.value, a0.type",
+	},
+	ExpressionTestCase{
+		Cypher: "r",
+		SQL:    "r0.from_id, r0.to_id, r0.type",
 	},
 	ExpressionTestCase{
 		Cypher: "a.value",
