@@ -162,25 +162,25 @@ func (m *MariaDB) resolveAssets(assets []knowledge.AssetKey, registry *AssetRegi
 
 	tx, err := m.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to begin transaction: %v", err)
 	}
 
 	stmt, err := tx.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ?")
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to prepare statement: %v", err)
 	}
 
 	for _, a := range assets {
 		q, err := stmt.QueryContext(context.Background(), a.Type, a.Key)
 		if err != nil {
-			return err
+			return fmt.Errorf("Unable to query asset %v: %v", a, err)
 		}
 		defer q.Close()
 
 		for q.Next() {
 			var idx int64
 			if err := q.Scan(&idx); err != nil {
-				return err
+				return fmt.Errorf("Unable to retrieve id for %v: %v", a, err)
 			}
 			registry.Set(knowledge.AssetKey(a), idx)
 		}
@@ -231,7 +231,7 @@ INSERT INTO assets (type, value) VALUES (?, ?)`)
 			}
 			idx, err := res.LastInsertId()
 			if err != nil {
-				return 0, err
+				return 0, fmt.Errorf("Unable to retrieve last inserted ID: %v", err)
 			}
 			registry.Set(knowledge.AssetKey(a), idx)
 
@@ -297,7 +297,7 @@ func (m *MariaDB) upsertRelations(source string, relations []knowledge.Relation,
 		}
 
 		if err := tx.Commit(); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("Unable to commit transaction: %v", err)
 		}
 	}
 	bar.Finish()
@@ -335,7 +335,7 @@ WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? A
 		bar.Increment()
 		rCount, err := res.RowsAffected()
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, fmt.Errorf("Unable to count rows affected by relations deletion: %v", err)
 		}
 		removedCount += rCount
 	}
@@ -346,17 +346,17 @@ DELETE a FROM assets a
 WHERE id NOT IN (select from_id from relations)
 AND id NOT IN (select to_id from relations)`)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("Unable to delete assets: %v", err)
 	}
 
 	removedAssetsCount, err := res.RowsAffected()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("Unable to count rows affected by assets deletion: %v", err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("Unable to commit transaction of relations deletion: %v", err)
 	}
 	return removedCount, removedAssetsCount, err
 }
@@ -383,13 +383,13 @@ func (m *MariaDB) UpdateGraph(source string, bulk *knowledge.GraphUpdatesBulk) e
 	fmt.Println("Start resolving assets")
 	err := m.resolveAssets(assetKeys, &registry)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to resolve assets: %v", err)
 	}
 
 	fmt.Println("Start upserting assets")
 	count, err := m.upsertAssets(bulk.GetAssetUpserts(), &registry)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to upsert assets: %v", err)
 	}
 
 	nowAssetInsert := time.Now()
@@ -398,14 +398,14 @@ func (m *MariaDB) UpdateGraph(source string, bulk *knowledge.GraphUpdatesBulk) e
 	fmt.Println("Start upserting relations")
 	count, err = m.upsertRelations(source, bulk.GetRelationUpserts(), &registry)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to upsert relations: %v", err)
 	}
 	nowRelationInsert := time.Now()
 	fmt.Printf("%d relations inserted in %fs\n", count, nowRelationInsert.Sub(nowAssetInsert).Seconds())
 
 	relCount, assetsCount, err := m.removeRelations(source, bulk.GetRelationRemovals())
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to remove relations: %v", err)
 	}
 	fmt.Printf("%d assets removed and %d relations removed in %fs\n",
 		assetsCount,
