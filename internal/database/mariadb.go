@@ -43,11 +43,11 @@ func NewMariaDB(username string, password string, host string, databaseName stri
 // InitializeSchema initialize the schema of the database
 func (m *MariaDB) InitializeSchema() error {
 	// type must be part of the primary key to be a partition key
-	q, err := m.db.QueryContext(context.Background(), `
+	_, err := m.db.ExecContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS assets (
 	id INT NOT NULL AUTO_INCREMENT,
-	value VARCHAR(255) NOT NULL,
-	type VARCHAR(64) NOT NULL,
+	value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+	type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
 	CONSTRAINT pk_asset PRIMARY KEY (id),
 	UNIQUE unique_asset_idx (type, value),
@@ -56,21 +56,20 @@ CREATE TABLE IF NOT EXISTS assets (
 	if err != nil {
 		return err
 	}
-	defer q.Close()
 
 	// type must be part of the primary key to be a partition key
-	q, err = m.db.QueryContext(context.Background(), `
+	_, err = m.db.ExecContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS relations (
 	id INT NOT NULL AUTO_INCREMENT,
 	from_id INT NOT NULL,
 	to_id INT NOT NULL,
-	type VARCHAR(64) NOT NULL,
-	source VARCHAR(64) NOT NULL,
+	type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+	source VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
 	CONSTRAINT pk_relation PRIMARY KEY (id),
 	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
 	CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
-	
+
 	INDEX full_relation_type_from_to_idx (type, from_id, to_id),
     INDEX full_relation_type_to_from_idx (type, to_id, from_id),
     INDEX full_relation_from_type_to_idx (from_id, type, to_id),
@@ -80,24 +79,22 @@ CREATE TABLE IF NOT EXISTS relations (
 	if err != nil {
 		return err
 	}
-	defer q.Close()
 
 	// Create the table storing the schema graphs
-	q, err = m.db.QueryContext(context.Background(), `
+	_, err = m.db.ExecContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS graph_schema (
 	id INTEGER AUTO_INCREMENT NOT NULL,
-	importer VARCHAR(64) NOT NULL,
+	importer VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 	graph TEXT NOT NULL,
 	timestamp TIMESTAMP,
-	
+
 	CONSTRAINT pk_schema PRIMARY KEY (id))`)
 	if err != nil {
 		return err
 	}
-	defer q.Close()
 
 	// Create the table storing importers tokens
-	q, err = m.db.QueryContext(context.Background(), `
+	_, err = m.db.ExecContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS importers (
 	id INTEGER AUTO_INCREMENT NOT NULL,
 	name VARCHAR(64) NOT NULL,
@@ -109,10 +106,9 @@ CREATE TABLE IF NOT EXISTS importers (
 	if err != nil {
 		return err
 	}
-	defer q.Close()
 
 	// Create the table storing importers tokens
-	q, err = m.db.QueryContext(context.Background(), `
+	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS query_history (
 			id INTEGER AUTO_INCREMENT NOT NULL,
 			timestamp TIMESTAMP,
@@ -126,7 +122,7 @@ CREATE TABLE IF NOT EXISTS importers (
 	if err != nil {
 		return err
 	}
-	defer q.Close()
+
 	return nil
 }
 
