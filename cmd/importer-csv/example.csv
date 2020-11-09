@@ -1,0 +1,9 @@
+employee,James,work_at,office,New York
+employee,Paul,work_at,office,Paris
+employee,Jean,work_at,office,Paris
+employee,James,has,email,james@criteo.com
+employee,Paul,has,email,paul@criteo.com
+employee,Jean,has,email,jean@criteo.com
+employee,Paul,is_in,team,team1
+employee,James,is_in,team,team1
+employee,Jean,is_in,team,team2
