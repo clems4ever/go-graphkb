@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"reflect"
 	"strconv"
 	"sync/atomic"
@@ -33,7 +34,7 @@ type SourceRelation struct {
 
 // NewMariaDB create an instance of mariadb
 func NewMariaDB(username string, password string, host string, databaseName string, allowCleartextPassword bool) *MariaDB {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s", username, password,
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s", username, url.QueryEscape(password),
 		host, databaseName, strconv.FormatBool(allowCleartextPassword)))
 	if err != nil {
 		log.Fatal(err)
