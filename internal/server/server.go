@@ -7,14 +7,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/clems4ever/go-graphkb/internal/history"
-	"github.com/clems4ever/go-graphkb/internal/importers"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	auth "github.com/abbot/go-http-auth"
+
+	"github.com/clems4ever/go-graphkb/internal/history"
+	"github.com/clems4ever/go-graphkb/internal/importers"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
+	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/gorilla/mux"
@@ -301,14 +306,29 @@ func postGraphUpdates(registry importers.Registry, graphUpdatesC chan knowledge.
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok, source, err := isTokenValid(registry, r)
 		if err != nil {
+			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
+				With(
+					prometheus.Labels{
+						"source":      "",
+						"status_code": strconv.FormatInt(http.StatusInternalServerError, 10)}).
+				Inc()
 			replyWithInternalError(w, err)
 			return
 		}
 
 		if !ok {
+			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
+				With(prometheus.Labels{
+					"source":      source,
+					"status_code": strconv.FormatInt(http.StatusUnauthorized, 10)}).
+				Inc()
 			replyWithUnauthorized(w)
 			return
 		}
+
+		metrics.GraphUpdateEnqueuingRequestsReceivedCounter.
+			With(prometheus.Labels{"source": source}).
+			Inc()
 
 		requestBody := knowledge.GraphUpdateRequestBody{}
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
@@ -326,9 +346,18 @@ func postGraphUpdates(registry importers.Registry, graphUpdatesC chan knowledge.
 
 		_, err = bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
 		if err != nil {
+			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
+				With(prometheus.Labels{
+					"source":      source,
+					"status_code": strconv.FormatInt(http.StatusUnauthorized, 10)}).
+				Inc()
 			replyWithInternalError(w, err)
 			return
 		}
+
+		metrics.GraphUpdateEnqueuingRequestsSucceededCounter.
+			With(prometheus.Labels{"source": source}).
+			Inc()
 	}
 }
 
@@ -392,11 +421,15 @@ func StartServer(listenInterface string,
 
 	r.HandleFunc("/api/admin/flush", flushDatabaseHandler).Methods("POST")
 
+	r.Handle("/metrics", promhttp.Handler())
+
 	r.HandleFunc("/api/graph/read", getGraphRead(importersRegistry, database)).Methods("GET")
 	r.HandleFunc("/api/graph/update", postGraphUpdates(importersRegistry, graphUpdatesC)).Methods("POST")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
+
+	metrics.StartTimeGauge.Set(float64(time.Now().Unix()))
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
