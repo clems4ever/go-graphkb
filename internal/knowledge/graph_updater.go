@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // SourceSubGraphUpdates represents the updates to perform on a source subgraph
@@ -79,10 +81,18 @@ func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) erro
 }
 
 func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
+	metrics.GraphUpdatesProcessingRequestedCounter.
+		With(prometheus.Labels{"source": updates.Source}).
+		Inc()
+
 	if err := sl.updateSchema(updates.Source, &updates.Schema); err != nil {
+		metrics.GraphUpdatesProcessingFailedCounter.
+			With(prometheus.Labels{"source": updates.Source}).
+			Inc()
 		return err
 	}
 
+	// Here we add the edges from the source to each node being observed by that source.
 	sl.appendObservedRelations(updates.Source, &updates.Updates)
 
 	fmt.Printf("Start updating the graph with:\n"+
@@ -92,10 +102,19 @@ func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
 		"\t%d relations to remove\n",
 		len(updates.Updates.GetAssetUpserts()), len(updates.Updates.GetAssetRemovals()),
 		len(updates.Updates.GetRelationUpserts()), len(updates.Updates.GetAssetRemovals()))
+
 	if err := sl.graphDB.UpdateGraph(updates.Source, &updates.Updates); err != nil {
+		metrics.GraphUpdatesProcessingFailedCounter.
+			With(prometheus.Labels{"source": updates.Source}).
+			Inc()
 		fmt.Printf("[ERROR] Unable to write data in graph DB: %v\n", err)
 		return err
 	}
+
+	metrics.GraphUpdatesProcessingSucceededCounter.
+		With(prometheus.Labels{"source": updates.Source}).
+		Inc()
+
 	return nil
 }
 
