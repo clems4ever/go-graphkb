@@ -22,3 +22,4 @@ go-graphkb
 importer-csv
 
 .config.yml
+main

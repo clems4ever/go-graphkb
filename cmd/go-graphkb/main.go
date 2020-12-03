@@ -88,7 +88,8 @@ func onInit() {
 		viper.GetString("mariadb_username"),
 		viper.GetString("mariadb_password"),
 		viper.GetString("mariadb_host"),
-		dbName)
+		dbName,
+		viper.GetBool("mariadb_allow_cleartext_password"))
 }
 
 func count(cmd *cobra.Command, args []string) {

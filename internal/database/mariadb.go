@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -31,8 +32,9 @@ type SourceRelation struct {
 }
 
 // NewMariaDB create an instance of mariadb
-func NewMariaDB(username string, password string, host string, databaseName string) *MariaDB {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s", username, password, host, databaseName))
+func NewMariaDB(username string, password string, host string, databaseName string, allowCleartextPassword bool) *MariaDB {
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s", username, password,
+		host, databaseName, strconv.FormatBool(allowCleartextPassword)))
 	if err != nil {
 		log.Fatal(err)
 	}
