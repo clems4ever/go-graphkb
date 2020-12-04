@@ -252,7 +252,7 @@ const D3Graph = <Node extends NodeLike, Edge extends EdgeLike>(props: Props<Node
                     onNodeMouseOutCallback(d.data);
                 }
             })
-            .on("dblclick", function (d) {
+            .on("dblclick", function (ev, d) {
                 onNodeDoubleClickCallback(d.data);
             });
 
