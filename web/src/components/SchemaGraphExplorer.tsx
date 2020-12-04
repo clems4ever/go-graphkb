@@ -21,7 +21,7 @@ interface D3Link {
     label: string;
 }
 
-export default function (props: Props) {
+export default function SchemaGraphExplorer (props: Props) {
     const [graph, ,] = useSchemaGraph(props.sources);
 
     const nodes = graph ? graph.vertices

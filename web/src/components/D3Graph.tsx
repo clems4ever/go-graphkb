@@ -160,11 +160,10 @@ const D3Graph = <Node extends NodeLike, Edge extends EdgeLike>(props: Props<Node
         const zoom = d3.zoom()
             .scaleExtent([0.5, 2])
             .translateExtent([[-5000, -5000], [5000 + bounds.width, 5000 + bounds.height]])
-            .on("zoom", zoomed);
-
-        function zoomed() {
-            graph.attr("transform", d3.event.transform);
-        }
+            .on("zoom", function zoomed(e) {
+                graph.attr("transform", e.transform);
+            }
+        );
 
         svg.call(zoom as any).on("dblclick.zoom", null);
     }, [bounds]);
@@ -238,8 +237,8 @@ const D3Graph = <Node extends NodeLike, Edge extends EdgeLike>(props: Props<Node
             .append("g")
             .attr("class", "node-group")
             .attr("z-index", "10")
-            .on("mouseover", function (d) {
-                d3.event.preventDefault();
+            .on("mouseover", function (ev, d) {
+                ev.preventDefault();
                 d3.select(this).select("circle").attr("stroke", "white");
                 d3.select(this).select("text").attr("stroke", "white");
                 if (!hoverDisabled.current) {
@@ -340,19 +339,19 @@ const D3Graph = <Node extends NodeLike, Edge extends EdgeLike>(props: Props<Node
         }
 
         const dragDrop: any = d3.drag()
-            .on('start', (node: any) => {
+            .on('start', (ev: any, node: any) => {
                 hoverDisabled.current = true;
-                if (!d3.event.active) simulation.alphaTarget(0.1).restart();
+                if (!ev.active) simulation.alphaTarget(0.1).restart();
                 node.fx = node.x;
                 node.fy = node.y;
             })
-            .on('drag', (node: any) => {
-                node.fx = d3.event.x;
-                node.fy = d3.event.y;
+            .on('drag', (ev: any, node: any) => {
+                node.fx = ev.x;
+                node.fy = ev.y;
             })
-            .on('end', (node: any) => {
+            .on('end', (ev: any, node: any) => {
                 hoverDisabled.current = false;
-                if (!d3.event.active) simulation.alphaTarget(0)
+                if (!ev.active) simulation.alphaTarget(0)
                 node.fx = null;
                 node.fy = null;
             })
