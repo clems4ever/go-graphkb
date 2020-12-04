@@ -26,7 +26,7 @@ export default function SchemaGraphDialog (props: Props) {
         }
     }
 
-    useEffect(() => { setSelectedSources(sources) }, [sources]);
+    // useEffect(() => { setSelectedSources(sources) }, [sources]);
 
     return (
         <Dialog open={props.open}
@@ -35,24 +35,28 @@ export default function SchemaGraphDialog (props: Props) {
             className={styles.dialog}
             PaperProps={{ className: styles.dialogPaper }}>
             <div className={styles.schemaExplorerContainer}>
+            <div className={styles.schemaGraphExplorer}>
+                    <SchemaGraphExplorer
+                        backgroundColor={theme.palette.background.default}
+                        sources={selectedSources}
+                        hideObservations={hideObservations} />
+                </div>
                 <div className={styles.leftControl}>
-                    <SourcesList
-                        sources={props.sources.sort()}
-                        selected={selectedSources}
-                        showObservation={!hideObservations}
-                        onShowObservationsClick={() => setHideObservations(!hideObservations)}
-                        className={styles.sourcesList}
-                        onSourceClick={handleSourceClick} />
+                    <div className={styles.leftControlChild}>
+                        <SourcesList
+                            sources={props.sources.sort()}
+                            selected={selectedSources}
+                            showObservation={!hideObservations}
+                            onShowObservationsClick={() => setHideObservations(!hideObservations)}
+                            className={styles.sourcesList}
+                            onSourceClick={handleSourceClick} />
+                    </div>
                 </div>
                 <FontAwesomeIcon
                     icon={faTimes}
                     className={styles.closeIcon}
                     size="2x" onClick={props.onClose}
                     style={{ width: 32 }} />
-                <SchemaGraphExplorer
-                    backgroundColor={theme.palette.background.default}
-                    sources={selectedSources}
-                    hideObservations={hideObservations} />
             </div>
         </Dialog>
     )
@@ -67,7 +71,7 @@ const useStyles = makeStyles(theme => ({
         overflow: "hidden",
     },
     schemaExplorerContainer: {
-        height: "100%",
+        height: '100%',
     },
     closeIcon: {
         position: "absolute",
@@ -81,17 +85,35 @@ const useStyles = makeStyles(theme => ({
         }
     },
     leftControl: {
-        position: "absolute",
-        top: theme.spacing(),
-        left: theme.spacing(),
-        borderRadius: 5,
+        padding: theme.spacing(),
+        display: "inline-block",
+        height: `calc(100% - ${2 * theme.spacing()}px)`,
+        zIndex: 10000,
+    },
+    leftControlChild: {
+        display: "inline-block",
+        border: '1px solid grey',
         backgroundColor: "rgba(23, 23, 23, 0)",
         opacity: 0.7,
         '&:hover': {
             backgroundColor: "rgba(23, 23, 23, 1)",
-        }
+        },
+        '-ms-overflow-style': 'none',  /* IE and Edge */
+        scrollbarWidth: 'none',
+        '&::-webkit-scrollbar': {
+            display: "none",
+        },
+        overflow: "auto",
+        height: "100%",
     },
     sourcesList: {
+    },
+    schemaGraphExplorer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
     }
 }));
 
