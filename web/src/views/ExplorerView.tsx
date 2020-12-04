@@ -14,6 +14,7 @@ import DatabaseDialog from '../components/DatabaseDialog';
 import { DatabaseDetails } from '../models/DatabaseDetails';
 import SearchField from '../components/SearchField';
 import MuiAlert from '@material-ui/lab/Alert';
+import { useQueryParam, StringParam, withDefault } from 'use-query-params';
 
 function Alert(props: any) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -26,6 +27,7 @@ const ExplorerView = () => {
     const styles = useStyles();
     const [sources, setSources] = useState(undefined as string[] | undefined);
     const [query, setQuery] = useState(QUERY);
+    const [submittedQuery, setSubmittedQuery] = useQueryParam("q", withDefault(StringParam, QUERY));
     const [queryResult, setQueryResult] = useState(undefined as QueryResultSet | undefined);
     const [isQueryLoading, setIsQueryLoading] = useState(false);
     const [error, setError] = useState(undefined as undefined | Error);
@@ -36,16 +38,23 @@ const ExplorerView = () => {
     const [searchFocus, setSearchFocus] = useState(false);
 
     const handleQuerySubmit = useCallback(async (q: string) => {
-        setIsQueryLoading(true);
-        try {
-            const res = await postQuery(q);
-            setQueryResult(res);
-        } catch (err) {
-            console.error(err);
-            setError(err);
-        }
-        setIsQueryLoading(false);
-    }, [setIsQueryLoading, setQueryResult]);
+        setSubmittedQuery(q);
+    }, [setSubmittedQuery]);
+
+    useEffect(() => {
+        (async function() {
+            setIsQueryLoading(true);
+            try {
+                const res = await postQuery(submittedQuery);
+                setQueryResult(res);
+            } catch (err) {
+                console.error(err);
+                setError(err);
+            }
+            setIsQueryLoading(false);
+        })();
+        setQuery(submittedQuery);
+    }, [submittedQuery]);
 
     const getSourcesCallback = useCallback(async () => {
         try {
