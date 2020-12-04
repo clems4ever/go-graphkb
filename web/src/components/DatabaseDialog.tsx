@@ -10,7 +10,7 @@ export interface Props {
     onClose: () => void;
 }
 
-export default function (props: Props) {
+export default function DatabaseDialog(props: Props) {
     const classes = useStyles();
     return (
         <Dialog

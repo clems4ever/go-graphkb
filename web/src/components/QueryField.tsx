@@ -9,7 +9,7 @@ export interface Props {
     onSubmit: () => void;
 }
 
-export default function (props: Props) {
+export default function QueryField (props: Props) {
     const styles = useStyles();
     const inputRef = useRef<HTMLInputElement>();
     const [cursor, setCursor] = useState({ line: 0, column: 0 } as Cursor);

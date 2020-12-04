@@ -40,7 +40,7 @@ function relationKey(r: Relation): string {
     return `${r.from_id}-${r.type}-${r.to_id}`;
 }
 
-export default function (props: Props) {
+export default function GraphExplorer (props: Props) {
     const [nodes, setNodes] = useState([] as D3Node[]);
     const [edges, setEdges] = useState([] as D3Link[]);
     const [assetHovered, setAssetHovered] = useState(undefined as Asset | undefined);

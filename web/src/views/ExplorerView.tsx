@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { makeStyles, Grid, Snackbar, SnackbarContent, Paper, useTheme, IconButton } from '@material-ui/core';
+import { makeStyles, Grid, Snackbar, Paper, useTheme } from '@material-ui/core';
 import GraphExplorer from '../components/GraphExplorer';
 import QueryField from '../components/QueryField';
 import { postQuery, getSources, getDatabaseDetails } from "../services/SourceGraph";
@@ -15,6 +15,11 @@ import DatabaseDialog from '../components/DatabaseDialog';
 import { DatabaseDetails } from '../models/DatabaseDetails';
 import SearchField from '../components/SearchField';
 import CloseIcon from '@material-ui/icons/Close';
+import MuiAlert from '@material-ui/lab/Alert';
+
+function Alert(props: any) {
+  return <MuiAlert elevation={6} variant="filled" {...props} />;
+}
 
 const QUERY = `MATCH (n0)-[r]-(n1) RETURN n0, r, n1 LIMIT 20`;
 
@@ -96,22 +101,9 @@ const ExplorerView = () => {
                     vertical: 'top',
                     horizontal: 'right',
                 }}>
-                <SnackbarContent message={error
-                    ? <span style={{ display: 'flex', alignItems: 'center' }}>
-                        <ErrorIcon style={{ fontSize: 20, marginRight: theme.spacing() }} />
-                        {error.message}
-                    </span>
-                    : ""}
-                    style={{
-                        backgroundColor: theme.palette.error.dark,
-                        color: "white"
-                    }}
-                    action={
-                        <IconButton size="small" aria-label="close" color="inherit" onClick={() => setError(undefined)}>
-                            <CloseIcon fontSize="small" />
-                        </IconButton>
-                    }>
-                </SnackbarContent>
+                    <Alert onClose={() => setError(undefined)} severity="error">
+                        {error ? error.message : ""}
+                    </Alert>
             </Snackbar>
             <div className={styles.container}>
                 <DatabaseDialog

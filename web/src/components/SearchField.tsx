@@ -15,7 +15,7 @@ export interface Props {
     onEnterKeyDown?: () => void;
 }
 
-export default function (props: Props) {
+export default function SearchField (props: Props) {
     const classes = useStyles();
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {

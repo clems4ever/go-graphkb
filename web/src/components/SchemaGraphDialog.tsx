@@ -11,7 +11,7 @@ export interface Props {
     onClose: () => void;
 }
 
-export default function (props: Props) {
+export default function SchemaGraphDialog (props: Props) {
     const theme = useTheme();
     const styles = useStyles();
     const [selectedSources, setSelectedSources] = useState<string[]>([]);
