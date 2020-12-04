@@ -52,7 +52,6 @@ func replyWithUnauthorized(w http.ResponseWriter) {
 
 func getSourceGraph(registry importers.Registry, db schema.Persistor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sourcesParams, ok := r.URL.Query()["sources"]
 		importers := []string{}
 		availableImporters := []string{}
 
@@ -65,9 +64,12 @@ func getSourceGraph(registry importers.Registry, db schema.Persistor) http.Handl
 			availableImporters = append(availableImporters, k)
 		}
 
-		if ok && len(sourcesParams) > 0 {
-			for _, s := range sourcesParams {
-				importers = append(importers, strings.Split(s, ",")...)
+		sourcesParams, ok := r.URL.Query()["sources"]
+		if ok {
+			if sourcesParams[0] != "" {
+				for _, s := range sourcesParams {
+					importers = append(importers, strings.Split(s, ",")...)
+				}
 			}
 		} else {
 			importers = availableImporters
