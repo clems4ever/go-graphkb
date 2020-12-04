@@ -6,7 +6,6 @@ import { postQuery, getSources, getDatabaseDetails } from "../services/SourceGra
 import { QueryResultSet } from '../models/QueryResultSet';
 import ResultsTable from '../components/ResultsTable';
 import { Asset } from '../models/Asset';
-import ErrorIcon from '@material-ui/icons/Error';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faProjectDiagram, faDatabase, IconDefinition } from '@fortawesome/free-solid-svg-icons'
 import SchemaGraphDialog from '../components/SchemaGraphDialog';
@@ -14,7 +13,6 @@ import { SizeProp } from '@fortawesome/fontawesome-svg-core';
 import DatabaseDialog from '../components/DatabaseDialog';
 import { DatabaseDetails } from '../models/DatabaseDetails';
 import SearchField from '../components/SearchField';
-import CloseIcon from '@material-ui/icons/Close';
 import MuiAlert from '@material-ui/lab/Alert';
 
 function Alert(props: any) {
