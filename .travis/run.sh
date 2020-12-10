@@ -1,8 +1,9 @@
 #!/bin/bash
 
-go test -v ./...
+docker build -t go-graphkb-build .
 
-pushd web && npm ci && npm run build && popd
-go build -o go-graphkb cmd/go-graphkb/main.go
-go build -o importer-csv cmd/importer-csv/main.go
-
+cid=`docker create go-graphkb-build`
+docker cp $cid:/node/src/go-graphkb .
+docker cp $cid:/node/src/importer-csv .
+docker cp $cid:/node/src/build web/
+docker rm $cid
