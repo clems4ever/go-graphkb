@@ -2,6 +2,8 @@ language: go
 
 go:
   - 1.13.x
+node_js:
+  - 14
 
 script:
   - .travis/run.sh
