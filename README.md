@@ -17,7 +17,7 @@ Run the following commands
 
     # Insert the example data available in examples/ directory
     # with the following command:
-    go run cmd/importer-csv/main.go --config cmd/importer-csv/config.yml
+    go run cmd/datasource-csv/main.go --config cmd/datasource-csv/config.yml
 
 Then visit the web UI accessible at http://127.0.0.1:3000.
 

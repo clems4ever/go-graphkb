@@ -17,10 +17,10 @@ import (
 	auth "github.com/abbot/go-http-auth"
 
 	"github.com/clems4ever/go-graphkb/internal/history"
-	"github.com/clems4ever/go-graphkb/internal/importers"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
@@ -55,34 +55,34 @@ func replyWithUnauthorized(w http.ResponseWriter) {
 	}
 }
 
-func getSourceGraph(registry importers.Registry, db schema.Persistor) http.HandlerFunc {
+func getSourceGraph(registry sources.Registry, db schema.Persistor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		importers := []string{}
-		availableImporters := []string{}
+		sources := []string{}
+		availableSources := []string{}
 
-		importerToToken, err := registry.ListImporters(r.Context())
+		sourceToToken, err := registry.ListSources(r.Context())
 		if err != nil {
 			replyWithInternalError(w, err)
 			return
 		}
-		for k := range importerToToken {
-			availableImporters = append(availableImporters, k)
+		for k := range sourceToToken {
+			availableSources = append(availableSources, k)
 		}
 
 		sourcesParams, ok := r.URL.Query()["sources"]
 		if ok {
 			if sourcesParams[0] != "" {
 				for _, s := range sourcesParams {
-					importers = append(importers, strings.Split(s, ",")...)
+					sources = append(sources, strings.Split(s, ",")...)
 				}
 			}
 		} else {
-			importers = availableImporters
+			sources = availableSources
 		}
 
 		sg := schema.NewSchemaGraph()
-		for _, sname := range importers {
-			if !utils.IsStringInSlice(sname, availableImporters) {
+		for _, sname := range sources {
+			if !utils.IsStringInSlice(sname, availableSources) {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Printf("Source %s is not available", sname)
 				return
@@ -98,20 +98,20 @@ func getSourceGraph(registry importers.Registry, db schema.Persistor) http.Handl
 	}
 }
 
-func listImporters(registry importers.Registry) http.HandlerFunc {
+func listSources(registry sources.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		importersToToken, err := registry.ListImporters(r.Context())
+		sourcesToTokens, err := registry.ListSources(r.Context())
 		if err != nil {
 			replyWithInternalError(w, err)
 			return
 		}
 
-		importers := []string{}
-		for k := range importersToToken {
-			importers = append(importers, k)
+		sources := []string{}
+		for k := range sourcesToTokens {
+			sources = append(sources, k)
 		}
 
-		err = json.NewEncoder(w).Encode(importers)
+		err = json.NewEncoder(w).Encode(sources)
 		if err != nil {
 			replyWithInternalError(w, err)
 		}
@@ -249,20 +249,20 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 	}
 }
 
-func isTokenValid(registry importers.Registry, r *http.Request) (bool, string, error) {
+func isTokenValid(registry sources.Registry, r *http.Request) (bool, string, error) {
 	token, ok := r.URL.Query()["token"]
 
 	if !ok || len(token) != 1 {
 		return false, "", fmt.Errorf("Unable to detect token query parameter")
 	}
 
-	importerToToken, err := registry.ListImporters(r.Context())
+	sourceToToken, err := registry.ListSources(r.Context())
 
 	if err != nil {
 		return false, "", err
 	}
 
-	for sn, t := range importerToToken {
+	for sn, t := range sourceToToken {
 		if t == token[0] {
 			return true, sn, nil
 		}
@@ -271,7 +271,7 @@ func isTokenValid(registry importers.Registry, r *http.Request) (bool, string, e
 	return false, "", nil
 }
 
-func getGraphRead(registry importers.Registry, graphDB knowledge.GraphDB) http.HandlerFunc {
+func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok, source, err := isTokenValid(registry, r)
 		if err != nil {
@@ -302,7 +302,7 @@ func getGraphRead(registry importers.Registry, graphDB knowledge.GraphDB) http.H
 	}
 }
 
-func postGraphUpdates(registry importers.Registry, graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
+func postGraphUpdates(registry sources.Registry, graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok, source, err := isTokenValid(registry, r)
 		if err != nil {
@@ -387,14 +387,14 @@ func Secret(user, realm string) string {
 func StartServer(listenInterface string,
 	database knowledge.GraphDB,
 	schemaPersistor schema.Persistor,
-	importersRegistry importers.Registry,
+	sourcesRegistry sources.Registry,
 	queryHistorizer history.Historizer,
 	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
 
 	r := mux.NewRouter()
 
-	listImportersHandler := listImporters(importersRegistry)
-	getSourceGraphHandler := getSourceGraph(importersRegistry, schemaPersistor)
+	listSourcesHandler := listSources(sourcesRegistry)
+	getSourceGraphHandler := getSourceGraph(sourcesRegistry, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
 	postQueryHandler := postQuery(database, queryHistorizer)
 	flushDatabaseHandler := flushDatabase(database)
@@ -408,14 +408,14 @@ func StartServer(listenInterface string,
 			})
 		}
 
-		listImportersHandler = AuthMiddleware(listImportersHandler)
+		listSourcesHandler = AuthMiddleware(listSourcesHandler)
 		getSourceGraphHandler = AuthMiddleware(getSourceGraphHandler)
 		getDatabaseDetailsHandler = AuthMiddleware(getDatabaseDetailsHandler)
 		postQueryHandler = AuthMiddleware(postQueryHandler)
 		flushDatabaseHandler = AuthMiddleware(flushDatabaseHandler)
 	}
 
-	r.HandleFunc("/api/sources", listImportersHandler).Methods("GET")
+	r.HandleFunc("/api/sources", listSourcesHandler).Methods("GET")
 	r.HandleFunc("/api/schema", getSourceGraphHandler).Methods("GET")
 	r.HandleFunc("/api/database", getDatabaseDetailsHandler).Methods("GET")
 
@@ -423,8 +423,8 @@ func StartServer(listenInterface string,
 
 	r.Handle("/metrics", promhttp.Handler())
 
-	r.HandleFunc("/api/graph/read", getGraphRead(importersRegistry, database)).Methods("GET")
-	r.HandleFunc("/api/graph/update", postGraphUpdates(importersRegistry, graphUpdatesC)).Methods("POST")
+	r.HandleFunc("/api/graph/read", getGraphRead(sourcesRegistry, database)).Methods("GET")
+	r.HandleFunc("/api/graph/update", postGraphUpdates(sourcesRegistry, graphUpdatesC)).Methods("POST")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
