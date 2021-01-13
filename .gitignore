@@ -19,7 +19,7 @@
 # Release artifacts
 *.tar.gz
 go-graphkb
-importer-csv
+datasource-csv
 
 .config.yml
 main

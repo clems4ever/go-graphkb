@@ -1,5 +1,0 @@
-graphkb_url: "http://localhost:8080"
-graphkb_auth_token: "importer-csv"
-graphkb_skip_verify: true
-
-path: "example.csv"

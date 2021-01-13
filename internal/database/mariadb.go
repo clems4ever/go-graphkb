@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS relations (
 	_, err = m.db.ExecContext(context.Background(), `
 CREATE TABLE IF NOT EXISTS graph_schema (
 	id INTEGER AUTO_INCREMENT NOT NULL,
-	importer VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+	source VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 	graph TEXT NOT NULL,
 	timestamp TIMESTAMP,
 
@@ -95,21 +95,20 @@ CREATE TABLE IF NOT EXISTS graph_schema (
 		return err
 	}
 
-	// Create the table storing importers tokens
+	// Create the table storing data sources tokens
 	_, err = m.db.ExecContext(context.Background(), `
-CREATE TABLE IF NOT EXISTS importers (
+CREATE TABLE IF NOT EXISTS sources (
 	id INTEGER AUTO_INCREMENT NOT NULL,
 	name VARCHAR(64) NOT NULL,
 	auth_token VARCHAR(64) NOT NULL,
 
-	CONSTRAINT pk_importer PRIMARY KEY (id),
-	UNIQUE unique_importer_idx (name, auth_token)
+	CONSTRAINT pk_source PRIMARY KEY (id),
+	UNIQUE unique_source_idx (name, auth_token)
 )`)
 	if err != nil {
 		return err
 	}
 
-	// Create the table storing importers tokens
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS query_history (
 			id INTEGER AUTO_INCREMENT NOT NULL,
@@ -568,7 +567,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 		return fmt.Errorf("Unable to json encode schema: %v", err)
 	}
 
-	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (importer, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
+	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (source, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
 		sourceName, string(b))
 	if err != nil {
 		return fmt.Errorf("Unable to save schema in DB: %v", err)
@@ -579,7 +578,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 
 // LoadSchema load the schema graph of the source from DB
 func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.SchemaGraph, error) {
-	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE importer = ? ORDER BY id DESC LIMIT 1", sourceName)
+	row := m.db.QueryRowContext(ctx, "SELECT graph FROM graph_schema WHERE source = ? ORDER BY id DESC LIMIT 1", sourceName)
 	var rawJSON string
 	if err := row.Scan(&rawJSON); err != nil {
 		if err == sql.ErrNoRows {
@@ -597,25 +596,25 @@ func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.Sch
 	return graph, nil
 }
 
-// ListImporters list importers with their authentication tokens
-func (m *MariaDB) ListImporters(ctx context.Context) (map[string]string, error) {
-	rows, err := m.db.QueryContext(ctx, "SELECT name, auth_token FROM importers")
+// ListSources list sources with their authentication tokens
+func (m *MariaDB) ListSources(ctx context.Context) (map[string]string, error) {
+	rows, err := m.db.QueryContext(ctx, "SELECT name, auth_token FROM sources")
 
 	if err != nil {
 		return nil, fmt.Errorf("Unable to read sources from database: %v", err)
 	}
 	defer rows.Close()
 
-	importers := make(map[string]string)
+	sources := make(map[string]string)
 	for rows.Next() {
-		var importerName string
+		var sourceName string
 		var authToken string
-		if err := rows.Scan(&importerName, &authToken); err != nil {
+		if err := rows.Scan(&sourceName, &authToken); err != nil {
 			return nil, err
 		}
-		importers[importerName] = authToken
+		sources[sourceName] = authToken
 	}
-	return importers, nil
+	return sources, nil
 }
 
 // MariaDBCursor is a cursor of data retrieved by MariaDB

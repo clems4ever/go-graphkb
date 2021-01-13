@@ -9,7 +9,7 @@ COPY cmd cmd
 COPY graphkb graphkb
 COPY internal internal
 RUN cd cmd/go-graphkb && GOOS=linux GOARCH=amd64 go build -o go-graphkb main.go
-RUN cd cmd/go-graphkb && GOOS=linux GOARCH=amd64 go build -o importer-csv main.go
+RUN cd cmd/go-graphkb && GOOS=linux GOARCH=amd64 go build -o datasource-csv main.go
 
 
 
@@ -22,4 +22,4 @@ COPY web .
 RUN yarn install && yarn build
 
 COPY --from=go-builder /go/src/cmd/go-graphkb/go-graphkb ./
-COPY --from=go-builder /go/src/cmd/go-graphkb/importer-csv ./
+COPY --from=go-builder /go/src/cmd/go-graphkb/datasource-csv ./
