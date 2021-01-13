@@ -527,7 +527,7 @@ func (m *MariaDB) FlushAll() error {
 // CountAssets count the total number of assets in db.
 func (m *MariaDB) CountAssets() (int64, error) {
 	var count int64
-	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM assets")
+	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(DISTINCT value, type) FROM assets")
 
 	err := row.Scan(&count)
 	if err != nil {
