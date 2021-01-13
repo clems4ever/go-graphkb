@@ -324,6 +324,7 @@ func (m *MariaDB) removeRelations(sourceID int, relations []knowledge.Relation) 
 		return 0, 0, err
 	}
 	bar := pb.StartNew(len(relations))
+	defer bar.Finish()
 	removedCount := int64(0)
 
 	stmt, err := tx.PrepareContext(context.Background(), `
@@ -352,7 +353,6 @@ WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? A
 		}
 		removedCount += rCount
 	}
-	bar.Finish()
 
 	res, err := tx.ExecContext(context.Background(), `
 DELETE a FROM assets a
