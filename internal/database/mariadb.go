@@ -163,21 +163,14 @@ func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey, regis
 	bar := pb.StartNew(len(assets))
 	defer bar.Finish()
 
-	tx, err := m.db.Begin()
+	stmt, err := m.db.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ? AND source_id = ?")
 	if err != nil {
-		return fmt.Errorf("Unable to begin transaction: %v", err)
-	}
-
-	stmt, err := tx.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ? AND source_id = ?")
-	if err != nil {
-		tx.Rollback()
 		return fmt.Errorf("Unable to prepare statement: %v", err)
 	}
 
 	for _, a := range assets {
 		q, err := stmt.QueryContext(context.Background(), a.Type, a.Key, sourceID)
 		if err != nil {
-			tx.Rollback()
 			return fmt.Errorf("Unable to query asset %v: %v", a, err)
 		}
 		defer q.Close()
@@ -185,7 +178,6 @@ func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey, regis
 		for q.Next() {
 			var idx int64
 			if err := q.Scan(&idx); err != nil {
-				tx.Rollback()
 				return fmt.Errorf("Unable to retrieve id for %v: %v", a, err)
 			}
 			registry.Set(knowledge.AssetKey(a), idx)
@@ -193,7 +185,7 @@ func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey, regis
 
 		bar.Increment()
 	}
-	return tx.Commit()
+	return nil
 }
 
 func (m *MariaDB) upsertAssets(sourceID int, assets []knowledge.Asset, registry *AssetRegistry) (int64, error) {
@@ -217,12 +209,7 @@ func (m *MariaDB) upsertAssets(sourceID int, assets []knowledge.Asset, registry 
 
 	// A chunk of assets to store in a transaction
 	for _, assetChunk := range assetChunks {
-		tx, err := m.db.Begin()
-		if err != nil {
-			return 0, err
-		}
-
-		insertQuery, err := tx.PrepareContext(context.Background(), `
+		insertQuery, err := m.db.PrepareContext(context.Background(), `
 INSERT INTO assets (type, value, source_id) VALUES (?, ?, ?)`)
 		if err != nil {
 			return 0, fmt.Errorf("Unable to prepare asset insertion query: %v", err)
@@ -233,23 +220,16 @@ INSERT INTO assets (type, value, source_id) VALUES (?, ?, ?)`)
 
 			res, err := insertQuery.ExecContext(context.Background(), a.Type, a.Key, sourceID)
 			if err != nil {
-				tx.Rollback()
 				return 0, fmt.Errorf("Unable to insert asset %v: %v", a, err)
 			}
 			idx, err := res.LastInsertId()
 			if err != nil {
-				tx.Rollback()
 				return 0, fmt.Errorf("Unable to retrieve last inserted ID: %v", err)
 			}
 			registry.Set(knowledge.AssetKey(a), idx)
 
 			atomic.AddInt64(&insertedCount, 1)
 			bar.Increment()
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			return 0, err
 		}
 	}
 	return insertedCount, nil
@@ -266,15 +246,9 @@ func (m *MariaDB) upsertRelations(sourceID int, relations []knowledge.Relation, 
 	relationChunks := utils.ChunkSlice(relations, 10000).([][]interface{})
 
 	for _, relationChunk := range relationChunks {
-		tx, err := m.db.Begin()
-		if err != nil {
-			return 0, err
-		}
-
-		q, err := tx.PrepareContext(context.Background(),
+		q, err := m.db.PrepareContext(context.Background(),
 			"INSERT INTO relations (from_id, to_id, type, source_id) VALUES (?, ?, ?, ?)")
 		if err != nil {
-			tx.Rollback()
 			return 0, fmt.Errorf("Unable to prepare relation insertion query: %v", err)
 		}
 		defer q.Close()
@@ -299,15 +273,10 @@ func (m *MariaDB) upsertRelations(sourceID int, relations []knowledge.Relation, 
 					bar.Increment()
 					continue
 				}
-				tx.Rollback()
 				return 0, fmt.Errorf("Unable to insert relation %v (%d -> %d): %v", r, idxFrom, idxTo, err)
 			}
 			bar.Increment()
 			insertedCount++
-		}
-
-		if err := tx.Commit(); err != nil {
-			return 0, fmt.Errorf("Unable to commit transaction: %v", err)
 		}
 	}
 	bar.Finish()
@@ -319,21 +288,16 @@ func (m *MariaDB) removeRelations(sourceID int, relations []knowledge.Relation) 
 		return 0, 0, nil
 	}
 
-	tx, err := m.db.Begin()
-	if err != nil {
-		return 0, 0, err
-	}
 	bar := pb.StartNew(len(relations))
 	defer bar.Finish()
 	removedCount := int64(0)
 
-	stmt, err := tx.PrepareContext(context.Background(), `
+	stmt, err := m.db.PrepareContext(context.Background(), `
 DELETE r FROM relations r
 INNER JOIN assets a ON r.from_id = a.id
 INNER JOIN assets b ON r.to_id = b.id
 WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? AND r.source_id = ?`)
 	if err != nil {
-		tx.Rollback()
 		return 0, 0, err
 	}
 	defer stmt.Close()
@@ -342,36 +306,27 @@ WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? A
 		res, err := stmt.ExecContext(context.Background(),
 			r.From.Type, r.From.Key, r.To.Type, r.To.Key, r.Type, sourceID)
 		if err != nil {
-			tx.Rollback()
 			return 0, 0, fmt.Errorf("Unable to detete relation %v: %v", r, err)
 		}
 		bar.Increment()
 		rCount, err := res.RowsAffected()
 		if err != nil {
-			tx.Rollback()
 			return 0, 0, fmt.Errorf("Unable to count rows affected by relations deletion: %v", err)
 		}
 		removedCount += rCount
 	}
 
-	res, err := tx.ExecContext(context.Background(), `
+	res, err := m.db.ExecContext(context.Background(), `
 DELETE a FROM assets a
 WHERE id NOT IN (select from_id from relations)
 AND id NOT IN (select to_id from relations)`)
 	if err != nil {
-		tx.Rollback()
 		return 0, 0, fmt.Errorf("Unable to delete assets: %v", err)
 	}
 
 	removedAssetsCount, err := res.RowsAffected()
 	if err != nil {
-		tx.Rollback()
 		return 0, 0, fmt.Errorf("Unable to count rows affected by assets deletion: %v", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to commit transaction of relations deletion: %v", err)
 	}
 	return removedCount, removedAssetsCount, err
 }
