@@ -243,7 +243,7 @@ func (m *MariaDB) upsertRelations(sourceID int, relations []knowledge.Relation, 
 	defer bar.Finish()
 	insertedCount := int64(0)
 
-	relationChunks := utils.ChunkSlice(relations, 10000).([][]interface{})
+	relationChunks := utils.ChunkSlice(relations, 1000).([][]interface{})
 
 	for _, relationChunk := range relationChunks {
 		q, err := m.db.PrepareContext(context.Background(),
