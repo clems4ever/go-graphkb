@@ -205,7 +205,7 @@ func (m *MariaDB) upsertAssets(sourceID int, assets []knowledge.Asset, registry 
 	defer bar.Finish()
 	insertedCount := int64(0)
 
-	assetChunks := utils.ChunkSlice(unresolved, 10000).([][]interface{})
+	assetChunks := utils.ChunkSlice(unresolved, 1000).([][]interface{})
 
 	// A chunk of assets to store in a transaction
 	for _, assetChunk := range assetChunks {
