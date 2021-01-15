@@ -3,6 +3,7 @@ module github.com/clems4ever/go-graphkb
 go 1.13
 
 require (
+	github.com/Workiva/go-datastructures v1.0.52 // indirect
 	github.com/abbot/go-http-auth v0.4.0
 	github.com/antlr/antlr4 v0.0.0-20200103163232-691acdc23f1f
 	github.com/cespare/reflex v0.3.0 // indirect
@@ -15,6 +16,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.4.0
+	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	gopkg.in/VividCortex/ewma.v1 v1.1.1 // indirect
 	gopkg.in/cheggaaa/pb.v2 v2.0.7 // indirect
 	gopkg.in/fatih/color.v1 v1.7.0 // indirect

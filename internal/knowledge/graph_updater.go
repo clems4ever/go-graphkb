@@ -16,7 +16,7 @@ type SourceSubGraphUpdates struct {
 	Source  string
 }
 
-// SourceListener represents the source listener waiting for source events
+// GraphUpdater represents the updater of graph
 type GraphUpdater struct {
 	graphDB         GraphDB
 	schemaPersistor schema.Persistor
@@ -80,7 +80,8 @@ func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) erro
 	return nil
 }
 
-func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
+// Update the assets and relations in DB
+func (sl *GraphUpdater) Update(updates SourceSubGraphUpdates) error {
 	metrics.GraphUpdatesProcessingRequestedCounter.
 		With(prometheus.Labels{"source": updates.Source}).
 		Inc()
@@ -116,19 +117,4 @@ func (sl *GraphUpdater) doUpdate(updates SourceSubGraphUpdates) error {
 		Inc()
 
 	return nil
-}
-
-// Listen events coming from the event bus
-func (sl *GraphUpdater) Listen(updatesC chan SourceSubGraphUpdates) chan struct{} {
-	closeC := make(chan struct{})
-
-	go func() {
-		for updates := range updatesC {
-			if err := sl.doUpdate(updates); err != nil {
-				fmt.Println(err)
-			}
-		}
-		close(closeC)
-	}()
-	return closeC
 }
