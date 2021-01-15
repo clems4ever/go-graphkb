@@ -113,20 +113,13 @@ func flush(cmd *cobra.Command, args []string) {
 }
 
 func listen(cmd *cobra.Command, args []string) {
-	eventBus := make(chan knowledge.SourceSubGraphUpdates)
-	listener := knowledge.NewGraphUpdater(Database, Database)
-
-	listener.Listen(eventBus)
-
 	if err := Database.InitializeSchema(); err != nil {
 		log.Fatal(err)
 	}
 
 	listenInterface := viper.GetString("server_listen")
 
-	server.StartServer(listenInterface, Database, Database, Database, Database, eventBus)
-
-	close(eventBus)
+	server.StartServer(listenInterface, Database, Database, Database, Database)
 }
 
 func read(cmd *cobra.Command, args []string) {

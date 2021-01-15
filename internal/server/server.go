@@ -1,59 +1,28 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	auth "github.com/abbot/go-http-auth"
-
+	"github.com/clems4ever/go-graphkb/internal/handlers"
 	"github.com/clems4ever/go-graphkb/internal/history"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/clems4ever/go-graphkb/internal/utils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	auth "github.com/abbot/go-http-auth"
+
 	"github.com/gorilla/mux"
 	"github.com/spf13/viper"
 )
-
-func replyWithSourceGraph(w http.ResponseWriter, sg *schema.SchemaGraph) {
-	responseJSON, err := json.Marshal(sg)
-	if err != nil {
-		replyWithInternalError(w, err)
-		return
-	}
-
-	if _, err := w.Write(responseJSON); err != nil {
-		replyWithInternalError(w, err)
-	}
-}
-
-func replyWithInternalError(w http.ResponseWriter, err error) {
-	fmt.Println(err)
-	w.WriteHeader(http.StatusInternalServerError)
-	_, werr := w.Write([]byte(err.Error()))
-	if werr != nil {
-		fmt.Println(werr)
-	}
-}
-
-func replyWithUnauthorized(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusUnauthorized)
-	_, werr := w.Write([]byte("Unauthorized"))
-	if werr != nil {
-		fmt.Println(werr)
-	}
-}
 
 func getSourceGraph(registry sources.Registry, db schema.Persistor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +31,7 @@ func getSourceGraph(registry sources.Registry, db schema.Persistor) http.Handler
 
 		sourceToToken, err := registry.ListSources(r.Context())
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 		for k := range sourceToToken {
@@ -89,12 +58,12 @@ func getSourceGraph(registry sources.Registry, db schema.Persistor) http.Handler
 			}
 			g, err := db.LoadSchema(context.Background(), sname)
 			if err != nil {
-				replyWithInternalError(w, err)
+				handlers.ReplyWithInternalError(w, err)
 				return
 			}
 			sg.Merge(g)
 		}
-		replyWithSourceGraph(w, &sg)
+		handlers.ReplyWithSourceGraph(w, &sg)
 	}
 }
 
@@ -102,7 +71,7 @@ func listSources(registry sources.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sourcesToTokens, err := registry.ListSources(r.Context())
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
@@ -113,7 +82,7 @@ func listSources(registry sources.Registry) http.HandlerFunc {
 
 		err = json.NewEncoder(w).Encode(sources)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 		}
 	}
 }
@@ -127,13 +96,13 @@ func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 
 		assetsCount, err := database.CountAssets()
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
 		relationsCount, err := database.CountRelations()
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
@@ -168,7 +137,7 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 		requestBody := QueryRequestBody{}
 		err := json.NewDecoder(r.Body).Decode(&requestBody)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
@@ -177,7 +146,7 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 			fmt.Println("Empty query parameter")
 			_, err = w.Write([]byte("Empty query parameter"))
 			if err != nil {
-				replyWithInternalError(w, err)
+				handlers.ReplyWithInternalError(w, err)
 			}
 			return
 		}
@@ -188,7 +157,7 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 
 		res, err := querier.Query(ctx, requestBody.Query)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 		defer res.Cursor.Close()
@@ -215,7 +184,7 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 			var d interface{}
 			err := res.Cursor.Read(context.Background(), &d)
 			if err != nil {
-				replyWithInternalError(w, err)
+				handlers.ReplyWithInternalError(w, err)
 				return
 			}
 
@@ -244,132 +213,51 @@ func postQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 		}
 	}
-}
-
-func isTokenValid(registry sources.Registry, r *http.Request) (bool, string, error) {
-	token, ok := r.URL.Query()["token"]
-
-	if !ok || len(token) != 1 {
-		return false, "", fmt.Errorf("Unable to detect token query parameter")
-	}
-
-	sourceToToken, err := registry.ListSources(r.Context())
-
-	if err != nil {
-		return false, "", err
-	}
-
-	for sn, t := range sourceToToken {
-		if t == token[0] {
-			return true, sn, nil
-		}
-	}
-
-	return false, "", nil
 }
 
 func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ok, source, err := isTokenValid(registry, r)
+		ok, source, err := handlers.IsTokenValid(registry, r)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
 		if !ok {
-			replyWithUnauthorized(w)
+			handlers.ReplyWithUnauthorized(w)
 			return
 		}
 
 		g := knowledge.NewGraph()
 		if err := graphDB.ReadGraph(source, g); err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
 		gJSON, err := json.Marshal(g)
 		if err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
 		if _, err := w.Write(gJSON); err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 		}
-	}
-}
-
-func postGraphUpdates(registry sources.Registry, graphUpdatesC chan knowledge.SourceSubGraphUpdates) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ok, source, err := isTokenValid(registry, r)
-		if err != nil {
-			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
-				With(
-					prometheus.Labels{
-						"source":      "",
-						"status_code": strconv.FormatInt(http.StatusInternalServerError, 10)}).
-				Inc()
-			replyWithInternalError(w, err)
-			return
-		}
-
-		if !ok {
-			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
-				With(prometheus.Labels{
-					"source":      source,
-					"status_code": strconv.FormatInt(http.StatusUnauthorized, 10)}).
-				Inc()
-			replyWithUnauthorized(w)
-			return
-		}
-
-		metrics.GraphUpdateEnqueuingRequestsReceivedCounter.
-			With(prometheus.Labels{"source": source}).
-			Inc()
-
-		requestBody := knowledge.GraphUpdateRequestBody{}
-		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
-			replyWithInternalError(w, err)
-			return
-		}
-
-		// TODO(c.michaud): verify compatibility of the schema with graph updates
-
-		graphUpdatesC <- knowledge.SourceSubGraphUpdates{
-			Updates: *requestBody.Updates,
-			Schema:  requestBody.Schema,
-			Source:  source,
-		}
-
-		_, err = bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
-		if err != nil {
-			metrics.GraphUpdateEnqueuingRequestsFailedCounter.
-				With(prometheus.Labels{
-					"source":      source,
-					"status_code": strconv.FormatInt(http.StatusUnauthorized, 10)}).
-				Inc()
-			replyWithInternalError(w, err)
-			return
-		}
-
-		metrics.GraphUpdateEnqueuingRequestsSucceededCounter.
-			With(prometheus.Labels{"source": source}).
-			Inc()
 	}
 }
 
 func flushDatabase(graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := graphDB.FlushAll(); err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
 		if err := graphDB.InitializeSchema(); err != nil {
-			replyWithInternalError(w, err)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 	}
@@ -388,10 +276,11 @@ func StartServer(listenInterface string,
 	database knowledge.GraphDB,
 	schemaPersistor schema.Persistor,
 	sourcesRegistry sources.Registry,
-	queryHistorizer history.Historizer,
-	graphUpdatesC chan knowledge.SourceSubGraphUpdates) {
+	queryHistorizer history.Historizer) {
 
 	r := mux.NewRouter()
+
+	graphUpdater := knowledge.NewGraphUpdater(database, schemaPersistor)
 
 	listSourcesHandler := listSources(sourcesRegistry)
 	getSourceGraphHandler := getSourceGraph(sourcesRegistry, schemaPersistor)
@@ -424,7 +313,7 @@ func StartServer(listenInterface string,
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.HandleFunc("/api/graph/read", getGraphRead(sourcesRegistry, database)).Methods("GET")
-	r.HandleFunc("/api/graph/update", postGraphUpdates(sourcesRegistry, graphUpdatesC)).Methods("POST")
+	r.HandleFunc("/api/graph/update", handlers.PostGraphUpdates(sourcesRegistry, graphUpdater)).Methods("POST")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
