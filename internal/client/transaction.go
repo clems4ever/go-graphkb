@@ -1,26 +1,22 @@
-package knowledge
+package client
 
 import (
 	"sync"
 
+	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
-
-type GraphUpdateRequestBody struct {
-	Updates *GraphUpdatesBulk  `json:"updates"`
-	Schema  schema.SchemaGraph `json:"schema"`
-}
 
 // Transaction represent a transaction generating updates by diffing the provided graph against
 // the previous version.
 type Transaction struct {
-	api *GraphAPI
+	client *GraphClient
 
-	currentGraph *Graph
+	currentGraph *knowledge.Graph
 
 	// The graph being updated
-	newGraph *Graph
-	binder   *GraphBinder
+	newGraph *knowledge.Graph
+	binder   *knowledge.GraphBinder
 
 	// Lock used when binding or relating assets
 	mutex sync.Mutex
@@ -41,15 +37,15 @@ func (cgt *Transaction) Bind(asset string, assetType schema.AssetType) {
 }
 
 // Commit commit the transaction and gives ownership to the source for caching.
-func (cgt *Transaction) Commit() (*Graph, error) {
+func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	sg := cgt.newGraph.ExtractSchema()
-	bulk := GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
+	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
 
-	if err := cgt.api.UpdateGraph(sg, *bulk); err != nil {
+	if err := cgt.client.UpdateGraph(sg, *bulk); err != nil {
 		return nil, err
 	}
 
 	g := cgt.newGraph
-	cgt.newGraph = NewGraph()
+	cgt.newGraph = knowledge.NewGraph()
 	return g, nil // give ownership of the transaction graph so that it can be cached if needed
 }

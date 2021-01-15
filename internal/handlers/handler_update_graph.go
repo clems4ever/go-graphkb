@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/clems4ever/go-graphkb/internal/client"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/sources"
@@ -44,7 +45,7 @@ func PostGraphUpdates(registry sources.Registry, graphUpdater *knowledge.GraphUp
 			With(prometheus.Labels{"source": source}).
 			Inc()
 
-		requestBody := knowledge.GraphUpdateRequestBody{}
+		requestBody := client.GraphUpdateRequestBody{}
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			ReplyWithInternalError(w, err)
 			return
