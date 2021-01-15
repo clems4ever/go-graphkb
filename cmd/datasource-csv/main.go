@@ -15,10 +15,11 @@ import (
 // CSVSource represent a CSV source file
 type CSVSource struct {
 	dataPath string
+	graphAPI *graphkb.GraphAPI
 }
 
 // NewCSVSource create a new instance of CSV source
-func NewCSVSource() *CSVSource {
+func NewCSVSource(graphAPI *graphkb.GraphAPI) *CSVSource {
 	csvSource := new(CSVSource)
 	csvSource.dataPath = viper.GetString("path")
 
@@ -26,11 +27,12 @@ func NewCSVSource() *CSVSource {
 		log.Fatal(fmt.Errorf("Unable to detect CSV file path in configuration. Check patch configuration is provided"))
 	}
 
+	csvSource.graphAPI = graphAPI
 	return csvSource
 }
 
-// Start the CSVSource fetching
-func (cs *CSVSource) Start(dataSource *graphkb.DataSource) error {
+// Publish the graph built from CSV
+func (cs *CSVSource) Publish() error {
 	file, err := os.Open(cs.dataPath)
 	if err != nil {
 		return err
@@ -39,12 +41,12 @@ func (cs *CSVSource) Start(dataSource *graphkb.DataSource) error {
 
 	r := csv.NewReader(file)
 
-	previousGraph, err := dataSource.ReadCurrentGraph()
+	previousGraph, err := cs.graphAPI.ReadCurrentGraph()
 	if err != nil {
 		return fmt.Errorf("Unable to read previous graph: %v", err)
 	}
 
-	tx := dataSource.CreateTransaction(previousGraph)
+	tx := cs.graphAPI.CreateTransaction(previousGraph)
 
 	header := true
 
@@ -77,11 +79,6 @@ func (cs *CSVSource) Start(dataSource *graphkb.DataSource) error {
 	return err
 }
 
-// Stop the CSV source
-func (cs *CSVSource) Stop() error {
-	return nil
-}
-
 // ConfigPath string
 var ConfigPath string
 
@@ -103,14 +100,16 @@ func main() {
 		Use: "source-csv [opts]",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			options := graphkb.DataSourceOptions{
+			options := graphkb.GraphAPIOptions{
 				URL:        viper.GetString("graphkb_url"),
 				AuthToken:  viper.GetString("graphkb_auth_token"),
 				SkipVerify: viper.GetBool("graphkb_skip_verify"),
 			}
 
-			if err := graphkb.Start(NewCSVSource(), options); err != nil {
-				log.Fatal(err)
+			dataSource := NewCSVSource(graphkb.NewGraphAPI(options))
+
+			if err := dataSource.Publish(); err != nil {
+				panic(err)
 			}
 		},
 	}

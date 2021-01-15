@@ -1,7 +1,6 @@
 package graphkb
 
-import "github.com/clems4ever/go-graphkb/internal/knowledge"
+import "github.com/clems4ever/go-graphkb/internal/client"
 
-type DataSource = knowledge.DataSource
-
-type Transaction = knowledge.Transaction
+// Transaction represent a graph transaction
+type Transaction = client.Transaction

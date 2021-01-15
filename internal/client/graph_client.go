@@ -1,4 +1,4 @@
-package knowledge
+package client
 
 import (
 	"bytes"
@@ -8,49 +8,51 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
-// GraphEmitter an emitter of full source graph
-type GraphAPI struct {
-	// GraphKB URL and auth token
+// GraphClient is a client of the GraphKB API
+type GraphClient struct {
 	url       string
 	authToken string
 
 	client *http.Client
 }
 
-// NewGraphEmitter create an emitter of graph
-func NewGraphAPI(url, authToken string, skipVerify bool) *GraphAPI {
+// NewGraphClient create a client of the GraphKB API
+func NewGraphClient(URL, authToken string, skipVerify bool) *GraphClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipVerify},
 	}
 	client := &http.Client{Transport: tr}
 
-	return &GraphAPI{
-		url:       url,
+	return &GraphClient{
+		url:       URL,
 		authToken: authToken,
 		client:    client,
 	}
 }
 
 // ReadCurrentGraph read the current graph stored in graph kb
-func (gapi *GraphAPI) ReadCurrentGraph() (*Graph, error) {
-	url := fmt.Sprintf("%s/api/graph/read?token=%s", gapi.url, gapi.authToken)
+func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
+	url := fmt.Sprintf("%s/api/graph/read?token=%s", gc.url, gc.authToken)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := gapi.client.Do(req)
+	res, err := gc.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("Expected status code was 200 but got %d", res.StatusCode)
+	if res.StatusCode == 401 {
+		return nil, fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode != 200 {
+		return nil, fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
 	}
 
 	b, err := ioutil.ReadAll(res.Body)
@@ -58,7 +60,7 @@ func (gapi *GraphAPI) ReadCurrentGraph() (*Graph, error) {
 		return nil, err
 	}
 
-	graph := NewGraph()
+	graph := knowledge.NewGraph()
 	err = json.Unmarshal(b, graph)
 	if err != nil {
 		return nil, err
@@ -66,7 +68,8 @@ func (gapi *GraphAPI) ReadCurrentGraph() (*Graph, error) {
 	return graph, nil
 }
 
-func (gapi *GraphAPI) UpdateGraph(sg schema.SchemaGraph, updates GraphUpdatesBulk) error {
+// UpdateGraph send a graph update to the API
+func (gc *GraphClient) UpdateGraph(sg schema.SchemaGraph, updates knowledge.GraphUpdatesBulk) error {
 	requestBody := GraphUpdateRequestBody{}
 	requestBody.Updates = &updates
 	requestBody.Schema = sg
@@ -76,19 +79,21 @@ func (gapi *GraphAPI) UpdateGraph(sg schema.SchemaGraph, updates GraphUpdatesBul
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	url := fmt.Sprintf("%s/api/graph/update?token=%s", gapi.url, gapi.authToken)
+	url := fmt.Sprintf("%s/api/graph/update?token=%s", gc.url, gc.authToken)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
 
-	res, err := gapi.client.Do(req)
+	res, err := gc.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 {
+	if res.StatusCode == 401 {
+		return fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode != 200 {
 		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
 	}
 	return nil
