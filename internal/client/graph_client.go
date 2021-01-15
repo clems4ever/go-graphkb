@@ -12,6 +12,9 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
+// ErrTooManyRequests error representing too many requests to the API
+var ErrTooManyRequests = fmt.Errorf("Too Many Requests")
+
 // GraphClient is a client of the GraphKB API
 type GraphClient struct {
 	url       string
@@ -49,9 +52,9 @@ func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == 401 {
+	if res.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("Unauthorized access. Check your auth token")
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
 	}
 
@@ -91,9 +94,11 @@ func (gc *GraphClient) UpdateGraph(sg schema.SchemaGraph, updates knowledge.Grap
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode == 401 {
+	if res.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("Unauthorized access. Check your auth token")
-	} else if res.StatusCode != 200 {
+	} else if res.StatusCode == http.StatusTooManyRequests {
+		return ErrTooManyRequests
+	} else if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
 	}
 	return nil
