@@ -2,7 +2,9 @@ package client
 
 import (
 	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
@@ -37,6 +39,27 @@ func (cgt *Transaction) Bind(asset string, assetType schema.AssetType) {
 	cgt.mutex.Unlock()
 }
 
+// withRetryOnTooManyRequests helper retrying the function when too many request error has been received
+func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
+	trials := 0
+	for {
+		err := fn()
+		if err == ErrTooManyRequests {
+			backoffTime := time.Duration(int(math.Pow(1.01, float64(trials)))*15) * time.Second
+			fmt.Printf("Sleeping for %d seconds", backoffTime/time.Second)
+			time.Sleep(backoffTime)
+		} else if err != nil {
+			return err
+		} else {
+			return nil
+		}
+		trials++
+		if trials == maxRetries {
+			return fmt.Errorf("Too many retries... Aborting")
+		}
+	}
+}
+
 // Commit commit the transaction and gives ownership to the source for caching.
 func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	sg := cgt.newGraph.ExtractSchema()
@@ -48,23 +71,23 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
 
 	for _, r := range bulk.GetRelationRemovals() {
-		if err := cgt.client.DeleteRelation(r); err != nil {
+		if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelation(r) }, 10); err != nil {
 			return nil, fmt.Errorf("Unable to remove the relation %v: %v", r, err)
 		}
 	}
 	for _, a := range bulk.GetAssetRemovals() {
-		if err := cgt.client.DeleteAsset(a); err != nil {
+		if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAsset(a) }, 10); err != nil {
 			return nil, fmt.Errorf("Unable to remove the asset %v: %v", a, err)
 		}
 	}
 
 	for _, a := range bulk.GetAssetUpserts() {
-		if err := cgt.client.UpsertAsset(a); err != nil {
+		if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertAsset(a) }, 10); err != nil {
 			return nil, fmt.Errorf("Unable to upsert the asset %v: %v", a, err)
 		}
 	}
 	for _, r := range bulk.GetRelationUpserts() {
-		if err := cgt.client.UpsertRelation(r); err != nil {
+		if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertRelation(r) }, 10); err != nil {
 			return nil, fmt.Errorf("Unable to upsert the relation %v: %v", r, err)
 		}
 	}
