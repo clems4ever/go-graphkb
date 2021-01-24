@@ -135,6 +135,7 @@ func (g *Graph) Equal(other *Graph) bool {
 	return true
 }
 
+// ExtractSchema extract the schema from the graph
 func (g *Graph) ExtractSchema() schema.SchemaGraph {
 	sg := schema.NewSchemaGraph()
 
@@ -149,37 +150,39 @@ func (g *Graph) ExtractSchema() schema.SchemaGraph {
 	return sg
 }
 
-func (sg *Graph) MarshalJSON() ([]byte, error) {
-	schemaJson := new(GraphJSON)
-	schemaJson.Assets = []Asset{}
-	schemaJson.Relations = []Relation{}
+// MarshalJSON marshall the graph in JSON
+func (g *Graph) MarshalJSON() ([]byte, error) {
+	schemaJSON := new(GraphJSON)
+	schemaJSON.Assets = []Asset{}
+	schemaJSON.Relations = []Relation{}
 
-	for v := range sg.assets.Iter() {
-		schemaJson.Assets = append(schemaJson.Assets, v.(Asset))
+	for v := range g.assets.Iter() {
+		schemaJSON.Assets = append(schemaJSON.Assets, v.(Asset))
 	}
 
-	for e := range sg.relations.Iter() {
-		schemaJson.Relations = append(schemaJson.Relations, e.(Relation))
+	for e := range g.relations.Iter() {
+		schemaJSON.Relations = append(schemaJSON.Relations, e.(Relation))
 	}
 
-	return json.Marshal(schemaJson)
+	return json.Marshal(schemaJSON)
 }
 
-func (sg *Graph) UnmarshalJSON(b []byte) error {
+// UnmarshalJSON unmarshal a graph from JSON
+func (g *Graph) UnmarshalJSON(b []byte) error {
 	j := GraphJSON{}
 	if err := json.Unmarshal(b, &j); err != nil {
 		return err
 	}
 
-	sg.assets = mapset.NewSet()
-	sg.relations = mapset.NewSet()
+	g.assets = mapset.NewSet()
+	g.relations = mapset.NewSet()
 
 	for _, v := range j.Assets {
-		sg.assets.Add(v)
+		g.assets.Add(v)
 	}
 
 	for _, e := range j.Relations {
-		sg.relations.Add(e)
+		g.relations.Add(e)
 	}
 	return nil
 }

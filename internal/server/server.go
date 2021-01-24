@@ -313,7 +313,12 @@ func StartServer(listenInterface string,
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.HandleFunc("/api/graph/read", getGraphRead(sourcesRegistry, database)).Methods("GET")
-	r.HandleFunc("/api/graph/update", handlers.PostGraphUpdates(sourcesRegistry, graphUpdater)).Methods("POST")
+
+	r.HandleFunc("/api/graph/schema", handlers.PutSchema(sourcesRegistry, graphUpdater)).Methods("PUT")
+	r.HandleFunc("/api/graph/asset", handlers.PutAsset(sourcesRegistry, graphUpdater)).Methods("PUT")
+	r.HandleFunc("/api/graph/relation", handlers.PutRelation(sourcesRegistry, graphUpdater)).Methods("PUT")
+	r.HandleFunc("/api/graph/asset", handlers.DeleteAsset(sourcesRegistry, graphUpdater)).Methods("DELETE")
+	r.HandleFunc("/api/graph/relation", handlers.DeleteRelation(sourcesRegistry, graphUpdater)).Methods("DELETE")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))

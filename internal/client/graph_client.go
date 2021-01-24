@@ -71,10 +71,9 @@ func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
 	return graph, nil
 }
 
-// UpdateGraph send a graph update to the API
-func (gc *GraphClient) UpdateGraph(sg schema.SchemaGraph, updates knowledge.GraphUpdatesBulk) error {
-	requestBody := GraphUpdateRequestBody{}
-	requestBody.Updates = &updates
+// UpdateSchema send a graph schema update to the API
+func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
+	requestBody := PutGraphSchemaRequestBody{}
 	requestBody.Schema = sg
 
 	b, err := json.Marshal(requestBody)
@@ -82,8 +81,136 @@ func (gc *GraphClient) UpdateGraph(sg schema.SchemaGraph, updates knowledge.Grap
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	url := fmt.Sprintf("%s/api/graph/update?token=%s", gc.url, gc.authToken)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	url := fmt.Sprintf("%s/api/graph/schema?token=%s", gc.url, gc.authToken)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+
+	res, err := gc.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode == http.StatusTooManyRequests {
+		return ErrTooManyRequests
+	} else if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+	}
+	return nil
+}
+
+// UpsertAsset send an asset upsert operation to the API
+func (gc *GraphClient) UpsertAsset(asset knowledge.Asset) error {
+	requestBody := PutGraphAssetRequestBody{}
+	requestBody.Asset = asset
+
+	b, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("Unable to marshall request body")
+	}
+
+	url := fmt.Sprintf("%s/api/graph/asset?token=%s", gc.url, gc.authToken)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+
+	res, err := gc.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode == http.StatusTooManyRequests {
+		return ErrTooManyRequests
+	} else if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+	}
+	return nil
+}
+
+// DeleteAsset send an asset removal operation to the API
+func (gc *GraphClient) DeleteAsset(asset knowledge.Asset) error {
+	requestBody := DeleteGraphAssetRequestBody{}
+	requestBody.Asset = asset
+
+	b, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("Unable to marshall request body")
+	}
+
+	url := fmt.Sprintf("%s/api/graph/asset?token=%s", gc.url, gc.authToken)
+	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+
+	res, err := gc.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode == http.StatusTooManyRequests {
+		return ErrTooManyRequests
+	} else if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+	}
+	return nil
+}
+
+// UpsertRelation send a relation upsert operation to the API
+func (gc *GraphClient) UpsertRelation(relation knowledge.Relation) error {
+	requestBody := PutGraphRelationRequestBody{}
+	requestBody.Relation = relation
+
+	b, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("Unable to marshall request body")
+	}
+
+	url := fmt.Sprintf("%s/api/graph/relation?token=%s", gc.url, gc.authToken)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+
+	res, err := gc.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("Unauthorized access. Check your auth token")
+	} else if res.StatusCode == http.StatusTooManyRequests {
+		return ErrTooManyRequests
+	} else if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+	}
+	return nil
+}
+
+// DeleteRelation send a relation upsert operation to the API
+func (gc *GraphClient) DeleteRelation(relation knowledge.Relation) error {
+	requestBody := DeleteGraphRelationRequestBody{}
+	requestBody.Relation = relation
+
+	b, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("Unable to marshall request body")
+	}
+
+	url := fmt.Sprintf("%s/api/graph/relation?token=%s", gc.url, gc.authToken)
+	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
