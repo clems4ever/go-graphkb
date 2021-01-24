@@ -8,14 +8,10 @@ import (
 	"log"
 	"reflect"
 	"strconv"
-	"sync/atomic"
 	"time"
 
-	"github.com/cheggaaa/pb"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
-	"github.com/clems4ever/go-graphkb/internal/utils"
-	mapset "github.com/deckarep/golang-set"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/golang-collections/go-datastructures/queue"
 )
@@ -23,12 +19,8 @@ import (
 // MariaDB mariadb as graph storage backend
 type MariaDB struct {
 	db *sql.DB
-}
 
-// SourceRelation represent a relation coming from a source
-type SourceRelation struct {
-	knowledge.Relation `json:",inline"`
-	Source             string `json:"source"`
+	sourcesCache map[string]int
 }
 
 // NewMariaDB create an instance of mariadb
@@ -159,179 +151,40 @@ func isUnknownTableError(err error) bool {
 	return ok && driverErr.Number == 1051
 }
 
-func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey, registry *AssetRegistry) error {
-	bar := pb.StartNew(len(assets))
-	defer bar.Finish()
-
+// resolveAssets resolve the asset IDs of the assets
+func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey) ([]int, error) {
 	stmt, err := m.db.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ? AND source_id = ?")
 	if err != nil {
-		return fmt.Errorf("Unable to prepare statement: %v", err)
+		return nil, fmt.Errorf("Unable to prepare statement: %v", err)
 	}
 
+	assetIDs := []int{}
 	for _, a := range assets {
 		q, err := stmt.QueryContext(context.Background(), a.Type, a.Key, sourceID)
 		if err != nil {
-			return fmt.Errorf("Unable to query asset %v: %v", a, err)
+			return nil, fmt.Errorf("Unable to query asset %v: %v", a, err)
 		}
 		defer q.Close()
+
+		found := false
 
 		for q.Next() {
-			var idx int64
+			var idx int
 			if err := q.Scan(&idx); err != nil {
-				return fmt.Errorf("Unable to retrieve id for %v: %v", a, err)
+				return nil, fmt.Errorf("Unable to retrieve id for %v: %v", a, err)
 			}
-			registry.Set(knowledge.AssetKey(a), idx)
+			found = true
+			assetIDs = append(assetIDs, int(idx))
 		}
-
-		bar.Increment()
+		if !found {
+			return nil, fmt.Errorf("Asset ID of asset %v was not found in DB", a)
+		}
 	}
-	return nil
+	return assetIDs, nil
 }
 
-func (m *MariaDB) upsertAssets(sourceID int, assets []knowledge.Asset, registry *AssetRegistry) (int64, error) {
-	if len(assets) == 0 {
-		return 0, nil
-	}
-
-	unresolved := []knowledge.Asset{}
-	for _, a := range assets {
-		_, ok := registry.Get(knowledge.AssetKey(a))
-		if !ok {
-			unresolved = append(unresolved, a)
-		}
-	}
-
-	bar := pb.StartNew(len(unresolved))
-	defer bar.Finish()
-	insertedCount := int64(0)
-
-	assetChunks := utils.ChunkSlice(unresolved, 1000).([][]interface{})
-
-	// A chunk of assets to store in a transaction
-	for _, assetChunk := range assetChunks {
-		insertQuery, err := m.db.PrepareContext(context.Background(), `
-INSERT INTO assets (type, value, source_id) VALUES (?, ?, ?)`)
-		if err != nil {
-			return 0, fmt.Errorf("Unable to prepare asset insertion query: %v", err)
-		}
-
-		for _, aC := range assetChunk {
-			a := aC.(knowledge.Asset)
-
-			res, err := insertQuery.ExecContext(context.Background(), a.Type, a.Key, sourceID)
-			if err != nil {
-				return 0, fmt.Errorf("Unable to insert asset %v: %v", a, err)
-			}
-			idx, err := res.LastInsertId()
-			if err != nil {
-				return 0, fmt.Errorf("Unable to retrieve last inserted ID: %v", err)
-			}
-			registry.Set(knowledge.AssetKey(a), idx)
-
-			atomic.AddInt64(&insertedCount, 1)
-			bar.Increment()
-		}
-	}
-	return insertedCount, nil
-}
-
-func (m *MariaDB) upsertRelations(sourceID int, relations []knowledge.Relation, registry *AssetRegistry) (int64, error) {
-	if len(relations) == 0 {
-		return 0, nil
-	}
-	bar := pb.StartNew(len(relations))
-	defer bar.Finish()
-	insertedCount := int64(0)
-
-	relationChunks := utils.ChunkSlice(relations, 1000).([][]interface{})
-
-	for _, relationChunk := range relationChunks {
-		q, err := m.db.PrepareContext(context.Background(),
-			"INSERT INTO relations (from_id, to_id, type, source_id) VALUES (?, ?, ?, ?)")
-		if err != nil {
-			return 0, fmt.Errorf("Unable to prepare relation insertion query: %v", err)
-		}
-		defer q.Close()
-
-		for _, rC := range relationChunk {
-			r := rC.(knowledge.Relation)
-			idxFrom, ok := registry.Get(r.From)
-			if !ok {
-				fmt.Printf("[WARNING] ID of asset %v (from) has not been found in cache\n", r.From)
-				continue
-			}
-
-			idxTo, ok := registry.Get(r.To)
-			if !ok {
-				fmt.Printf("[WARNING] ID of asset %v (to) has not been found in cache\n", r.To)
-				continue
-			}
-
-			_, err = q.ExecContext(context.Background(), idxFrom, idxTo, r.Type, sourceID)
-			if err != nil {
-				if isDuplicateEntryError(err) {
-					bar.Increment()
-					continue
-				}
-				return 0, fmt.Errorf("Unable to insert relation %v (%d -> %d): %v", r, idxFrom, idxTo, err)
-			}
-			bar.Increment()
-			insertedCount++
-		}
-	}
-	bar.Finish()
-	return insertedCount, nil
-}
-
-func (m *MariaDB) removeRelations(sourceID int, relations []knowledge.Relation) (int64, int64, error) {
-	if len(relations) == 0 {
-		return 0, 0, nil
-	}
-
-	bar := pb.StartNew(len(relations))
-	defer bar.Finish()
-	removedCount := int64(0)
-
-	stmt, err := m.db.PrepareContext(context.Background(), `
-DELETE r FROM relations r
-INNER JOIN assets a ON r.from_id = a.id
-INNER JOIN assets b ON r.to_id = b.id
-WHERE a.type = ? AND a.value = ? AND b.type = ? AND b.value = ? AND r.type = ? AND r.source_id = ?`)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer stmt.Close()
-
-	for _, r := range relations {
-		res, err := stmt.ExecContext(context.Background(),
-			r.From.Type, r.From.Key, r.To.Type, r.To.Key, r.Type, sourceID)
-		if err != nil {
-			return 0, 0, fmt.Errorf("Unable to detete relation %v: %v", r, err)
-		}
-		bar.Increment()
-		rCount, err := res.RowsAffected()
-		if err != nil {
-			return 0, 0, fmt.Errorf("Unable to count rows affected by relations deletion: %v", err)
-		}
-		removedCount += rCount
-	}
-
-	res, err := m.db.ExecContext(context.Background(), `
-DELETE a FROM assets a
-WHERE id NOT IN (select from_id from relations)
-AND id NOT IN (select to_id from relations)`)
-	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to delete assets: %v", err)
-	}
-
-	removedAssetsCount, err := res.RowsAffected()
-	if err != nil {
-		return 0, 0, fmt.Errorf("Unable to count rows affected by assets deletion: %v", err)
-	}
-	return removedCount, removedAssetsCount, err
-}
-
-func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
+// resolveSourceIDFromDB resolve the source ID from the source name from the database
+func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
 	r, err := m.db.QueryContext(context.Background(), "SELECT id FROM sources WHERE name = ? LIMIT 1", sourceName)
 	if err != nil {
 		return 0, err
@@ -347,62 +200,93 @@ func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
 	return sourceID, nil
 }
 
-// UpdateGraph update graph with bulk of operations
-func (m *MariaDB) UpdateGraph(source string, bulk *knowledge.GraphUpdatesBulk) error {
-	registry := AssetRegistry{cache: make(map[knowledge.AssetKey]int64)}
-	now := time.Now()
-
-	assetKeysSet := mapset.NewSet()
-	for _, a := range bulk.GetAssetUpserts() {
-		assetKeysSet.Add(knowledge.AssetKey(a))
-	}
-	for _, r := range bulk.GetRelationUpserts() {
-		assetKeysSet.Add(r.From)
-		assetKeysSet.Add(r.To)
+// resolveSourceID resolve the source ID from the source name from the cache first and then from the DB
+func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
+	if v, ok := m.sourcesCache[sourceName]; ok {
+		return v, nil
 	}
 
-	assetKeys := []knowledge.AssetKey{}
-	for a := range assetKeysSet.Iter() {
-		assetKeys = append(assetKeys, a.(knowledge.AssetKey))
-	}
+	return m.resolveSourceIDFromDB(sourceName)
+}
 
-	fmt.Println("Retrieve source ID from database")
+// UpsertAsset upsert one asset into the graph of the given source
+func (m *MariaDB) UpsertAsset(source string, asset knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
 
-	fmt.Println("Start resolving assets")
-	err = m.resolveAssets(sourceID, assetKeys, &registry)
+	_, err = m.db.ExecContext(context.Background(), `
+	INSERT INTO assets (type, value, source_id) VALUES (?, ?, ?)`, asset.Type, asset.Key, sourceID)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve assets: %v", err)
+		return fmt.Errorf("Unable to insert in DB asset %v from source %s: %v", asset, source, err)
+	}
+	return nil
+}
+
+// UpsertRelation upsert one relation into the graph of the given source
+func (m *MariaDB) UpsertRelation(source string, relation knowledge.Relation) error {
+	sourceID, err := m.resolveSourceID(source)
+	if err != nil {
+		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
 
-	fmt.Println("Start upserting assets")
-	count, err := m.upsertAssets(sourceID, bulk.GetAssetUpserts(), &registry)
+	assetIDs, err := m.resolveAssets(sourceID, []knowledge.AssetKey{relation.From, relation.To})
 	if err != nil {
-		return fmt.Errorf("Unable to upsert assets: %v", err)
+		return fmt.Errorf("Unable to resolve the IDs of the assets in relation %v: %v", relation, err)
 	}
 
-	nowAssetInsert := time.Now()
-	fmt.Printf("%d assets inserted in %fs\n", count, nowAssetInsert.Sub(now).Seconds())
-
-	fmt.Println("Start upserting relations")
-	count, err = m.upsertRelations(sourceID, bulk.GetRelationUpserts(), &registry)
-	if err != nil {
-		return fmt.Errorf("Unable to upsert relations: %v", err)
+	if len(assetIDs) != 2 {
+		return fmt.Errorf("Unexpected number of resolved IDs")
 	}
-	nowRelationInsert := time.Now()
-	fmt.Printf("%d relations inserted in %fs\n", count, nowRelationInsert.Sub(nowAssetInsert).Seconds())
 
-	relCount, assetsCount, err := m.removeRelations(sourceID, bulk.GetRelationRemovals())
+	_, err = m.db.ExecContext(context.Background(),
+		"INSERT INTO relations (from_id, to_id, type, source_id) VALUES (?, ?, ?, ?)",
+		assetIDs[0], assetIDs[1], relation.Type, sourceID)
 	if err != nil {
-		return fmt.Errorf("Unable to remove relations: %v", err)
+		return fmt.Errorf("Unable to prepare relation insertion query: %v", err)
 	}
-	fmt.Printf("%d assets removed and %d relations removed in %fs\n",
-		assetsCount,
-		relCount,
-		time.Since(nowRelationInsert).Seconds())
+	return nil
+}
+
+// RemoveAsset remove one asset from the graph of the given source
+func (m *MariaDB) RemoveAsset(source string, asset knowledge.Asset) error {
+	sourceID, err := m.resolveSourceID(source)
+	if err != nil {
+		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+	}
+
+	_, err = m.db.ExecContext(context.Background(), `
+	DELETE FROM assets WHERE type = ? AND value = ? AND source_id = ?`,
+		asset.Type, asset.Key, sourceID)
+	if err != nil {
+		return fmt.Errorf("Unable to remove from DB asset %v from source %s: %v", asset, source, err)
+	}
+	return nil
+}
+
+// RemoveRelation remove one relation from the graph of the given source
+func (m *MariaDB) RemoveRelation(source string, relation knowledge.Relation) error {
+	sourceID, err := m.resolveSourceID(source)
+	if err != nil {
+		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+	}
+
+	assetIDs, err := m.resolveAssets(sourceID, []knowledge.AssetKey{relation.From, relation.To})
+	if err != nil {
+		return fmt.Errorf("Unable to resolve the IDs of the assets in relation %v: %v", relation, err)
+	}
+
+	if len(assetIDs) != 2 {
+		return fmt.Errorf("Unexpected number of resolved IDs")
+	}
+
+	_, err = m.db.ExecContext(context.Background(),
+		"DELETE FROM relations WHERE from_id = ? AND to_id = ? AND type = ? AND source_id = ?",
+		assetIDs[0], assetIDs[1], relation.Type, sourceID)
+	if err != nil {
+		return fmt.Errorf("Unable to prepare relation insertion query: %v", err)
+	}
 	return nil
 }
 

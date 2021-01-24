@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/schema"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // SourceSubGraphUpdates represents the updates to perform on a source subgraph
@@ -54,7 +52,8 @@ func (sl *GraphUpdater) appendObservedRelations(source string, updates *GraphUpd
 	updates.RemoveRelations(observedRelationsToRemove...)
 }
 
-func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) error {
+// UpdateSchema update the schema for the source with the one provided in the request
+func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error {
 	for _, a := range sg.Assets() {
 		sg.AddRelation(schema.AssetType("source"), "observed", a)
 	}
@@ -67,11 +66,11 @@ func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) erro
 		return err
 	}
 
-	schemaEqual := previousSchema.Equal(*sg)
+	schemaEqual := previousSchema.Equal(sg)
 
 	if !schemaEqual {
 		fmt.Println("The schema needs an update")
-		if err := sl.schemaPersistor.SaveSchema(context.Background(), source, *sg); err != nil {
+		if err := sl.schemaPersistor.SaveSchema(context.Background(), source, sg); err != nil {
 			fmt.Printf("[ERROR] Unable to write schema in DB: %v.\n", err)
 			fmt.Println("[WARNING] The graph has not been updated.")
 			return err
@@ -80,41 +79,34 @@ func (sl *GraphUpdater) updateSchema(source string, sg *schema.SchemaGraph) erro
 	return nil
 }
 
-// Update the assets and relations in DB
-func (sl *GraphUpdater) Update(updates SourceSubGraphUpdates) error {
-	metrics.GraphUpdatesProcessingRequestedCounter.
-		With(prometheus.Labels{"source": updates.Source}).
-		Inc()
-
-	if err := sl.updateSchema(updates.Source, &updates.Schema); err != nil {
-		metrics.GraphUpdatesProcessingFailedCounter.
-			With(prometheus.Labels{"source": updates.Source}).
-			Inc()
-		return err
+// UpsertAsset upsert an asset in the graph of the data source
+func (sl *GraphUpdater) UpsertAsset(source string, asset Asset) error {
+	if err := sl.graphDB.UpsertAsset(source, asset); err != nil {
+		return fmt.Errorf("Unable to upsert asset %v from source %s: %v", asset, source, err)
 	}
+	return nil
+}
 
-	// Here we add the edges from the source to each node being observed by that source.
-	sl.appendObservedRelations(updates.Source, &updates.Updates)
-
-	fmt.Printf("Start updating the graph with:\n"+
-		"\t%d assets to upsert\n"+
-		"\t%d assets to remove\n"+
-		"\t%d relations to upsert\n"+
-		"\t%d relations to remove\n",
-		len(updates.Updates.GetAssetUpserts()), len(updates.Updates.GetAssetRemovals()),
-		len(updates.Updates.GetRelationUpserts()), len(updates.Updates.GetAssetRemovals()))
-
-	if err := sl.graphDB.UpdateGraph(updates.Source, &updates.Updates); err != nil {
-		metrics.GraphUpdatesProcessingFailedCounter.
-			With(prometheus.Labels{"source": updates.Source}).
-			Inc()
-		fmt.Printf("[ERROR] Unable to write data in graph DB: %v\n", err)
-		return err
+// UpsertRelation upsert a relation in the graph of the data source
+func (sl *GraphUpdater) UpsertRelation(source string, relation Relation) error {
+	if err := sl.graphDB.UpsertRelation(source, relation); err != nil {
+		return fmt.Errorf("Unable to upsert relation %v from source %s: %v", relation, source, err)
 	}
+	return nil
+}
 
-	metrics.GraphUpdatesProcessingSucceededCounter.
-		With(prometheus.Labels{"source": updates.Source}).
-		Inc()
+// RemoveAsset upsert an asset in the graph of the data source
+func (sl *GraphUpdater) RemoveAsset(source string, asset Asset) error {
+	if err := sl.graphDB.RemoveAsset(source, asset); err != nil {
+		return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+	}
+	return nil
+}
 
+// RemoveRelation upsert a relation in the graph of the data source
+func (sl *GraphUpdater) RemoveRelation(source string, relation Relation) error {
+	if err := sl.graphDB.RemoveRelation(source, relation); err != nil {
+		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+	}
 	return nil
 }

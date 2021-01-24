@@ -7,6 +7,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
+// GraphQueryResult represent a result from the database with the projection model
 type GraphQueryResult struct {
 	Cursor      Cursor
 	Projections []Projection
@@ -18,8 +19,13 @@ type GraphDB interface {
 
 	InitializeSchema() error
 
-	UpdateGraph(source string, bulk *GraphUpdatesBulk) error
 	ReadGraph(source string, graph *Graph) error
+
+	// Atomic operations on the graph
+	UpsertAsset(source string, asset Asset) error
+	UpsertRelation(source string, relation Relation) error
+	RemoveAsset(source string, asset Asset) error
+	RemoveRelation(source string, relation Relation) error
 
 	FlushAll() error
 
@@ -36,6 +42,7 @@ type Cursor interface {
 	Close() error
 }
 
+// AssetWithID represent an asset with an ID from the database
 type AssetWithID struct {
 	ID    string `json:"_id"`
 	Asset `json:",inline"`
@@ -45,6 +52,7 @@ func (a AssetWithID) String() string {
 	return fmt.Sprintf("Asset{id:%s, type:%s, value:%s}", a.ID, a.Asset.Type, a.Asset.Key)
 }
 
+// RelationWithID represent a relation with an ID from the database
 type RelationWithID struct {
 	ID   string                 `json:"_id"`
 	From string                 `json:"from_id"`

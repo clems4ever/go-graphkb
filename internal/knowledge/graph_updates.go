@@ -32,6 +32,7 @@ func NewGraphUpdatesBulk() *GraphUpdatesBulk {
 	}
 }
 
+// Clear the bulk
 func (gub *GraphUpdatesBulk) Clear() {
 	gub.assetUpserts.Clear()
 	gub.assetRemovals.Clear()
@@ -39,6 +40,7 @@ func (gub *GraphUpdatesBulk) Clear() {
 	gub.relationRemovals.Clear()
 }
 
+// GetAssetUpserts retrieve the list of all assets to be upsered
 func (gub *GraphUpdatesBulk) GetAssetUpserts() []Asset {
 	assets := []Asset{}
 	for v := range gub.assetUpserts.Iter() {
@@ -47,6 +49,7 @@ func (gub *GraphUpdatesBulk) GetAssetUpserts() []Asset {
 	return assets
 }
 
+// HasAssetUpsert check whether asset needs to be upserted
 func (gub *GraphUpdatesBulk) HasAssetUpsert(asset Asset) bool {
 	return gub.assetUpserts.Contains(asset)
 }
@@ -63,6 +66,7 @@ func (gub *GraphUpdatesBulk) UpsertAssets(assets ...Asset) {
 	}
 }
 
+// GetAssetRemovals retrieve all assets to be removed
 func (gub *GraphUpdatesBulk) GetAssetRemovals() []Asset {
 	assets := []Asset{}
 	for v := range gub.assetRemovals.Iter() {
@@ -71,6 +75,7 @@ func (gub *GraphUpdatesBulk) GetAssetRemovals() []Asset {
 	return assets
 }
 
+// HasAssetRemoval check whether this asset need to be removed
 func (gub *GraphUpdatesBulk) HasAssetRemoval(asset Asset) bool {
 	return gub.assetRemovals.Contains(asset)
 }
@@ -87,6 +92,7 @@ func (gub *GraphUpdatesBulk) RemoveAssets(assets ...Asset) {
 	}
 }
 
+// GetRelationUpserts retrieve all relations to be upserted
 func (gub *GraphUpdatesBulk) GetRelationUpserts() []Relation {
 	relations := []Relation{}
 	for v := range gub.relationUpserts.Iter() {
@@ -95,6 +101,7 @@ func (gub *GraphUpdatesBulk) GetRelationUpserts() []Relation {
 	return relations
 }
 
+// HasRelationUpsert check whether the relation needs to be upserted
 func (gub *GraphUpdatesBulk) HasRelationUpsert(relation Relation) bool {
 	return gub.relationUpserts.Contains(relation)
 }
@@ -111,6 +118,7 @@ func (gub *GraphUpdatesBulk) UpsertRelations(relations ...Relation) {
 	}
 }
 
+// GetRelationRemovals retrieve all relations to be removed
 func (gub *GraphUpdatesBulk) GetRelationRemovals() []Relation {
 	relations := []Relation{}
 	for v := range gub.relationRemovals.Iter() {
@@ -119,6 +127,7 @@ func (gub *GraphUpdatesBulk) GetRelationRemovals() []Relation {
 	return relations
 }
 
+// HasRelationRemoval check whether the bulk contains the removal of this relation
 func (gub *GraphUpdatesBulk) HasRelationRemoval(relation Relation) bool {
 	return gub.relationRemovals.Contains(relation)
 }
@@ -135,6 +144,7 @@ func (gub *GraphUpdatesBulk) RemoveRelations(relations ...Relation) {
 	}
 }
 
+// MarshalJSON marshal a graph update bulk
 func (gub *GraphUpdatesBulk) MarshalJSON() ([]byte, error) {
 	j := &GraphUpdatesBulkJSON{}
 	j.AssetUpserts = gub.GetAssetUpserts()
@@ -144,6 +154,7 @@ func (gub *GraphUpdatesBulk) MarshalJSON() ([]byte, error) {
 	return json.Marshal(j)
 }
 
+// UnmarshalJSON unmarshal a graph updates bulk
 func (gub *GraphUpdatesBulk) UnmarshalJSON(bytes []byte) error {
 	j := GraphUpdatesBulkJSON{}
 	if err := json.Unmarshal(bytes, &j); err != nil {
