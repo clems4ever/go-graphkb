@@ -45,6 +45,7 @@ services:
         USER_ID: ${USER_ID}
         GROUP_ID: ${GROUP_ID}
     entrypoint: "./scripts/graphkb-entrypoint.sh"
+    command: "cmd/go-graphkb/config.yml"
     working_dir: "/app"
     volumes:
       - .:/app
