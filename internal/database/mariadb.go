@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS relations (
 	CONSTRAINT pk_relation PRIMARY KEY (id),
 	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
 	CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
-	CONSTRAINT fk_relation_source FOREIGN KEY (source_id) REFERENCES sources (id),
+	CONSTRAINT fk_relation_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
 
 	INDEX full_relation_type_from_to_idx (type, from_id, to_id),
     INDEX full_relation_type_to_from_idx (type, to_id, from_id),
