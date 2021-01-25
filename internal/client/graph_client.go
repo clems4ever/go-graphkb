@@ -55,7 +55,7 @@ func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
 	if res.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("Unauthorized access. Check your auth token")
 	} else if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return nil, fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 
 	b, err := ioutil.ReadAll(res.Body)
@@ -98,7 +98,7 @@ func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func (gc *GraphClient) UpsertAsset(asset knowledge.Asset) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 	return nil
 }
@@ -162,7 +162,7 @@ func (gc *GraphClient) DeleteAsset(asset knowledge.Asset) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 	return nil
 }
@@ -194,7 +194,7 @@ func (gc *GraphClient) UpsertRelation(relation knowledge.Relation) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func (gc *GraphClient) DeleteRelation(relation knowledge.Relation) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d", res.StatusCode)
+		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
 	}
 	return nil
 }
