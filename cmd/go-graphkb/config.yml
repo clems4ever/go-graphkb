@@ -6,3 +6,6 @@ mariadb_username: graphkb
 mariadb_password: password
 mariadb_host: db
 mariadb_database: graphkb
+
+# The level of concurrency allowed by the graph update API.
+concurrency: 32

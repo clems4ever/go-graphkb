@@ -118,8 +118,12 @@ func listen(cmd *cobra.Command, args []string) {
 	}
 
 	listenInterface := viper.GetString("server_listen")
+	concurrency := viper.GetInt64("concurrency")
+	if concurrency == 0 {
+		concurrency = 32
+	}
 
-	server.StartServer(listenInterface, Database, Database, Database, Database)
+	server.StartServer(listenInterface, Database, Database, Database, Database, concurrency)
 }
 
 func read(cmd *cobra.Command, args []string) {

@@ -17,6 +17,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/semaphore"
 
 	auth "github.com/abbot/go-http-auth"
 
@@ -276,7 +277,8 @@ func StartServer(listenInterface string,
 	database knowledge.GraphDB,
 	schemaPersistor schema.Persistor,
 	sourcesRegistry sources.Registry,
-	queryHistorizer history.Historizer) {
+	queryHistorizer history.Historizer,
+	concurrency int64) {
 
 	r := mux.NewRouter()
 
@@ -314,11 +316,13 @@ func StartServer(listenInterface string,
 
 	r.HandleFunc("/api/graph/read", getGraphRead(sourcesRegistry, database)).Methods("GET")
 
-	r.HandleFunc("/api/graph/schema", handlers.PutSchema(sourcesRegistry, graphUpdater)).Methods("PUT")
-	r.HandleFunc("/api/graph/asset", handlers.PutAsset(sourcesRegistry, graphUpdater)).Methods("PUT")
-	r.HandleFunc("/api/graph/relation", handlers.PutRelation(sourcesRegistry, graphUpdater)).Methods("PUT")
-	r.HandleFunc("/api/graph/asset", handlers.DeleteAsset(sourcesRegistry, graphUpdater)).Methods("DELETE")
-	r.HandleFunc("/api/graph/relation", handlers.DeleteRelation(sourcesRegistry, graphUpdater)).Methods("DELETE")
+	sem := semaphore.NewWeighted(concurrency)
+
+	r.HandleFunc("/api/graph/schema", handlers.PutSchema(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
+	r.HandleFunc("/api/graph/asset", handlers.PutAsset(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
+	r.HandleFunc("/api/graph/relation", handlers.PutRelation(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
+	r.HandleFunc("/api/graph/asset", handlers.DeleteAsset(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
+	r.HandleFunc("/api/graph/relation", handlers.DeleteRelation(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
@@ -327,12 +331,12 @@ func StartServer(listenInterface string,
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
-		fmt.Printf("Listening on %s with TLS enabled, the connection is secure\n", listenInterface)
+		fmt.Printf("Listening on %s with TLS enabled, the connection is secure [concurrency=%d]\n", listenInterface, concurrency)
 		err = http.ListenAndServeTLS(listenInterface, viper.GetString("server_tls_cert"),
 			viper.GetString("server_tls_key"), r)
 	} else {
-		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate\n",
-			listenInterface)
+		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]\n",
+			listenInterface, concurrency)
 		err = http.ListenAndServe(listenInterface, r)
 	}
 	if err != nil {

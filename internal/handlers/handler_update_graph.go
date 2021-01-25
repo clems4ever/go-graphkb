@@ -12,9 +12,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-var updatesSemaphore = semaphore.NewWeighted(int64(256))
-
-func handleUpdate(registry sources.Registry, fn func(source string, body io.Reader) error) http.HandlerFunc {
+func handleUpdate(registry sources.Registry, fn func(source string, body io.Reader) error, sem *semaphore.Weighted) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok, source, err := IsTokenValid(registry, r)
 		if err != nil {
@@ -28,12 +26,12 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 		}
 
 		{
-			ok = updatesSemaphore.TryAcquire(1)
+			ok = sem.TryAcquire(1)
 			if !ok {
 				ReplyWithTooManyRequests(w)
 				return
 			}
-			defer updatesSemaphore.Release(1)
+			defer sem.Release(1)
 
 			if err = fn(source, r.Body); err != nil {
 				ReplyWithInternalError(w, err)
@@ -50,7 +48,7 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 }
 
 // PutSchema upsert an asset into the graph of the data source
-func PutSchema(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) http.HandlerFunc {
+func PutSchema(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.PutGraphSchemaRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -60,11 +58,11 @@ func PutSchema(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		graphUpdater.UpdateSchema(source, requestBody.Schema)
 		return nil
-	})
+	}, sem)
 }
 
 // PutAsset upsert an asset into the graph of the data source
-func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) http.HandlerFunc {
+func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.PutGraphAssetRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -74,11 +72,11 @@ func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) h
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		graphUpdater.UpsertAsset(source, requestBody.Asset)
 		return nil
-	})
+	}, sem)
 }
 
 // PutRelation upsert a relation into the graph of the data source
-func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) http.HandlerFunc {
+func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.PutGraphRelationRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -88,11 +86,11 @@ func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		graphUpdater.UpsertRelation(source, requestBody.Relation)
 		return nil
-	})
+	}, sem)
 }
 
 // DeleteAsset delete an asset from the graph of the data source
-func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) http.HandlerFunc {
+func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.DeleteGraphAssetRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -102,11 +100,11 @@ func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		graphUpdater.RemoveAsset(source, requestBody.Asset)
 		return nil
-	})
+	}, sem)
 }
 
 // DeleteRelation upsert a relation into the graph of the data source
-func DeleteRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater) http.HandlerFunc {
+func DeleteRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.DeleteGraphRelationRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -116,5 +114,5 @@ func DeleteRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpda
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		graphUpdater.RemoveRelation(source, requestBody.Relation)
 		return nil
-	})
+	}, sem)
 }

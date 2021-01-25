@@ -50,12 +50,10 @@ func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
 	trials := 0
 	for {
 		err := fn()
-		if err == ErrTooManyRequests {
+		if err != nil {
 			backoffTime := time.Duration(int(math.Pow(1.01, float64(trials)))*15) * time.Second
 			fmt.Printf("Sleeping for %d seconds", backoffTime/time.Second)
 			time.Sleep(backoffTime)
-		} else if err != nil {
-			return err
 		} else {
 			return nil
 		}
@@ -64,38 +62,6 @@ func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
 			return fmt.Errorf("Too many retries... Aborting")
 		}
 	}
-}
-
-func runTasksInParallel(fn func(data interface{}) error, workers int, items []interface{}) error {
-	var wg sync.WaitGroup
-	var err error
-
-	dataC := make(chan interface{})
-
-	wg.Add(workers)
-
-	for i := 0; i < workers; i++ {
-		go func() {
-			for {
-				select {
-				case d, more := <-dataC:
-					// if d is nil, it means the channel has been closed
-					if !more || err != nil {
-						return
-					}
-					err = fn(d)
-				}
-			}
-		}()
-	}
-
-	for _, d := range items {
-		dataC <- d
-	}
-
-	close(dataC)
-	wg.Wait()
-	return err
 }
 
 // Commit commit the transaction and gives ownership to the source for caching.
