@@ -10,6 +10,7 @@ import (
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/clems4ever/go-graphkb/internal/utils"
 )
 
 // Transaction represent a transaction generating updates by diffing the provided graph against
@@ -25,6 +26,9 @@ type Transaction struct {
 
 	// Lock used when binding or relating assets
 	mutex sync.Mutex
+
+	// Number of parallel queries to the Graph API
+	parallelization int
 }
 
 // Relate create a relation between two assets
@@ -62,13 +66,45 @@ func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
 	}
 }
 
+func runTasksInParallel(fn func(data interface{}) error, workers int, items []interface{}) error {
+	var wg sync.WaitGroup
+	var err error
+
+	dataC := make(chan interface{})
+
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			for {
+				select {
+				case d, more := <-dataC:
+					// if d is nil, it means the channel has been closed
+					if !more || err != nil {
+						return
+					}
+					err = fn(d)
+				}
+			}
+		}()
+	}
+
+	for _, d := range items {
+		dataC <- d
+	}
+
+	close(dataC)
+	wg.Wait()
+	return err
+}
+
 // Commit commit the transaction and gives ownership to the source for caching.
 func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	sg := cgt.newGraph.ExtractSchema()
 
 	fmt.Println("Start uploading the schema of the graph...")
 	if err := cgt.client.UpdateSchema(sg); err != nil {
-		return nil, fmt.Errorf("Unable to update the schema of the graph")
+		return nil, fmt.Errorf("Unable to update the schema of the graph: %v", err)
 	}
 
 	fmt.Println("Finished uploading the schema of the graph...")
@@ -78,55 +114,75 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	fmt.Println("Start uploading the graph...")
 
 	progress := pb.New(len(bulk.GetAssetRemovals()) + len(bulk.GetAssetUpserts()) + len(bulk.GetRelationRemovals()) + len(bulk.GetRelationUpserts()))
-	progress.Start()
 	defer progress.Finish()
 
-	var wg sync.WaitGroup
+	progress.Start()
 
-	wg.Add(2)
+	p := utils.NewWorkerPool(cgt.parallelization)
+	defer p.Close()
 
-	var err1, err2 error
+	futures := make([]chan error, 0)
 
-	go func() {
-		defer wg.Done()
-		for _, r := range bulk.GetRelationRemovals() {
+	for _, r := range bulk.GetRelationRemovals() {
+		f := p.Exec(func() error {
 			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelation(r) }, 10); err != nil {
-				err1 = fmt.Errorf("Unable to remove the relation %v: %v", r, err)
-				return
+				return fmt.Errorf("Unable to remove the relation %v: %v", r, err)
 			}
 			progress.Increment()
-		}
-		for _, a := range bulk.GetAssetRemovals() {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAsset(a) }, 10); err != nil {
-				err1 = fmt.Errorf("Unable to remove the asset %v: %v", a, err)
-			}
-			progress.Increment()
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		for _, a := range bulk.GetAssetUpserts() {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertAsset(a) }, 10); err != nil {
-				err2 = fmt.Errorf("Unable to upsert the asset %v: %v", a, err)
-			}
-			progress.Increment()
-		}
-		for _, r := range bulk.GetRelationUpserts() {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertRelation(r) }, 10); err != nil {
-				err2 = fmt.Errorf("Unable to upsert the relation %v: %v", r, err)
-			}
-			progress.Increment()
-		}
-	}()
-
-	wg.Wait()
-
-	if err1 != nil {
-		return nil, err1
+			return nil
+		})
+		futures = append(futures, f)
 	}
-	if err2 != nil {
-		return nil, err2
+
+	for _, a := range bulk.GetAssetUpserts() {
+		f := p.Exec(func() error {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertAsset(a) }, 10); err != nil {
+				return fmt.Errorf("Unable to upsert the asset %v: %v", a, err)
+			}
+			progress.Increment()
+			return nil
+		})
+		futures = append(futures, f)
+	}
+
+	// Wait for all futures to complete
+	for _, f := range futures {
+		err := <-f
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	futures = make([]chan error, 0)
+
+	for _, a := range bulk.GetAssetRemovals() {
+		f := p.Exec(func() error {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAsset(a) }, 10); err != nil {
+				return fmt.Errorf("Unable to remove the asset %v: %v", a, err)
+			}
+			progress.Increment()
+			return nil
+		})
+		futures = append(futures, f)
+	}
+
+	for _, r := range bulk.GetRelationUpserts() {
+		f := p.Exec(func() error {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertRelation(r) }, 10); err != nil {
+				return fmt.Errorf("Unable to upsert the relation %v: %v", r, err)
+			}
+			progress.Increment()
+			return nil
+		})
+		futures = append(futures, f)
+	}
+
+	// Wait for all futures to complete
+	for _, f := range futures {
+		err := <-f
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	fmt.Println("Finished uploading the graph...")

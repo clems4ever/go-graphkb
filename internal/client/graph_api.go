@@ -31,6 +31,7 @@ func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transact
 	transaction.binder = knowledge.NewGraphBinder(transaction.newGraph)
 	transaction.client = gapi.client
 	transaction.currentGraph = currentGraph
+	transaction.parallelization = 30
 	return transaction
 }
 

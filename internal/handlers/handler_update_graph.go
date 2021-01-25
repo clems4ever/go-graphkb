@@ -12,7 +12,7 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-var updatesSemaphore = semaphore.NewWeighted(int64(32))
+var updatesSemaphore = semaphore.NewWeighted(int64(256))
 
 func handleUpdate(registry sources.Registry, fn func(source string, body io.Reader) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
