@@ -52,7 +52,7 @@ func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
 		err := fn()
 		if err != nil {
 			backoffTime := time.Duration(int(math.Pow(1.01, float64(trials)))*15) * time.Second
-			fmt.Printf("Sleeping for %d seconds", backoffTime/time.Second)
+			fmt.Printf("Sleeping for %d seconds\n", backoffTime/time.Second)
 			time.Sleep(backoffTime)
 		} else {
 			return nil
