@@ -158,6 +158,7 @@ func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey) ([]in
 	if err != nil {
 		return nil, fmt.Errorf("Unable to prepare statement: %v", err)
 	}
+	defer stmt.Close()
 
 	assetIDs := []int{}
 	for _, a := range assets {
@@ -190,6 +191,7 @@ func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer r.Close()
 
 	var sourceID int
 	for r.Next() {
@@ -308,6 +310,8 @@ WHERE s.name = ? AND r.type <> 'observed' AND (a.type <> 'source' AND b.type <> 
 	if err != nil {
 		return err
 	}
+
+	defer rows.Close()
 
 	for rows.Next() {
 		var FromType, ToType, FromKey, ToKey, Type string
