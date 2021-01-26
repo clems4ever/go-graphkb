@@ -103,10 +103,10 @@ func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
 	return nil
 }
 
-// UpsertAsset send an asset upsert operation to the API
-func (gc *GraphClient) UpsertAsset(asset knowledge.Asset) error {
+// UpsertAssets send an asset upsert operation to the API
+func (gc *GraphClient) UpsertAssets(assets ...knowledge.Asset) error {
 	requestBody := PutGraphAssetRequestBody{}
-	requestBody.Asset = asset
+	requestBody.Assets = assets
 
 	b, err := json.Marshal(requestBody)
 	if err != nil {
@@ -135,10 +135,10 @@ func (gc *GraphClient) UpsertAsset(asset knowledge.Asset) error {
 	return nil
 }
 
-// DeleteAsset send an asset removal operation to the API
-func (gc *GraphClient) DeleteAsset(asset knowledge.Asset) error {
+// DeleteAssets send an asset removal operation to the API
+func (gc *GraphClient) DeleteAssets(assets ...knowledge.Asset) error {
 	requestBody := DeleteGraphAssetRequestBody{}
-	requestBody.Asset = asset
+	requestBody.Assets = assets
 
 	b, err := json.Marshal(requestBody)
 	if err != nil {
@@ -167,10 +167,10 @@ func (gc *GraphClient) DeleteAsset(asset knowledge.Asset) error {
 	return nil
 }
 
-// UpsertRelation send a relation upsert operation to the API
-func (gc *GraphClient) UpsertRelation(relation knowledge.Relation) error {
+// UpsertRelations send a relation upsert operation to the API
+func (gc *GraphClient) UpsertRelations(relations ...knowledge.Relation) error {
 	requestBody := PutGraphRelationRequestBody{}
-	requestBody.Relation = relation
+	requestBody.Relations = relations
 
 	b, err := json.Marshal(requestBody)
 	if err != nil {
@@ -199,10 +199,10 @@ func (gc *GraphClient) UpsertRelation(relation knowledge.Relation) error {
 	return nil
 }
 
-// DeleteRelation send a relation upsert operation to the API
-func (gc *GraphClient) DeleteRelation(relation knowledge.Relation) error {
+// DeleteRelations send a relation upsert operation to the API
+func (gc *GraphClient) DeleteRelations(relations ...knowledge.Relation) error {
 	requestBody := DeleteGraphRelationRequestBody{}
-	requestBody.Relation = relation
+	requestBody.Relations = relations
 
 	b, err := json.Marshal(requestBody)
 	if err != nil {

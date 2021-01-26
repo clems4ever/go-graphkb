@@ -319,10 +319,12 @@ func StartServer(listenInterface string,
 	sem := semaphore.NewWeighted(concurrency)
 
 	r.HandleFunc("/api/graph/schema", handlers.PutSchema(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
-	r.HandleFunc("/api/graph/asset", handlers.PutAsset(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
-	r.HandleFunc("/api/graph/relation", handlers.PutRelation(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
-	r.HandleFunc("/api/graph/asset", handlers.DeleteAsset(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
-	r.HandleFunc("/api/graph/relation", handlers.DeleteRelation(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
+
+	r.HandleFunc("/api/graph/asset", handlers.PutAssets(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
+	r.HandleFunc("/api/graph/asset", handlers.DeleteAssets(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
+
+	r.HandleFunc("/api/graph/relation", handlers.PutRelations(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
+	r.HandleFunc("/api/graph/relation", handlers.DeleteRelations(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))

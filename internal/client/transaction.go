@@ -91,7 +91,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	for _, r := range bulk.GetRelationRemovals() {
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelation(r) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(r) }, 10); err != nil {
 				return fmt.Errorf("Unable to remove the relation %v: %v", r, err)
 			}
 			progress.Increment()
@@ -102,7 +102,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	for _, a := range bulk.GetAssetUpserts() {
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertAsset(a) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertAssets(a) }, 10); err != nil {
 				return fmt.Errorf("Unable to upsert the asset %v: %v", a, err)
 			}
 			progress.Increment()
@@ -123,7 +123,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	for _, a := range bulk.GetAssetRemovals() {
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAsset(a) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(a) }, 10); err != nil {
 				return fmt.Errorf("Unable to remove the asset %v: %v", a, err)
 			}
 			progress.Increment()
@@ -134,7 +134,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	for _, r := range bulk.GetRelationUpserts() {
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertRelation(r) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.UpsertRelations(r) }, 10); err != nil {
 				return fmt.Errorf("Unable to upsert the relation %v: %v", r, err)
 			}
 			progress.Increment()

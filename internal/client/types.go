@@ -18,20 +18,20 @@ type PutGraphSchemaRequestBody struct {
 
 // PutGraphAssetRequestBody a request body for the asset upsert
 type PutGraphAssetRequestBody struct {
-	Asset knowledge.Asset `json:"asset"`
+	Assets []knowledge.Asset `json:"assets"`
 }
 
 // PutGraphRelationRequestBody a request body for the relation upsert
 type PutGraphRelationRequestBody struct {
-	Relation knowledge.Relation `json:"relation"`
+	Relations []knowledge.Relation `json:"relations"`
 }
 
 // DeleteGraphAssetRequestBody a request body for the asset removal
 type DeleteGraphAssetRequestBody struct {
-	Asset knowledge.Asset `json:"asset"`
+	Assets []knowledge.Asset `json:"assets"`
 }
 
 // DeleteGraphRelationRequestBody a request body for the relation removal
 type DeleteGraphRelationRequestBody struct {
-	Relation knowledge.Relation `json:"relation"`
+	Relations []knowledge.Relation `json:"relations"`
 }
