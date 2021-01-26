@@ -1,10 +1,14 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 )
+
+// ErrInexistentDBID represent an error thrown when a DB ID has not been pushed into th registry
+var ErrInexistentDBID = errors.New("DB ID does not exist")
 
 // AssetTemporaryIDGenerator is a kind of cache associating IDs to assets so that pivot points are joined by those IDs
 type AssetTemporaryIDGenerator struct {
@@ -55,7 +59,7 @@ func (atig *AssetTemporaryIDGenerator) Push(asset knowledge.Asset, DBID int) (in
 func (atig *AssetTemporaryIDGenerator) Get(DBID int) (int, error) {
 	id, ok := atig.DBIDToTemporaryID[DBID]
 	if !ok {
-		return 0, fmt.Errorf("DB ID %d does not exist in generator", DBID)
+		return 0, ErrInexistentDBID
 	}
 	return id, nil
 }

@@ -658,12 +658,20 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 
 			tmpIDFrom, err := mc.temporaryIDGenerator.Get(r.From)
 			if err != nil {
-				return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (from): %v", r.From, err)
+				if err == ErrInexistentDBID {
+					tmpIDFrom = -1
+				} else {
+					return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (from): %v", r.From, err)
+				}
 			}
 
 			tmpIDTo, err := mc.temporaryIDGenerator.Get(r.To)
 			if err != nil {
-				return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (to): %v", r.To, err)
+				if err == ErrInexistentDBID {
+					tmpIDFrom = -1
+				} else {
+					return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (to): %v", r.To, err)
+				}
 			}
 
 			output[i] = knowledge.RelationWithID{
