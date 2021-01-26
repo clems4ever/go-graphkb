@@ -30,7 +30,8 @@ func NewMariaDB(username string, password string, host string, databaseName stri
 	if err != nil {
 		log.Fatal(err)
 	}
-	db.SetMaxIdleConns(0)
+	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(10)
 	return &MariaDB{db: db}
 }
 
