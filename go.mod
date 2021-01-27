@@ -3,6 +3,7 @@ module github.com/clems4ever/go-graphkb
 go 1.13
 
 require (
+	github.com/VividCortex/mysqlerr v0.0.0-20201215173831-4c396ae82aac
 	github.com/Workiva/go-datastructures v1.0.52 // indirect
 	github.com/abbot/go-http-auth v0.4.0
 	github.com/antlr/antlr4 v0.0.0-20200103163232-691acdc23f1f

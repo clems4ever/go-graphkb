@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/VividCortex/mysqlerr"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	mysql "github.com/go-sql-driver/mysql"
@@ -265,15 +266,23 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 			`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
 			h, asset.Type, asset.Key)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
+			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+				// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
+			} else {
+				tx.Rollback()
+				return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
+			}
 		}
 
 		_, err = tx.ExecContext(context.Background(),
 			`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+				// TODO(c.michaud): update the update_time?
+			} else {
+				tx.Rollback()
+				return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+			}
 		}
 	}
 
@@ -305,15 +314,23 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 			"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
 			rH, aFrom, aTo, relation.Type)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
+			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+				// If the entry is duplicated, it's fine but we still need insert a line into relations_by_source.
+			} else {
+				tx.Rollback()
+				return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
+			}
 		}
 
 		_, err = tx.ExecContext(context.Background(),
 			`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+				// TODO(c.michaud): update the update_time?
+			} else {
+				tx.Rollback()
+				return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+			}
 		}
 	}
 
@@ -347,7 +364,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 		}
 
 		_, err = tx.ExecContext(context.Background(),
-			`DELETE FROM assets WHERE asset_id = ? AND NOT EXISTS (
+			`DELETE FROM assets WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM assets_by_source WHERE asset_id = ?
 		)`,
 			h, h)
@@ -388,7 +405,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 		}
 
 		_, err = tx.ExecContext(context.Background(),
-			`DELETE FROM relations WHERE relation_id = ? AND NOT EXISTS (
+			`DELETE FROM relations WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM relations_by_source WHERE relation_id = ?
 		)`,
 			rH, rH)
