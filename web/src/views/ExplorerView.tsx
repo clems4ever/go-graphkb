@@ -33,7 +33,6 @@ const ExplorerView = () => {
     const [error, setError] = useState(undefined as undefined | Error);
     const [schemaOpen, setSchemaOpen] = useState(false);
     const [databaseDialogOpen, setDatabaseDialogOpen] = useState(false);
-    const [databaseDetails, setDatabaseDetails] = useState(undefined as DatabaseDetails | undefined);
     const [searchValue, setSearchValue] = useState("");
     const [searchFocus, setSearchFocus] = useState(false);
 
@@ -65,20 +64,9 @@ const ExplorerView = () => {
         }
     }, []);
 
-    const getDatabaseDetailsCallback = useCallback(async () => {
-        try {
-            setDatabaseDetails(await getDatabaseDetails());
-        } catch (err) {
-            console.error(err);
-            setError(new Error("Unable to fetch database details: " + err.message));
-        }
-    }, []);
-
     useEffect(() => { handleQuerySubmit(QUERY) }, [handleQuerySubmit]);
 
     useEffect(() => { getSourcesCallback() }, [getSourcesCallback]);
-
-    useEffect(() => { getDatabaseDetailsCallback() }, [getDatabaseDetailsCallback]);
 
     const handleAssetDoubleClick = (asset: Asset) => {
         const newQuery = `MATCH (a:${asset.type})-[r]-(n) WHERE a.value = '${asset.key}' RETURN a, r, n`;
@@ -115,9 +103,7 @@ const ExplorerView = () => {
             <div className={styles.container}>
                 <DatabaseDialog
                     open={databaseDialogOpen}
-                    onClose={() => setDatabaseDialogOpen(false)}
-                    assetsCount={databaseDetails ? databaseDetails.assets_count : -1}
-                    relationsCount={databaseDetails ? databaseDetails.relations_count : -1} />
+                    onClose={() => setDatabaseDialogOpen(false)} />
 
                 <SchemaGraphDialog
                     open={schemaOpen}
