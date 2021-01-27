@@ -14,13 +14,14 @@ function computeColumns(columns: ColumnType[]) {
     return columns.map((v, i) => ({ title: `${v.name} (${v.type})`, field: `col-${i}`, export: true }));
 }
 
-function cellToValue(row: TypedDoc[], colIdx: number, columns: ColumnType[]): string {
+function cellToValue(row: TypedDoc[], colIdx: number, columns: ColumnType[]): string | JSX.Element {
     const v = row[colIdx];
     if (columns[colIdx].type === "property") {
         return v as string;
     } else if (columns[colIdx].type === "asset") {
         const d = v as Asset;
-        return d.key;
+        const key = (d.key === '') ? '(empty)' : d.key;
+        return <p><span style={{color: "yellow"}}>{d.type}</span><br/><span>{key}</span></p>;
     } else if (columns[colIdx].type === "relation") {
         const d = v as Relation;
         return d.type;
@@ -28,8 +29,8 @@ function cellToValue(row: TypedDoc[], colIdx: number, columns: ColumnType[]): st
     return "unknown";
 }
 
-function columnToValue(results: QueryResultSet, rowIdx: number): { [k: string]: string } {
-    const values = {} as { [k: string]: string };
+function columnToValue(results: QueryResultSet, rowIdx: number): { [k: string]: string | JSX.Element } {
+    const values = {} as { [k: string]: string | JSX.Element };
     results.items[rowIdx].forEach((v, i) => {
         const x = cellToValue(results.items[rowIdx], i, results.columns);
         values[`col-${i}`] = x;
@@ -46,7 +47,7 @@ function computeValues(results: QueryResultSet) {
 
 const ResultsTable = memo(function (props: Props) {
     const [columns, setColumns] = useState<{ title: string, field: string }[]>([]);
-    const [data, setData] = useState<{ [k: string]: string }[]>([]);
+    const [data, setData] = useState<{ [k: string]: string | JSX.Element }[]>([]);
 
     useEffect(() => {
         const cols: { title: string, field: string }[] = props.results
