@@ -25,40 +25,8 @@ func NewGraphUpdater(graphDB GraphDB, schemaPersistor schema.Persistor) *GraphUp
 	return &GraphUpdater{graphDB, schemaPersistor}
 }
 
-// Augment the graph of the user with "observed" relation from the source to the each asset
-func (sl *GraphUpdater) appendObservedRelations(source string, updates *GraphUpdatesBulk) {
-	assetsToAdd := []Asset{Asset{Type: "source", Key: source}}
-	observedRelationsToRemove := []Relation{}
-	observedRelationsToAdd := []Relation{}
-
-	for _, a := range updates.GetAssetUpserts() {
-		observedRelationsToAdd = append(observedRelationsToAdd, Relation{
-			Type: "observed",
-			From: AssetKey(assetsToAdd[0]),
-			To:   AssetKey(a),
-		})
-	}
-
-	for _, a := range updates.GetAssetRemovals() {
-		observedRelationsToRemove = append(observedRelationsToRemove, Relation{
-			Type: "observed",
-			From: AssetKey(assetsToAdd[0]),
-			To:   AssetKey(a),
-		})
-	}
-
-	updates.UpsertAssets(assetsToAdd...)
-	updates.UpsertRelations(observedRelationsToAdd...)
-	updates.RemoveRelations(observedRelationsToRemove...)
-}
-
 // UpdateSchema update the schema for the source with the one provided in the request
 func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error {
-	for _, a := range sg.Assets() {
-		sg.AddRelation(schema.AssetType("source"), "observed", a)
-	}
-	sg.AddAsset("source")
-
 	previousSchema, err := sl.schemaPersistor.LoadSchema(context.Background(), source)
 	if err != nil {
 		fmt.Printf("[ERROR] Unable to read schema from DB: %v.\n", err)
