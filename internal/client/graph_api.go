@@ -1,6 +1,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 )
 
@@ -8,8 +10,7 @@ import (
 type GraphAPI struct {
 	client *GraphClient
 
-	parallelization int
-	chunkSize       int
+	options GraphAPIOptions
 }
 
 // GraphAPIOptions options to pass to build graph API
@@ -26,28 +27,50 @@ type GraphAPIOptions struct {
 
 	// The size of a chunk of updates, i.e., number of assets or relations sent in one HTTP request to the streaming API.
 	ChunkSize int
+
+	// Max number of retries before giving up (default is 10)
+	MaxRetries int
+	// The base delay between retries (default is 5 seconds). This delay is multiplied by the backoff factor.
+	RetryDelay time.Duration
+
+	// The backoff factor (default is 1.01)
+	RetryBackoffFactor float64
 }
 
 // NewGraphAPI create an emitter of graph
 func NewGraphAPI(options GraphAPIOptions) *GraphAPI {
 	return &GraphAPI{
-		client:          NewGraphClient(options.URL, options.AuthToken, options.SkipVerify),
-		parallelization: options.Parallelization,
-		chunkSize:       options.ChunkSize,
+		client:  NewGraphClient(options.URL, options.AuthToken, options.SkipVerify),
+		options: options,
 	}
 }
 
 // CreateTransaction create a full graph transaction. This kind of transaction will diff the new graph
 // with previous version of it.
 func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transaction {
-	var parallelization = gapi.parallelization
+	var parallelization = gapi.options.Parallelization
 	if parallelization == 0 {
 		parallelization = 30
 	}
 
-	var chunkSize = gapi.chunkSize
+	var chunkSize = gapi.options.ChunkSize
 	if chunkSize == 0 {
 		chunkSize = 1000
+	}
+
+	var maxRetries = gapi.options.MaxRetries
+	if maxRetries == 0 {
+		maxRetries = 10
+	}
+
+	var retryDelay = gapi.options.RetryDelay
+	if retryDelay == 0 {
+		retryDelay = 5 * time.Second
+	}
+
+	var retryBackoff = gapi.options.RetryBackoffFactor
+	if retryBackoff == 0.0 {
+		retryBackoff = 1.01
 	}
 
 	transaction := new(Transaction)
@@ -57,6 +80,10 @@ func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transact
 	transaction.currentGraph = currentGraph
 	transaction.parallelization = parallelization
 	transaction.chunkSize = chunkSize
+
+	transaction.retryCount = maxRetries
+	transaction.retryDelay = retryDelay
+	transaction.retryBackoffFactor = retryBackoff
 	return transaction
 }
 

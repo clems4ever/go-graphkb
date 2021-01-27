@@ -32,6 +32,10 @@ type Transaction struct {
 
 	// The number of items to send to the streaming API in one request
 	chunkSize int
+
+	retryCount         int
+	retryDelay         time.Duration
+	retryBackoffFactor float64
 }
 
 // Relate create a relation between two assets
@@ -49,12 +53,12 @@ func (cgt *Transaction) Bind(asset string, assetType schema.AssetType) {
 }
 
 // withRetryOnTooManyRequests helper retrying the function when too many request error has been received
-func withRetryOnTooManyRequests(fn func() error, maxRetries int) error {
+func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetries int, delay time.Duration) error {
 	trials := 0
 	for {
 		err := fn()
 		if err != nil {
-			backoffTime := time.Duration(int(math.Pow(1.01, float64(trials)))*15) * time.Second
+			backoffTime := time.Duration(int(math.Pow(backoffFactor, float64(trials)))) * delay
 			fmt.Printf("Sleeping for %d seconds\n", backoffTime/time.Second)
 			time.Sleep(backoffTime)
 		} else {
@@ -104,7 +108,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 			relations = append(relations, r.(knowledge.Relation))
 		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(relations) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
 				return fmt.Errorf("Unable to remove the relations %v: %v", relations, err)
 			}
 			progress.Add(len(relations))
@@ -119,7 +123,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 			assets = append(assets, a.(knowledge.Asset))
 		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAssets(assets) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
 				return fmt.Errorf("Unable to upsert the asset %v: %v", assets, err)
 			}
 			progress.Add(len(assets))
@@ -144,7 +148,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 			assets = append(assets, a.(knowledge.Asset))
 		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(assets) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
 				return fmt.Errorf("Unable to remove the asset %v: %v", assets, err)
 			}
 			progress.Add(len(assets))
@@ -159,7 +163,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 			relations = append(relations, r.(knowledge.Relation))
 		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelations(relations) }, 10); err != nil {
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
 				return fmt.Errorf("Unable to upsert the relation %v: %v", relations, err)
 			}
 			progress.Add(len(relations))

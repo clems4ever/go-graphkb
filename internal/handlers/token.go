@@ -5,24 +5,25 @@ import (
 	"net/http"
 
 	"github.com/clems4ever/go-graphkb/internal/sources"
+	"github.com/clems4ever/go-graphkb/internal/utils"
 )
 
 // IsTokenValid is the token valid
 func IsTokenValid(registry sources.Registry, r *http.Request) (bool, string, error) {
-	token, ok := r.URL.Query()["token"]
+	token := r.Header.Get(utils.XAuthTokenHeader)
 
-	if !ok || len(token) != 1 {
-		return false, "", fmt.Errorf("Unable to detect token query parameter")
+	if token == "" {
+		return false, "", fmt.Errorf("No auth token provided")
 	}
 
 	sourceToToken, err := registry.ListSources(r.Context())
 
 	if err != nil {
-		return false, "", err
+		return false, "", fmt.Errorf("Unable to list the sources: %v", err)
 	}
 
 	for sn, t := range sourceToToken {
-		if t == token[0] {
+		if t == token {
 			return true, sn, nil
 		}
 	}
