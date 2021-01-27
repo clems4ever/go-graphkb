@@ -79,34 +79,34 @@ func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error
 	return nil
 }
 
-// UpsertAsset upsert an asset in the graph of the data source
-func (sl *GraphUpdater) InsertAsset(source string, asset Asset) error {
-	if err := sl.graphDB.InsertAsset(source, asset); err != nil {
-		return fmt.Errorf("Unable to upsert asset %v from source %s: %v", asset, source, err)
+// InsertAssets insert multiple assets in the graph of the data source
+func (sl *GraphUpdater) InsertAssets(source string, assets []Asset) error {
+	if err := sl.graphDB.InsertAssets(source, assets); err != nil {
+		return fmt.Errorf("Unable to insert assets %v from source %s: %v", assets, source, err)
 	}
 	return nil
 }
 
-// UpsertRelation upsert a relation in the graph of the data source
-func (sl *GraphUpdater) InsertRelation(source string, relation Relation) error {
-	if err := sl.graphDB.InsertRelation(source, relation); err != nil {
-		return fmt.Errorf("Unable to upsert relation %v from source %s: %v", relation, source, err)
+// InsertRelations insert multiple relations in the graph of the data source
+func (sl *GraphUpdater) InsertRelations(source string, relations []Relation) error {
+	if err := sl.graphDB.InsertRelations(source, relations); err != nil {
+		return fmt.Errorf("Unable to insert relations %v from source %s: %v", relations, source, err)
 	}
 	return nil
 }
 
-// RemoveAsset upsert an asset in the graph of the data source
-func (sl *GraphUpdater) RemoveAsset(source string, asset Asset) error {
-	if err := sl.graphDB.RemoveAsset(source, asset); err != nil {
-		return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+// RemoveAssets remove multiple assets from the graph of the data source
+func (sl *GraphUpdater) RemoveAssets(source string, assets []Asset) error {
+	if err := sl.graphDB.RemoveAssets(source, assets); err != nil {
+		return fmt.Errorf("Unable to remove assets %v from source %s: %v", assets, source, err)
 	}
 	return nil
 }
 
-// RemoveRelation upsert a relation in the graph of the data source
-func (sl *GraphUpdater) RemoveRelation(source string, relation Relation) error {
-	if err := sl.graphDB.RemoveRelation(source, relation); err != nil {
-		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+// RemoveRelations remove multiple relations from the graph of the data source
+func (sl *GraphUpdater) RemoveRelations(source string, relations []Relation) error {
+	if err := sl.graphDB.RemoveRelations(source, relations); err != nil {
+		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relations, source, err)
 	}
 	return nil
 }

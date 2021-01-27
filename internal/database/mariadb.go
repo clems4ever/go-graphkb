@@ -246,31 +246,35 @@ func hashRelation(relation knowledge.Relation) uint64 {
 	return h.Sum64()
 }
 
-// InsertAsset insert one asset into the graph of the given source
-func (m *MariaDB) InsertAsset(source string, asset knowledge.Asset) error {
+// InsertAssets insert multiple assets into the graph of the given source
+func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID (asset insert): %v", err)
 	}
-	h := hashAsset(asset)
 
 	tx, err := m.db.Begin()
 	if err != nil {
 		return fmt.Errorf("Unable to create a transaction for inserting assets: %v", err)
 	}
-	_, err = tx.ExecContext(context.Background(),
-		`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
-		h, asset.Type, asset.Key)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
-	}
 
-	_, err = tx.ExecContext(context.Background(),
-		`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+	for _, asset := range assets {
+		h := hashAsset(asset)
+
+		_, err = tx.ExecContext(context.Background(),
+			`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
+			h, asset.Type, asset.Key)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
+		}
+
+		_, err = tx.ExecContext(context.Background(),
+			`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+		}
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -279,13 +283,8 @@ func (m *MariaDB) InsertAsset(source string, asset knowledge.Asset) error {
 	return nil
 }
 
-// InsertRelation upsert one relation into the graph of the given source
-func (m *MariaDB) InsertRelation(source string, relation knowledge.Relation) error {
-	// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
-	aFrom := hashAsset(knowledge.Asset(relation.From))
-	aTo := hashAsset(knowledge.Asset(relation.To))
-	rH := hashRelation(relation)
-
+// InsertRelations upsert one relation into the graph of the given source
+func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID (relation insert): %v", err)
@@ -296,19 +295,26 @@ func (m *MariaDB) InsertRelation(source string, relation knowledge.Relation) err
 		return fmt.Errorf("Unable to create a transaction for inserting relation: %v", err)
 	}
 
-	_, err = tx.ExecContext(context.Background(),
-		"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
-		rH, aFrom, aTo, relation.Type)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
-	}
+	for _, relation := range relations {
+		// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
+		aFrom := hashAsset(knowledge.Asset(relation.From))
+		aTo := hashAsset(knowledge.Asset(relation.To))
+		rH := hashRelation(relation)
 
-	_, err = tx.ExecContext(context.Background(),
-		`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+		_, err = tx.ExecContext(context.Background(),
+			"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
+			rH, aFrom, aTo, relation.Type)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
+		}
+
+		_, err = tx.ExecContext(context.Background(),
+			`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+		}
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -317,35 +323,39 @@ func (m *MariaDB) InsertRelation(source string, relation knowledge.Relation) err
 	return nil
 }
 
-// RemoveAsset remove one asset from the graph of the given source
-func (m *MariaDB) RemoveAsset(source string, asset knowledge.Asset) error {
+// RemoveAssets remove one asset from the graph of the given source
+func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
-	h := hashAsset(asset)
 
 	tx, err := m.db.Begin()
 	if err != nil {
 		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
 	}
 
-	_, err = tx.ExecContext(context.Background(),
-		`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
-		h, sourceID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to remove binding between asset %v and source %s: %v", asset, source, err)
-	}
+	for _, asset := range assets {
+		h := hashAsset(asset)
 
-	_, err = tx.ExecContext(context.Background(),
-		`DELETE FROM assets WHERE asset_id = ? AND NOT EXISTS (
+		_, err = tx.ExecContext(context.Background(),
+			`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
+			h, sourceID)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to remove binding between asset %v and source %s: %v", asset, source, err)
+		}
+
+		_, err = tx.ExecContext(context.Background(),
+			`DELETE FROM assets WHERE asset_id = ? AND NOT EXISTS (
 			SELECT * FROM assets_by_source WHERE asset_id = ?
 		)`,
-		h, h)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+			h, h)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+		}
+
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -354,35 +364,38 @@ func (m *MariaDB) RemoveAsset(source string, asset knowledge.Asset) error {
 	return nil
 }
 
-// RemoveRelation remove one relation from the graph of the given source
-func (m *MariaDB) RemoveRelation(source string, relation knowledge.Relation) error {
+// RemoveRelations remove relations from the graph of the given source
+func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
-	rH := hashRelation(relation)
 
 	tx, err := m.db.Begin()
 	if err != nil {
 		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
 	}
 
-	_, err = tx.ExecContext(context.Background(),
-		`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
-		rH, sourceID)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to remove binding between relation %v and source %s: %v", relation, source, err)
-	}
+	for _, relation := range relations {
+		rH := hashRelation(relation)
 
-	_, err = tx.ExecContext(context.Background(),
-		`DELETE FROM relations WHERE relation_id = ? AND NOT EXISTS (
+		_, err = tx.ExecContext(context.Background(),
+			`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
+			rH, sourceID)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to remove binding between relation %v and source %s: %v", relation, source, err)
+		}
+
+		_, err = tx.ExecContext(context.Background(),
+			`DELETE FROM relations WHERE relation_id = ? AND NOT EXISTS (
 			SELECT * FROM relations_by_source WHERE relation_id = ?
 		)`,
-		rH, rH)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+			rH, rH)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+		}
 	}
 
 	if err = tx.Commit(); err != nil {

@@ -228,6 +228,7 @@ func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.Han
 		}
 
 		if !ok {
+			fmt.Println("Unauthorized access with token", r.URL.Query()["token"])
 			handlers.ReplyWithUnauthorized(w)
 			return
 		}

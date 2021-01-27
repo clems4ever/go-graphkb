@@ -29,6 +29,9 @@ type Transaction struct {
 
 	// Number of parallel queries to the Graph API
 	parallelization int
+
+	// The number of items to send to the streaming API in one request
+	chunkSize int
 }
 
 // Relate create a relation between two assets
@@ -83,31 +86,43 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	defer progress.Finish()
 
 	progress.Start()
-
 	p := utils.NewWorkerPool(cgt.parallelization)
 	defer p.Close()
 
 	futures := make([]chan error, 0)
 
-	for _, r := range bulk.GetRelationRemovals() {
-		r := r
+	chunkSize := cgt.chunkSize
+
+	relationRemovalsChunks := utils.ChunkSlice(bulk.GetRelationRemovals(), chunkSize).([][]interface{})
+	relationInsertionChunks := utils.ChunkSlice(bulk.GetRelationUpserts(), chunkSize).([][]interface{})
+	assetRemovalsChunks := utils.ChunkSlice(bulk.GetAssetRemovals(), chunkSize).([][]interface{})
+	assetInsertionChunks := utils.ChunkSlice(bulk.GetAssetUpserts(), chunkSize).([][]interface{})
+
+	for _, rels := range relationRemovalsChunks {
+		relations := []knowledge.Relation{}
+		for _, r := range rels {
+			relations = append(relations, r.(knowledge.Relation))
+		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelation(r) }, 10); err != nil {
-				return fmt.Errorf("Unable to remove the relation %v: %v", r, err)
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(relations) }, 10); err != nil {
+				return fmt.Errorf("Unable to remove the relations %v: %v", relations, err)
 			}
-			progress.Increment()
+			progress.Add(len(relations))
 			return nil
 		})
 		futures = append(futures, f)
 	}
 
-	for _, a := range bulk.GetAssetUpserts() {
-		a := a
+	for _, ass := range assetInsertionChunks {
+		assets := []knowledge.Asset{}
+		for _, a := range ass {
+			assets = append(assets, a.(knowledge.Asset))
+		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAsset(a) }, 10); err != nil {
-				return fmt.Errorf("Unable to upsert the asset %v: %v", a, err)
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAssets(assets) }, 10); err != nil {
+				return fmt.Errorf("Unable to upsert the asset %v: %v", assets, err)
 			}
-			progress.Increment()
+			progress.Add(len(assets))
 			return nil
 		})
 		futures = append(futures, f)
@@ -123,25 +138,31 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	futures = make([]chan error, 0)
 
-	for _, a := range bulk.GetAssetRemovals() {
-		a := a
+	for _, ass := range assetRemovalsChunks {
+		assets := []knowledge.Asset{}
+		for _, a := range ass {
+			assets = append(assets, a.(knowledge.Asset))
+		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAsset(a) }, 10); err != nil {
-				return fmt.Errorf("Unable to remove the asset %v: %v", a, err)
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(assets) }, 10); err != nil {
+				return fmt.Errorf("Unable to remove the asset %v: %v", assets, err)
 			}
-			progress.Increment()
+			progress.Add(len(assets))
 			return nil
 		})
 		futures = append(futures, f)
 	}
 
-	for _, r := range bulk.GetRelationUpserts() {
-		r := r
+	for _, rels := range relationInsertionChunks {
+		relations := []knowledge.Relation{}
+		for _, r := range rels {
+			relations = append(relations, r.(knowledge.Relation))
+		}
 		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelation(r) }, 10); err != nil {
-				return fmt.Errorf("Unable to upsert the relation %v: %v", r, err)
+			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelations(relations) }, 10); err != nil {
+				return fmt.Errorf("Unable to upsert the relation %v: %v", relations, err)
 			}
-			progress.Increment()
+			progress.Add(len(relations))
 			return nil
 		})
 		futures = append(futures, f)

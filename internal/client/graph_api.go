@@ -32,6 +32,7 @@ func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transact
 	transaction.client = gapi.client
 	transaction.currentGraph = currentGraph
 	transaction.parallelization = 30
+	transaction.chunkSize = 1000
 	return transaction
 }
 
