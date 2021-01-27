@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Dialog, useTheme, makeStyles, List, ListItem, ListItemIcon, Checkbox, ListItemText, Switch } from "@material-ui/core";
 import SchemaGraphExplorer from "./SchemaGraphExplorer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -16,7 +16,6 @@ export default function SchemaGraphDialog (props: Props) {
     const styles = useStyles();
     const [selectedSources, setSelectedSources] = useState<string[]>([]);
     const [hideObservations, setHideObservations] = useState(true);
-    const { sources } = props;
 
     const handleSourceClick = (source: string) => {
         if (selectedSources.indexOf(source) === -1) {

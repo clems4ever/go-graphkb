@@ -10,6 +10,7 @@ export const useMemoizedCallback = <T extends (...args: any[]) => any>(callback:
     }, []);
 
     // The callback that is constantly updated according to the inputs.
+    // eslint-disable-next-line
     const updatedCallback = React.useCallback(callback, inputs);
 
     // The effect updates the callbackRef depending on the inputs.
