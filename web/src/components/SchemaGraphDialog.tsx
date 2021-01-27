@@ -15,7 +15,6 @@ export default function SchemaGraphDialog (props: Props) {
     const theme = useTheme();
     const styles = useStyles();
     const [selectedSources, setSelectedSources] = useState<string[]>([]);
-    const [hideObservations, setHideObservations] = useState(true);
 
     const handleSourceClick = (source: string) => {
         if (selectedSources.indexOf(source) === -1) {
@@ -37,16 +36,13 @@ export default function SchemaGraphDialog (props: Props) {
             <div className={styles.schemaGraphExplorer}>
                     <SchemaGraphExplorer
                         backgroundColor={theme.palette.background.default}
-                        sources={selectedSources}
-                        hideObservations={hideObservations} />
+                        sources={selectedSources} />
                 </div>
                 <div className={styles.leftControl}>
                     <div className={styles.leftControlChild}>
                         <SourcesList
                             sources={props.sources.sort()}
                             selected={selectedSources}
-                            showObservation={!hideObservations}
-                            onShowObservationsClick={() => setHideObservations(!hideObservations)}
                             className={styles.sourcesList}
                             onSourceClick={handleSourceClick} />
                     </div>
@@ -119,21 +115,15 @@ const useStyles = makeStyles(theme => ({
 interface SourcesListProps {
     sources: string[];
     selected: string[];
-    showObservation: boolean;
 
     className?: string;
 
     onSourceClick: (source: string) => void;
-    onShowObservationsClick: () => void;
 }
 
 function SourcesList(props: SourcesListProps) {
     const handleToggle = (source: string) => {
         return () => props.onSourceClick(source);
-    }
-
-    const handleShowObservationsToggle = () => {
-        props.onShowObservationsClick();
     }
 
     const items = props.sources.map((s, i) => {
@@ -156,20 +146,6 @@ function SourcesList(props: SourcesListProps) {
 
     return (
         <List className={props.className}>
-            <ListItem dense={true} onClick={handleShowObservationsToggle}>
-                <ListItemIcon>
-                    <Switch
-                        size="small"
-                        color="default"
-                        edge="start"
-                        checked={props.showObservation}
-                        tabIndex={-1}
-                        disableRipple
-                        inputProps={{ 'aria-labelledby': `show-source-observations-item` }}
-                    />
-                </ListItemIcon>
-                <ListItemText id={`show-source-observations-item`} primary={"Show observations"} />
-            </ListItem>
             {items}
         </List >
     )

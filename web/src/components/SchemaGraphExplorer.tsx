@@ -5,7 +5,6 @@ import D3Graph from "./D3Graph";
 export interface Props {
     sources: string[];
 
-    hideObservations: boolean;
     backgroundColor: string;
 }
 
@@ -25,12 +24,10 @@ export default function SchemaGraphExplorer (props: Props) {
     const [graph, ,] = useSchemaGraph(props.sources);
 
     const nodes = graph ? graph.vertices
-        .filter(v => !props.hideObservations || v !== "source")
         .map(v => ({ id: v, label: v, } as D3Node))
         : [];
 
     const links = graph ? graph.edges
-        .filter(e => !props.hideObservations || e.relation_type !== "observed")
         .map(e => ({
             id: `${e.from_type}-${e.relation_type}-${e.to_type}`,
             source: e.from_type,
