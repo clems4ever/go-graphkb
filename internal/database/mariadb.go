@@ -246,8 +246,8 @@ func hashRelation(relation knowledge.Relation) uint64 {
 	return h.Sum64()
 }
 
-// UpsertAsset upsert one asset into the graph of the given source
-func (m *MariaDB) UpsertAsset(source string, asset knowledge.Asset) error {
+// InsertAsset insert one asset into the graph of the given source
+func (m *MariaDB) InsertAsset(source string, asset knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID (asset insert): %v", err)
@@ -279,8 +279,8 @@ func (m *MariaDB) UpsertAsset(source string, asset knowledge.Asset) error {
 	return nil
 }
 
-// UpsertRelation upsert one relation into the graph of the given source
-func (m *MariaDB) UpsertRelation(source string, relation knowledge.Relation) error {
+// InsertRelation upsert one relation into the graph of the given source
+func (m *MariaDB) InsertRelation(source string, relation knowledge.Relation) error {
 	// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
 	aFrom := hashAsset(knowledge.Asset(relation.From))
 	aTo := hashAsset(knowledge.Asset(relation.To))

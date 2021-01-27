@@ -71,7 +71,7 @@ func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, s
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		err := graphUpdater.UpsertAsset(source, requestBody.Asset)
+		err := graphUpdater.InsertAsset(source, requestBody.Asset)
 		if err != nil {
 			return fmt.Errorf("Unable to insert asset: %v", err)
 		}
@@ -88,7 +88,7 @@ func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		err := graphUpdater.UpsertRelation(source, requestBody.Relation)
+		err := graphUpdater.InsertRelation(source, requestBody.Relation)
 		if err != nil {
 			return fmt.Errorf("Unable to insert relation: %v", err)
 		}

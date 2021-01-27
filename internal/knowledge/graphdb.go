@@ -22,8 +22,8 @@ type GraphDB interface {
 	ReadGraph(source string, graph *Graph) error
 
 	// Atomic operations on the graph
-	UpsertAsset(source string, asset Asset) error
-	UpsertRelation(source string, relation Relation) error
+	InsertAsset(source string, asset Asset) error
+	InsertRelation(source string, relation Relation) error
 	RemoveAsset(source string, asset Asset) error
 	RemoveRelation(source string, relation Relation) error
 

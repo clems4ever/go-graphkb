@@ -103,8 +103,8 @@ func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
 	return nil
 }
 
-// UpsertAsset send an asset upsert operation to the API
-func (gc *GraphClient) UpsertAsset(asset knowledge.Asset) error {
+// InsertAsset send an asset insert operation to the API
+func (gc *GraphClient) InsertAsset(asset knowledge.Asset) error {
 	requestBody := PutGraphAssetRequestBody{}
 	requestBody.Asset = asset
 
@@ -167,8 +167,8 @@ func (gc *GraphClient) DeleteAsset(asset knowledge.Asset) error {
 	return nil
 }
 
-// UpsertRelation send a relation upsert operation to the API
-func (gc *GraphClient) UpsertRelation(relation knowledge.Relation) error {
+// InsertRelation send a relation insert operation to the API
+func (gc *GraphClient) InsertRelation(relation knowledge.Relation) error {
 	requestBody := PutGraphRelationRequestBody{}
 	requestBody.Relation = relation
 

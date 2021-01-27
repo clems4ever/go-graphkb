@@ -80,16 +80,16 @@ func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error
 }
 
 // UpsertAsset upsert an asset in the graph of the data source
-func (sl *GraphUpdater) UpsertAsset(source string, asset Asset) error {
-	if err := sl.graphDB.UpsertAsset(source, asset); err != nil {
+func (sl *GraphUpdater) InsertAsset(source string, asset Asset) error {
+	if err := sl.graphDB.InsertAsset(source, asset); err != nil {
 		return fmt.Errorf("Unable to upsert asset %v from source %s: %v", asset, source, err)
 	}
 	return nil
 }
 
 // UpsertRelation upsert a relation in the graph of the data source
-func (sl *GraphUpdater) UpsertRelation(source string, relation Relation) error {
-	if err := sl.graphDB.UpsertRelation(source, relation); err != nil {
+func (sl *GraphUpdater) InsertRelation(source string, relation Relation) error {
+	if err := sl.graphDB.InsertRelation(source, relation); err != nil {
 		return fmt.Errorf("Unable to upsert relation %v from source %s: %v", relation, source, err)
 	}
 	return nil
