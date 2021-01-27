@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"reflect"
 	"strconv"
@@ -49,63 +50,90 @@ func (m *MariaDB) InitializeSchema() error {
 			UNIQUE unique_source_idx (name, auth_token)
 		)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create sources table: %v", err)
 	}
 
 	// type must be part of the primary key to be a partition key
 	_, err = m.db.ExecContext(context.Background(), `
-CREATE TABLE IF NOT EXISTS assets (
-	id INT NOT NULL AUTO_INCREMENT,
-	source_id INT NOT NULL,
-	value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-	type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+		CREATE TABLE IF NOT EXISTS assets (
+			id BIGINT UNSIGNED NOT NULL,
+			value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+			type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
-	CONSTRAINT pk_asset PRIMARY KEY (id),
-	CONSTRAINT fk_asset_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+			CONSTRAINT pk_asset PRIMARY KEY (id),
 
-	UNIQUE unique_asset_idx (type, value, source_id),
-	INDEX value_idx (value),
-	INDEX type_idx (type))`)
+			UNIQUE unique_asset_idx (type, value),
+			INDEX value_idx (value),
+			INDEX type_idx (type))`)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create assets table: %v", err)
 	}
 
-	// type must be part of the primary key to be a partition key
 	_, err = m.db.ExecContext(context.Background(), `
-CREATE TABLE IF NOT EXISTS relations (
-	id INT NOT NULL AUTO_INCREMENT,
-	from_id INT NOT NULL,
-	to_id INT NOT NULL,
-	type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
-	source_id INT NOT NULL,
+		CREATE TABLE IF NOT EXISTS relations (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			from_id BIGINT UNSIGNED NOT NULL,
+			to_id BIGINT UNSIGNED NOT NULL,
+			type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
-	CONSTRAINT pk_relation PRIMARY KEY (id),
-	CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
-	CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
-	CONSTRAINT fk_relation_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+			CONSTRAINT pk_relation PRIMARY KEY (id),
+			CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
+			CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
 
-	INDEX full_relation_type_from_to_idx (type, from_id, to_id),
-    INDEX full_relation_type_to_from_idx (type, to_id, from_id),
-    INDEX full_relation_from_type_to_idx (from_id, type, to_id),
-    INDEX full_relation_from_to_type_idx (from_id, to_id, type),
-    INDEX full_relation_to_from_type_idx (to_id, from_id, type),
-    INDEX full_relation_to_type_from_idx (to_id, type, from_id))`)
+			INDEX full_relation_type_from_to_idx (type, from_id, to_id),
+			INDEX full_relation_type_to_from_idx (type, to_id, from_id),
+			INDEX full_relation_from_type_to_idx (from_id, type, to_id),
+			INDEX full_relation_from_to_type_idx (from_id, to_id, type),
+			INDEX full_relation_to_from_type_idx (to_id, from_id, type),
+			INDEX full_relation_to_type_from_idx (to_id, type, from_id))`)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create relations table: %v", err)
+	}
+
+	_, err = m.db.ExecContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS relations_by_source (
+			id INT NOT NULL AUTO_INCREMENT,
+			source_id INT NOT NULL,
+			relation_id BIGINT UNSIGNED NOT NULL,
+			update_time TIMESTAMP,
+		
+			CONSTRAINT pk_relations_by_source PRIMARY KEY (id),
+			CONSTRAINT fk_relations_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+			CONSTRAINT fk_relations_by_source_relation_id FOREIGN KEY (relation_id) REFERENCES relations (id) ON DELETE CASCADE,
+		
+			INDEX source_idx (source_id))`)
+	if err != nil {
+		return fmt.Errorf("Unable to create relations_by_source table: %v", err)
+	}
+
+	_, err = m.db.ExecContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS assets_by_source (
+			id INT NOT NULL AUTO_INCREMENT,
+			source_id INT NOT NULL,
+			asset_id BIGINT UNSIGNED NOT NULL,
+			update_time TIMESTAMP,
+		
+			CONSTRAINT pk_assets_by_source PRIMARY KEY (id),
+			CONSTRAINT fk_asset_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+			CONSTRAINT fk_asset_by_source_asset_id FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
+		
+			INDEX source_idx (source_id))`)
+	if err != nil {
+		return fmt.Errorf("Unable to create assets_by_source tables: %v", err)
 	}
 
 	// Create the table storing the schema graphs
 	_, err = m.db.ExecContext(context.Background(), `
-CREATE TABLE IF NOT EXISTS graph_schema (
-	id INTEGER AUTO_INCREMENT NOT NULL,
-	source_id INT NOT NULL,
-	graph TEXT NOT NULL,
-	timestamp TIMESTAMP,
+		CREATE TABLE IF NOT EXISTS graph_schema (
+			id INTEGER AUTO_INCREMENT NOT NULL,
+			source_id INT NOT NULL,
+			graph TEXT NOT NULL,
+			timestamp TIMESTAMP,
 
-	CONSTRAINT pk_schema PRIMARY KEY (id),
-	CONSTRAINT fk_schema_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE)`)
+			CONSTRAINT pk_schema PRIMARY KEY (id),
+			CONSTRAINT fk_schema_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create graph_schema tables: %v", err)
 	}
 
 	_, err = m.db.ExecContext(context.Background(), `
@@ -120,7 +148,7 @@ CREATE TABLE IF NOT EXISTS graph_schema (
 			CONSTRAINT pk_history PRIMARY KEY (id)
 		)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to create query_history tables: %v", err)
 	}
 
 	return nil
@@ -152,39 +180,6 @@ func isUnknownTableError(err error) bool {
 	return ok && driverErr.Number == 1051
 }
 
-// resolveAssets resolve the asset IDs of the assets
-func (m *MariaDB) resolveAssets(sourceID int, assets []knowledge.AssetKey) ([]int, error) {
-	stmt, err := m.db.PrepareContext(context.Background(), "SELECT id FROM assets WHERE type = ? AND value = ? AND source_id = ?")
-	if err != nil {
-		return nil, fmt.Errorf("Unable to prepare statement: %v", err)
-	}
-	defer stmt.Close()
-
-	assetIDs := []int{}
-	for _, a := range assets {
-		q, err := stmt.QueryContext(context.Background(), a.Type, a.Key, sourceID)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to query asset %v: %v", a, err)
-		}
-		defer q.Close()
-
-		found := false
-
-		for q.Next() {
-			var idx int
-			if err := q.Scan(&idx); err != nil {
-				return nil, fmt.Errorf("Unable to retrieve id for %v: %v", a, err)
-			}
-			found = true
-			assetIDs = append(assetIDs, int(idx))
-		}
-		if !found {
-			return nil, fmt.Errorf("Asset ID of asset %v was not found in DB", a)
-		}
-	}
-	return assetIDs, nil
-}
-
 // resolveSourceIDFromDB resolve the source ID from the source name from the database
 func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
 	r, err := m.db.QueryContext(context.Background(), "SELECT id FROM sources WHERE name = ? LIMIT 1", sourceName)
@@ -205,6 +200,7 @@ func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
 
 // resolveSourceID resolve the source ID from the source name from the cache first and then from the DB
 func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
+	// TODO(c.michaud): invalidate cache after some time.
 	if v, ok := m.sourcesCache[sourceName]; ok {
 		return v, nil
 	}
@@ -212,42 +208,111 @@ func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
 	return m.resolveSourceIDFromDB(sourceName)
 }
 
+func hashAsset(asset knowledge.Asset) uint64 {
+	h := fnv.New64()
+
+	b := []byte{}
+	b = append(b, []byte(asset.Type)...)
+	b = append(b, []byte(asset.Key)...)
+
+	h.Write(b)
+	return h.Sum64()
+}
+
+func hashRelation(relation knowledge.Relation) uint64 {
+	h := fnv.New64()
+
+	hFrom := hashAsset(knowledge.Asset(relation.From))
+	hTo := hashAsset(knowledge.Asset(relation.To))
+
+	fromB := []byte{
+		byte(0xff & hFrom),
+		byte(0xff & (hFrom >> 8)),
+		byte(0xff & (hFrom >> 16)),
+		byte(0xff & (hFrom >> 24))}
+
+	toB := []byte{
+		byte(0xff & hTo),
+		byte(0xff & (hTo >> 8)),
+		byte(0xff & (hTo >> 16)),
+		byte(0xff & (hTo >> 24))}
+
+	b := []byte{}
+	b = append(b, fromB...)
+	b = append(b, []byte(relation.Type)...)
+	b = append(b, toB...)
+
+	h.Write(b)
+	return h.Sum64()
+}
+
 // UpsertAsset upsert one asset into the graph of the given source
 func (m *MariaDB) UpsertAsset(source string, asset knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+		return fmt.Errorf("Unable to resolve source ID (asset insert): %v", err)
+	}
+	h := hashAsset(asset)
+
+	tx, err := m.db.Begin()
+	if err != nil {
+		return fmt.Errorf("Unable to create a transaction for inserting assets: %v", err)
+	}
+	_, err = tx.ExecContext(context.Background(),
+		`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
+		h, asset.Type, asset.Key)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
 	}
 
-	_, err = m.db.ExecContext(context.Background(), `
-	INSERT INTO assets (type, value, source_id) VALUES (?, ?, ?)`, asset.Type, asset.Key, sourceID)
+	_, err = tx.ExecContext(context.Background(),
+		`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
 	if err != nil {
-		return fmt.Errorf("Unable to insert in DB asset %v from source %s: %v", asset, source, err)
+		tx.Rollback()
+		return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Unable to commit assets upsert: %v", err)
 	}
 	return nil
 }
 
 // UpsertRelation upsert one relation into the graph of the given source
 func (m *MariaDB) UpsertRelation(source string, relation knowledge.Relation) error {
+	// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
+	aFrom := hashAsset(knowledge.Asset(relation.From))
+	aTo := hashAsset(knowledge.Asset(relation.To))
+	rH := hashRelation(relation)
+
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+		return fmt.Errorf("Unable to resolve source ID (relation insert): %v", err)
 	}
 
-	assetIDs, err := m.resolveAssets(sourceID, []knowledge.AssetKey{relation.From, relation.To})
+	tx, err := m.db.Begin()
 	if err != nil {
-		return fmt.Errorf("Unable to resolve the IDs of the assets in relation %v: %v", relation, err)
+		return fmt.Errorf("Unable to create a transaction for inserting relation: %v", err)
 	}
 
-	if len(assetIDs) != 2 {
-		return fmt.Errorf("Unexpected number of resolved IDs")
-	}
-
-	_, err = m.db.ExecContext(context.Background(),
-		"INSERT INTO relations (from_id, to_id, type, source_id) VALUES (?, ?, ?, ?)",
-		assetIDs[0], assetIDs[1], relation.Type, sourceID)
+	_, err = tx.ExecContext(context.Background(),
+		"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
+		rH, aFrom, aTo, relation.Type)
 	if err != nil {
-		return fmt.Errorf("Unable to prepare relation insertion query: %v", err)
+		tx.Rollback()
+		return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
+	}
+
+	_, err = tx.ExecContext(context.Background(),
+		`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Unable to commit assets upsert: %v", err)
 	}
 	return nil
 }
@@ -258,12 +323,33 @@ func (m *MariaDB) RemoveAsset(source string, asset knowledge.Asset) error {
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
+	h := hashAsset(asset)
 
-	_, err = m.db.ExecContext(context.Background(), `
-	DELETE FROM assets WHERE type = ? AND value = ? AND source_id = ?`,
-		asset.Type, asset.Key, sourceID)
+	tx, err := m.db.Begin()
 	if err != nil {
-		return fmt.Errorf("Unable to remove from DB asset %v from source %s: %v", asset, source, err)
+		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
+	}
+
+	_, err = tx.ExecContext(context.Background(),
+		`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
+		h, sourceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Unable to remove binding between asset %v and source %s: %v", asset, source, err)
+	}
+
+	_, err = tx.ExecContext(context.Background(),
+		`DELETE FROM assets WHERE asset_id = ? AND NOT EXISTS (
+			SELECT * FROM assets_by_source WHERE asset_id = ?
+		)`,
+		h, h)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Unable to commit assets insert: %v", err)
 	}
 	return nil
 }
@@ -274,21 +360,33 @@ func (m *MariaDB) RemoveRelation(source string, relation knowledge.Relation) err
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
 	}
+	rH := hashRelation(relation)
 
-	assetIDs, err := m.resolveAssets(sourceID, []knowledge.AssetKey{relation.From, relation.To})
+	tx, err := m.db.Begin()
 	if err != nil {
-		return fmt.Errorf("Unable to resolve the IDs of the assets in relation %v: %v", relation, err)
+		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
 	}
 
-	if len(assetIDs) != 2 {
-		return fmt.Errorf("Unexpected number of resolved IDs")
+	_, err = tx.ExecContext(context.Background(),
+		`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
+		rH, sourceID)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("Unable to remove binding between relation %v and source %s: %v", relation, source, err)
 	}
 
-	_, err = m.db.ExecContext(context.Background(),
-		"DELETE FROM relations WHERE from_id = ? AND to_id = ? AND type = ? AND source_id = ?",
-		assetIDs[0], assetIDs[1], relation.Type, sourceID)
+	_, err = tx.ExecContext(context.Background(),
+		`DELETE FROM relations WHERE relation_id = ? AND NOT EXISTS (
+			SELECT * FROM relations_by_source WHERE relation_id = ?
+		)`,
+		rH, rH)
 	if err != nil {
-		return fmt.Errorf("Unable to prepare relation insertion query: %v", err)
+		tx.Rollback()
+		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Unable to commit relation removal: %v", err)
 	}
 	return nil
 }
@@ -296,39 +394,70 @@ func (m *MariaDB) RemoveRelation(source string, relation knowledge.Relation) err
 // ReadGraph read source subgraph
 func (m *MariaDB) ReadGraph(sourceName string, graph *knowledge.Graph) error {
 	fmt.Printf("Start reading graph of data source with name %s\n", sourceName)
-
-	now := time.Now()
-	// Select all assets for which there is an observed relation from the source
-	rows, err := m.db.QueryContext(context.Background(), `
-SELECT a.type, a.value, b.type, b.value, r.type FROM relations r
-INNER JOIN assets a ON a.id=r.from_id
-INNER JOIN assets b ON b.id=r.to_id
-INNER JOIN sources s ON s.id=r.source_id
-WHERE s.name = ? AND r.type <> 'observed' AND (a.type <> 'source' AND b.type <> 'source')
-	`, sourceName)
-
+	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
-		return err
+		return fmt.Errorf("Unable to resolve source ID from name %s: %v", sourceName, err)
 	}
 
-	defer rows.Close()
+	now := time.Now()
 
-	for rows.Next() {
-		var FromType, ToType, FromKey, ToKey, Type string
-		if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
-			return err
+	{
+		// Select all relations produced by this source
+		rows, err := m.db.QueryContext(context.Background(), `
+SELECT a.type, a.value, b.type, b.value, r.type FROM relations_by_source rbs
+INNER JOIN relations r ON rbs.relation_id = r.id
+INNER JOIN assets a ON a.id=r.from_id
+INNER JOIN assets b ON b.id=r.to_id
+WHERE rbs.source_id = ?
+	`, sourceID)
+
+		if err != nil {
+			return fmt.Errorf("Unable to retrieve relations: %v", err)
 		}
-		fromAsset := knowledge.Asset{
-			Type: schema.AssetType(FromType),
-			Key:  FromKey,
+
+		defer rows.Close()
+
+		for rows.Next() {
+			var FromType, ToType, FromKey, ToKey, Type string
+			if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
+				return err
+			}
+			fromAsset := knowledge.Asset{
+				Type: schema.AssetType(FromType),
+				Key:  FromKey,
+			}
+			toAsset := knowledge.Asset{
+				Type: schema.AssetType(ToType),
+				Key:  ToKey,
+			}
+			graph.AddRelation(
+				graph.AddAsset(fromAsset.Type, fromAsset.Key),
+				schema.RelationKeyType(Type),
+				graph.AddAsset(toAsset.Type, toAsset.Key))
 		}
-		toAsset := knowledge.Asset{
-			Type: schema.AssetType(ToType),
-			Key:  ToKey,
+	}
+
+	{
+		// Select all assets produced by this source. This is useful in case there are some standalone nodes in the graph of the source.
+		rows, err := m.db.QueryContext(context.Background(), `
+SELECT a.type, a.value FROM assets_by_source abs
+INNER JOIN assets a ON a.id=abs.asset_id
+WHERE abs.source_id = ?
+	`, sourceID)
+
+		if err != nil {
+			return fmt.Errorf("Unable to retrieve assets: %v", err)
 		}
-		from := graph.AddAsset(fromAsset.Type, fromAsset.Key)
-		to := graph.AddAsset(toAsset.Type, toAsset.Key)
-		graph.AddRelation(from, schema.RelationKeyType(Type), to)
+
+		defer rows.Close()
+
+		for rows.Next() {
+			var Key, Type string
+			if err := rows.Scan(&Type, &Key); err != nil {
+				return err
+			}
+			graph.AddAsset(schema.AssetType(Type), Key)
+		}
 	}
 
 	elapsed := time.Since(now)
@@ -338,7 +467,21 @@ WHERE s.name = ? AND r.type <> 'observed' AND (a.type <> 'source' AND b.type <> 
 
 // FlushAll flush the database
 func (m *MariaDB) FlushAll() error {
-	_, err := m.db.ExecContext(context.Background(), "DROP TABLE relations")
+	_, err := m.db.ExecContext(context.Background(), "DROP TABLE relations_by_source")
+	if err != nil {
+		if !isUnknownTableError(err) {
+			return err
+		}
+	}
+
+	_, err = m.db.ExecContext(context.Background(), "DROP TABLE assets_by_source")
+	if err != nil {
+		if !isUnknownTableError(err) {
+			return err
+		}
+	}
+
+	_, err = m.db.ExecContext(context.Background(), "DROP TABLE relations")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			return err
@@ -371,7 +514,7 @@ func (m *MariaDB) FlushAll() error {
 // CountAssets count the total number of assets in db.
 func (m *MariaDB) CountAssets() (int64, error) {
 	var count int64
-	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(DISTINCT value, type) FROM assets")
+	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM assets")
 
 	err := row.Scan(&count)
 	if err != nil {
@@ -510,16 +653,14 @@ func (m *MariaDB) ListSources(ctx context.Context) (map[string]string, error) {
 type MariaDBCursor struct {
 	*sql.Rows
 
-	Projections          []knowledge.Projection
-	temporaryIDGenerator *AssetTemporaryIDGenerator
+	Projections []knowledge.Projection
 }
 
 // NewMariaDBCursor create a new instance of MariaDBCursor
 func NewMariaDBCursor(rows *sql.Rows, projections []knowledge.Projection) *MariaDBCursor {
 	return &MariaDBCursor{
-		Rows:                 rows,
-		Projections:          projections,
-		temporaryIDGenerator: NewAssetTemporaryIDGenerator(),
+		Rows:        rows,
+		Projections: projections,
 	}
 }
 
@@ -530,18 +671,6 @@ func (mc *MariaDBCursor) HasMore() bool {
 
 // Read read one more item from the cursor
 func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
-	type AssetWithID struct {
-		ID int
-		knowledge.Asset
-	}
-
-	type RelationWithID struct {
-		ID   int
-		From int
-		To   int
-		Type schema.RelationKeyType
-	}
-
 	var err error
 	var fArr []string
 
@@ -594,13 +723,8 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 				Key:  fmt.Sprintf("%v", reflect.ValueOf(items[1])),
 			}
 
-			dbID, err := strconv.ParseInt(reflect.ValueOf(items[0]).String(), 10, 32)
-			if err != nil {
-				return fmt.Errorf("Unable to parse DBID: %v", err)
-			}
-
-			awi := AssetWithID{
-				ID:    int(dbID),
+			awi := knowledge.AssetWithID{
+				ID:    reflect.ValueOf(items[0]).String(),
 				Asset: asset,
 			}
 			output[i] = awi
@@ -609,22 +733,10 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			if err != nil {
 				return nil
 			}
-			dbIDFromStr := reflect.ValueOf(items[0]).String()
 
-			dbIDFrom, err := strconv.ParseInt(dbIDFromStr, 10, 32)
-			if err != nil {
-				return fmt.Errorf("Unable to parse DBID %s (from): %v", dbIDFromStr, err)
-			}
-
-			dbIDToStr := reflect.ValueOf(items[1]).String()
-			dbIDTo, err := strconv.ParseInt(dbIDToStr, 10, 32)
-			if err != nil {
-				return fmt.Errorf("Unable to parse DBID %s (to): %v", dbIDToStr, err)
-			}
-
-			r := RelationWithID{
-				From: int(dbIDFrom),
-				To:   int(dbIDTo),
+			r := knowledge.RelationWithID{
+				From: reflect.ValueOf(items[0]).String(),
+				To:   reflect.ValueOf(items[1]).String(),
 				Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[2]))),
 			}
 			output[i] = r
@@ -634,56 +746,6 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 				return nil
 			}
 			output[i] = items[0]
-		}
-	}
-
-	// Generate temporary IDs for each node
-	for i, o := range output {
-		switch o.(type) {
-		case AssetWithID:
-			a := o.(AssetWithID)
-
-			tmpID, err := mc.temporaryIDGenerator.Push(a.Asset, a.ID)
-			if err != nil {
-				return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d: %v", a.ID, err)
-			}
-
-			output[i] = knowledge.AssetWithID{
-				Asset: a.Asset,
-				ID:    fmt.Sprintf("%v", tmpID),
-			}
-		}
-	}
-
-	// Replace DB IDs by temporary IDs to merge pivot points having one DB ID per source
-	for i, o := range output {
-		switch o.(type) {
-		case RelationWithID:
-			r := o.(RelationWithID)
-
-			tmpIDFrom, err := mc.temporaryIDGenerator.Get(r.From)
-			if err != nil {
-				if err == ErrInexistentDBID {
-					tmpIDFrom = -1
-				} else {
-					return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (from): %v", r.From, err)
-				}
-			}
-
-			tmpIDTo, err := mc.temporaryIDGenerator.Get(r.To)
-			if err != nil {
-				if err == ErrInexistentDBID {
-					tmpIDFrom = -1
-				} else {
-					return fmt.Errorf("Unable to retrieve the temporary ID for DB ID %d (to): %v", r.To, err)
-				}
-			}
-
-			output[i] = knowledge.RelationWithID{
-				From: fmt.Sprintf("%v", tmpIDFrom),
-				To:   fmt.Sprintf("%v", tmpIDTo),
-				Type: r.Type,
-			}
 		}
 	}
 

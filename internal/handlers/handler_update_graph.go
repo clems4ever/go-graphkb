@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -70,7 +71,10 @@ func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, s
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		graphUpdater.UpsertAsset(source, requestBody.Asset)
+		err := graphUpdater.UpsertAsset(source, requestBody.Asset)
+		if err != nil {
+			return fmt.Errorf("Unable to insert asset: %v", err)
+		}
 		return nil
 	}, sem)
 }
@@ -84,7 +88,10 @@ func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		graphUpdater.UpsertRelation(source, requestBody.Relation)
+		err := graphUpdater.UpsertRelation(source, requestBody.Relation)
+		if err != nil {
+			return fmt.Errorf("Unable to insert relation: %v", err)
+		}
 		return nil
 	}, sem)
 }
@@ -98,7 +105,10 @@ func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		graphUpdater.RemoveAsset(source, requestBody.Asset)
+		err := graphUpdater.RemoveAsset(source, requestBody.Asset)
+		if err != nil {
+			return fmt.Errorf("Unable to remove asset: %v", err)
+		}
 		return nil
 	}, sem)
 }
@@ -112,7 +122,10 @@ func DeleteRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpda
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		graphUpdater.RemoveRelation(source, requestBody.Relation)
+		err := graphUpdater.RemoveRelation(source, requestBody.Relation)
+		if err != nil {
+			return fmt.Errorf("Unable to remove relation: %v", err)
+		}
 		return nil
 	}, sem)
 }
