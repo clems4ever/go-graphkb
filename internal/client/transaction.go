@@ -97,6 +97,10 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	chunkSize := cgt.chunkSize
 
+	fmt.Printf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d",
+		len(bulk.GetAssetUpserts()), len(bulk.GetAssetRemovals()),
+		len(bulk.GetRelationUpserts()), len(bulk.GetRelationRemovals()))
+
 	relationRemovalsChunks := utils.ChunkSlice(bulk.GetRelationRemovals(), chunkSize).([][]interface{})
 	relationInsertionChunks := utils.ChunkSlice(bulk.GetRelationUpserts(), chunkSize).([][]interface{})
 	assetRemovalsChunks := utils.ChunkSlice(bulk.GetAssetRemovals(), chunkSize).([][]interface{})
