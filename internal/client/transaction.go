@@ -97,7 +97,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 
 	chunkSize := cgt.chunkSize
 
-	fmt.Printf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d",
+	fmt.Printf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d\n",
 		len(bulk.GetAssetUpserts()), len(bulk.GetAssetRemovals()),
 		len(bulk.GetRelationUpserts()), len(bulk.GetRelationRemovals()))
 
