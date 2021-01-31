@@ -15,12 +15,6 @@ func NewSQLQueryTranslator() *SQLQueryTranslator {
 	return &SQLQueryTranslator{QueryGraph: NewQueryGraph()}
 }
 
-type AndOrExpression struct {
-	And        bool // true for And and false for Or
-	Children   []AndOrExpression
-	Expression string
-}
-
 type Projection struct {
 	Alias          string
 	ExpressionType ExpressionType
@@ -29,93 +23,6 @@ type Projection struct {
 type SQLTranslation struct {
 	Query           string
 	ProjectionTypes []Projection
-}
-
-func BuildAndOrExpression(tree AndOrExpression) (string, error) {
-	if tree.Expression != "" {
-		return tree.Expression, nil
-	} else if tree.And {
-		exprs := make([]string, 0)
-		for i := range tree.Children {
-			expr, err := BuildAndOrExpression(tree.Children[i])
-			if err != nil {
-				return "", err
-			}
-			if expr != "" {
-				exprs = append(exprs, expr)
-			}
-		}
-		if len(exprs) > 1 {
-			return fmt.Sprintf("(%s)", strings.Join(exprs, " AND ")), nil
-		}
-		return strings.Join(exprs, " AND "), nil
-	} else if !tree.And {
-		exprs := make([]string, 0)
-		for i := range tree.Children {
-			expr, err := BuildAndOrExpression(tree.Children[i])
-			if err != nil {
-				return "", err
-			}
-
-			if expr != "" {
-				exprs = append(exprs, expr)
-			}
-		}
-		if len(exprs) > 1 {
-			return fmt.Sprintf("(%s)", strings.Join(exprs, " OR ")), nil
-		}
-		return strings.Join(exprs, " OR "), nil
-	}
-	return "", nil
-}
-
-func CrossProductExpressions(and1 []AndOrExpression, and2 []AndOrExpression) []AndOrExpression {
-	outExpr := []AndOrExpression{}
-	for i := range and1 {
-		for j := range and2 {
-			children := AndOrExpression{
-				And:      true,
-				Children: []AndOrExpression{and1[i], and2[j]},
-			}
-			outExpr = append(outExpr, children)
-		}
-	}
-	return outExpr
-}
-
-// UnwindOrExpressions in order to transform query with or relations into a union
-// query which is more performant, an AndOrExpression is transformed into a list of AndExpressions
-func UnwindOrExpressions(tree AndOrExpression) ([]AndOrExpression, error) {
-	if tree.Expression != "" {
-		child := AndOrExpression{Children: []AndOrExpression{tree}, And: true}
-		return []AndOrExpression{child}, nil
-	} else if !tree.And {
-		exprs := []AndOrExpression{}
-		for i := range tree.Children {
-			nestedExpressions, err := UnwindOrExpressions(tree.Children[i])
-			if err != nil {
-				return nil, err
-			}
-			exprs = append(exprs, nestedExpressions...)
-		}
-		return exprs, nil
-	} else if tree.And {
-		exprs := []AndOrExpression{}
-		for i := range tree.Children {
-			expr, err := UnwindOrExpressions(tree.Children[i])
-			if err != nil {
-				return nil, err
-			}
-
-			if len(exprs) == 0 {
-				exprs = append(exprs, expr...)
-			} else {
-				exprs = CrossProductExpressions(exprs, expr)
-			}
-		}
-		return exprs, nil
-	}
-	return nil, fmt.Errorf("Unable to detect kind of node")
 }
 
 func (sqt *SQLQueryTranslator) buildSQLSelect(
@@ -214,35 +121,24 @@ func (sqt *SQLQueryTranslator) buildSingleSQLSelect(
 	return sqlQuery, nil
 }
 
+// Translate a Cypher query into a SQL model
 func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslation, error) {
 	andExpressions := AndOrExpression{And: true}
 	constrainedNodes := make(map[int]bool)
 
 	filterExpressions := AndOrExpression{And: true}
 	for _, x := range query.QuerySinglePartQuery.QueryMatches {
+		parser := NewPatternParser(&sqt.QueryGraph)
 		for _, y := range x.PatternElements {
-			_, i1, err := sqt.QueryGraph.PushNode(y.QueryNodePattern)
+			err := parser.ParsePatternElement(&y)
 			if err != nil {
 				return nil, err
-			}
-
-			for _, z := range y.QueryPatternElementChains {
-				_, i2, err := sqt.QueryGraph.PushNode(z.QueryNodePattern)
-				if err != nil {
-					return nil, err
-				}
-
-				_, _, err = sqt.QueryGraph.PushRelation(z.RelationshipPattern, i1, i2)
-				if err != nil {
-					return nil, err
-				}
-				i1 = i2
 			}
 		}
 
 		if x.Where != nil {
-			whereVisitor := QueryWhereVisitor{}
-			whereExpression, err := whereVisitor.ParseExpression(x.Where, &sqt.QueryGraph)
+			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph)
+			whereExpression, err := whereVisitor.ParseExpression(x.Where)
 			if err != nil {
 				return nil, err
 			}
@@ -253,8 +149,12 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 				}
 				constrainedNodes[typeAndIndex.Index] = true
 			}
-			filterExpressions.Children = append(filterExpressions.Children,
-				AndOrExpression{Expression: whereExpression})
+
+			// We only append the expression if it's not empty
+			if whereExpression != "" {
+				filterExpressions.Children = append(filterExpressions.Children,
+					AndOrExpression{Expression: whereExpression})
+			}
 		}
 	}
 
@@ -266,7 +166,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	aggregationRequired := false
 
 	for i, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems {
-		projectionVisitor := ProjectionVisitor{QueryGraph: &sqt.QueryGraph}
+		projectionVisitor := NewProjectionVisitor(&sqt.QueryGraph)
 		err := projectionVisitor.ParseExpression(&p.Expression)
 		if err != nil {
 			return nil, err
@@ -310,6 +210,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 			andExpressions.Children = append(andExpressions.Children, typesConstraints)
 		}
 	}
+
 	for i, r := range sqt.QueryGraph.Relations {
 		alias := fmt.Sprintf("r%d", i)
 		from = append(from, fmt.Sprintf("relations %s", alias))
@@ -399,7 +300,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 
 	limit := 0
 	if query.QuerySinglePartQuery.ProjectionBody.Limit != nil {
-		limitVisitor := QueryLimitVisitor{}
+		limitVisitor := NewQueryLimitVisitor(&sqt.QueryGraph)
 		err := limitVisitor.ParseExpression(
 			query.QuerySinglePartQuery.ProjectionBody.Limit)
 		if err != nil {
@@ -413,7 +314,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		if limit == 0 {
 			return nil, fmt.Errorf("SKIP must be used in combination with limit")
 		}
-		skipVisitor := QuerySkipVisitor{}
+		skipVisitor := NewQuerySkipVisitor(&sqt.QueryGraph)
 		err := skipVisitor.ParseExpression(
 			query.QuerySinglePartQuery.ProjectionBody.Skip)
 		if err != nil {

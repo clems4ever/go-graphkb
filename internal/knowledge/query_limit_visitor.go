@@ -6,11 +6,20 @@ type QueryLimitVisitor struct {
 	ExpressionVisitorBase
 
 	Limit int64
+
+	queryGraph *QueryGraph
+}
+
+// NewQueryLimitVisitor create an instance of query limit visitor
+func NewQueryLimitVisitor(queryGraph *QueryGraph) *QueryLimitVisitor {
+	return &QueryLimitVisitor{
+		queryGraph: queryGraph,
+	}
 }
 
 // ParseExpression return whether the expression require aggregation
 func (qlv *QueryLimitVisitor) ParseExpression(q *query.QueryExpression) error {
-	err := NewExpressionParser(qlv).ParseExpression(q)
+	err := NewExpressionParser(qlv, qlv.queryGraph).ParseExpression(q)
 	if err != nil {
 		return err
 	}

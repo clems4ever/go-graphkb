@@ -5,12 +5,19 @@ import "github.com/clems4ever/go-graphkb/internal/query"
 type QuerySkipVisitor struct {
 	ExpressionVisitorBase
 
-	Skip int64
+	queryGraph *QueryGraph
+	Skip       int64
+}
+
+func NewQuerySkipVisitor(queryGraph *QueryGraph) *QuerySkipVisitor {
+	return &QuerySkipVisitor{
+		queryGraph: queryGraph,
+	}
 }
 
 // ParseExpression return whether the expression require aggregation
 func (qsv *QuerySkipVisitor) ParseExpression(q *query.QueryExpression) error {
-	err := NewExpressionParser(qsv).ParseExpression(q)
+	err := NewExpressionParser(qsv, qsv.queryGraph).ParseExpression(q)
 	if err != nil {
 		return err
 	}

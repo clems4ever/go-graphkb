@@ -19,7 +19,7 @@ func NewExpressionBuilder(queryGraph *QueryGraph) *ExpressionBuilder {
 	visitor.queryGraph = queryGraph
 	return &ExpressionBuilder{
 		QueryGraph: queryGraph,
-		parser:     NewExpressionParser(&visitor),
+		parser:     NewExpressionParser(&visitor, queryGraph),
 		visitor:    &visitor,
 	}
 }
@@ -61,6 +61,11 @@ type SQLExpressionVisitor struct {
 	andExpressions []string
 	orExpression   string
 	expression     string
+}
+
+func (sev *SQLExpressionVisitor) OnRelationshipsPattern(e query.QueryRelationshipsPattern) error {
+	fmt.Println("relationships pattern")
+	return fmt.Errorf("relationships")
 }
 
 func (sev *SQLExpressionVisitor) OnVariable(name string) error {

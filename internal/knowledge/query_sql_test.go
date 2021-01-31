@@ -99,11 +99,11 @@ LIMIT 10`,
 		QueryCase{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.name, COUNT(n.name)",
 			SQL: `
-SELECT a0.name, COUNT(a1.name) FROM
-((SELECT a0.name, COUNT(a1.name) FROM assets a0, assets a1, relations r0
+SELECT a0.name, COUNT(*) FROM
+((SELECT a0.name, COUNT(*) FROM assets a0, assets a1, relations r0
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a0.id AND r0.to_id = a1.id)))
 UNION ALL
-(SELECT a0.name, COUNT(a1.name) FROM assets a0, assets a1, relations r0
+(SELECT a0.name, COUNT(*) FROM assets a0, assets a1, relations r0
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id))))
 GROUP BY a0.name`,
 		},
@@ -207,14 +207,14 @@ WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0
 WHERE r.value = '01.04'
 RETURN e.value, COUNT(cn.value)`,
 			SQL: `
-SELECT a2.value, COUNT(a1.value) FROM assets a0, assets a1, assets a2, relations r0, relations r1
+SELECT a2.value, COUNT(*) FROM assets a0, assets a1, assets a2, relations r0, relations r1
 WHERE (((((((a0.type = 'rack' AND a1.type = 'chef_name') AND a2.type = 'environment') AND r0.type = 'is_in') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'is_in') AND (r1.from_id = a1.id AND r1.to_id = a2.id)) AND a0.value = '01.04')
 GROUP BY a2.value`,
 		},
 		QueryCase{
 			Cypher: `MATCH (r:rack)<-[:is_in]-(cn:chef_name) RETURN COUNT(cn.value)`,
 			SQL: `
-SELECT COUNT(a1.value) FROM assets a0, assets a1, relations r0
+SELECT COUNT(*) FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'rack' AND a1.type = 'chef_name') AND r0.type = 'is_in') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
 		QueryCase{
@@ -222,6 +222,16 @@ WHERE (((a0.type = 'rack' AND a1.type = 'chef_name') AND r0.type = 'is_in') AND 
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE ((((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a0.id AND r0.to_id = a1.id)) AND (a0.value = '0x16' AND a1.value = 'myvar' OR a1.value = 'myvar2'))`,
+		},
+		QueryCase{
+			Cypher: `
+MATCH (ip:ip)<-[:observed]-(:device)
+WHERE (ip)<-[:scanned]-(:task)
+RETURN ip`,
+			SQL: `
+SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, assets a2, relations r0, relations r1
+WHERE ((((((a0.type = 'ip' AND a1.type = 'device') AND a2.type = 'task') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'scanned') AND (r1.from_id = a2.id AND r1.to_id = a0.id))
+			`,
 		},
 	}
 
@@ -241,13 +251,13 @@ WHERE ((((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r
 
 			sql, err := translator.Translate(q)
 			if c.Error != "" {
-				require.Error(t, err)
+				require.Error(t, err, "Error on test case %s", c.Cypher)
 				if err != nil {
-					assert.Equal(t, c.Error, err.Error())
+					assert.Equal(t, c.Error, err.Error(), "Error on test case %s", c.Cypher)
 				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, strings.TrimSpace(c.SQL), sql.Query)
+				require.NoError(t, err, "Error on test case %s", c.Cypher)
+				assert.Equal(t, strings.TrimSpace(c.SQL), sql.Query, "Error on test case %s", c.Cypher)
 			}
 		})
 	}

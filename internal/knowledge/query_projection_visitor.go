@@ -9,7 +9,7 @@ import (
 type ProjectionVisitor struct {
 	ExpressionVisitorBase
 
-	QueryGraph *QueryGraph
+	queryGraph *QueryGraph
 
 	Aggregation    bool
 	TypeAndIndex   TypeAndIndex
@@ -20,9 +20,15 @@ type ProjectionVisitor struct {
 	properties []string
 }
 
+func NewProjectionVisitor(queryGraph *QueryGraph) *ProjectionVisitor {
+	return &ProjectionVisitor{
+		queryGraph: queryGraph,
+	}
+}
+
 // ParseExpression return whether the expression require aggregation
 func (pv *ProjectionVisitor) ParseExpression(q *query.QueryExpression) error {
-	err := NewExpressionParser(pv).ParseExpression(q)
+	err := NewExpressionParser(pv, pv.queryGraph).ParseExpression(q)
 	if err != nil {
 		return err
 	}
@@ -41,7 +47,7 @@ func (pv *ProjectionVisitor) OnEnterFunctionInvocation(name string, distinct boo
 }
 
 func (pv *ProjectionVisitor) OnVariable(name string) error {
-	typeAndIndex, err := pv.QueryGraph.FindVariable(name)
+	typeAndIndex, err := pv.queryGraph.FindVariable(name)
 	if err != nil {
 		return err
 	}

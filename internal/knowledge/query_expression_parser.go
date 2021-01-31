@@ -15,6 +15,7 @@ const (
 	PropertyExprType ExpressionType = iota
 )
 
+// ExpressionVisitor a visitor of expression
 type ExpressionVisitor interface {
 	OnEnterPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error
 	OnExitPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error
@@ -72,13 +73,17 @@ type ExpressionVisitor interface {
 	OnExitExpression() error
 }
 
+// ExpressionParser is a parser of expression
 type ExpressionParser struct {
-	visitor ExpressionVisitor
+	visitor    ExpressionVisitor
+	queryGraph *QueryGraph
 }
 
-func NewExpressionParser(visitor ExpressionVisitor) *ExpressionParser {
+// NewExpressionParser create a new instance of expression parser.
+func NewExpressionParser(visitor ExpressionVisitor, queryGraph *QueryGraph) *ExpressionParser {
 	return &ExpressionParser{
-		visitor: visitor,
+		visitor:    visitor,
+		queryGraph: queryGraph,
 	}
 }
 
@@ -149,6 +154,12 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 			return err
 		}
 		err = ep.visitor.OnExitParenthesizedExpression()
+		if err != nil {
+			return err
+		}
+	} else if q.Atom.RelationshipsPattern != nil {
+		parser := NewPatternParser(ep.queryGraph)
+		err := parser.ParseRelationshipsPattern(q.Atom.RelationshipsPattern)
 		if err != nil {
 			return err
 		}
@@ -408,6 +419,19 @@ func (ep *ExpressionParser) ParseExpression(q *query.QueryExpression) error {
 
 type ExpressionVisitorBase struct{}
 
+func (evb *ExpressionVisitorBase) OnEnterRelationshipsPattern() error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnExitRelationshipsPattern() error {
+	return nil
+}
+
+func (evb *ExpressionVisitorBase) OnEnterNodePattern() error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnExitNodePattern() error {
+	return nil
+}
 func (evb *ExpressionVisitorBase) OnEnterPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
 	return nil
 }

@@ -36,7 +36,7 @@ func (pel *ParsingErrorListener) SyntaxError(recognizer antlr.Recognizer, offend
 	})
 }
 
-// TransformCypher transform an openCypher query into a QueryCypher.
+// TransformCypher transform an openCypher query into a QueryCypher structure.
 func TransformCypher(query string) (*QueryCypher, error) {
 	is := antlr.NewInputStream(query)
 	lexer := parser.NewCypherLexer(is)
@@ -558,6 +558,7 @@ type QueryAtom struct {
 	Literal                 *QueryLiteral
 	FunctionInvocation      *QueryFunctionInvocation
 	ParenthesizedExpression *QueryExpression
+	RelationshipsPattern    *QueryRelationshipsPattern
 }
 
 func (cl *BaseCypherVisitor) VisitOC_Atom(c *parser.OC_AtomContext) interface{} {
@@ -574,8 +575,29 @@ func (cl *BaseCypherVisitor) VisitOC_Atom(c *parser.OC_AtomContext) interface{} 
 	} else if c.OC_ParenthesizedExpression() != nil {
 		q.ParenthesizedExpression = new(QueryExpression)
 		*q.ParenthesizedExpression = c.OC_ParenthesizedExpression().Accept(cl).(QueryExpression)
+	} else if c.OC_RelationshipsPattern() != nil {
+		q.RelationshipsPattern = new(QueryRelationshipsPattern)
+		*q.RelationshipsPattern = c.OC_RelationshipsPattern().Accept(cl).(QueryRelationshipsPattern)
 	}
 	return q
+}
+
+type QueryRelationshipsPattern struct {
+	QueryNodePattern
+	QueryPatternElementChains []QueryPatternElementChain
+}
+
+func (cl *BaseCypherVisitor) VisitOC_RelationshipsPattern(c *parser.OC_RelationshipsPatternContext) interface{} {
+	relPattern := QueryRelationshipsPattern{}
+	relPattern.QueryNodePattern = c.OC_NodePattern().Accept(cl).(QueryNodePattern)
+
+	elemChains := make([]QueryPatternElementChain, 0)
+	for i := range c.AllOC_PatternElementChain() {
+		elemChains = append(elemChains, c.OC_PatternElementChain(i).Accept(cl).(QueryPatternElementChain))
+	}
+
+	relPattern.QueryPatternElementChains = elemChains
+	return relPattern
 }
 
 func (cl *BaseCypherVisitor) VisitOC_ParenthesizedExpression(c *parser.OC_ParenthesizedExpressionContext) interface{} {
