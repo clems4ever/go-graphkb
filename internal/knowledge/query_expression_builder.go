@@ -165,6 +165,11 @@ func (sev *SQLExpressionVisitor) OnExitFunctionInvocation(name string, distinct 
 	if distinct {
 		distinctStr = "DISTINCT "
 	}
+
+	if name == "COUNT" && !distinct {
+		sev.expression = "*"
+	}
+
 	sev.functionInvocation = fmt.Sprintf("%s(%s%s)", name, distinctStr, sev.expression)
 	sev.expression = ""
 	return nil
