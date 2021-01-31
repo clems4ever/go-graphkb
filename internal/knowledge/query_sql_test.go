@@ -37,6 +37,10 @@ WHERE a0.type = 'ip'`,
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value = 'prod'",
 		},
 		QueryCase{
+			Cypher: "MATCH (n) WHERE NOT n.value = 'prod' RETURN n",
+			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE NOT a0.value = 'prod'",
+		},
+		QueryCase{
 			Cypher: "MATCH (n) WHERE n.value STARTS WITH 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value LIKE 'prod%'",
 		},
