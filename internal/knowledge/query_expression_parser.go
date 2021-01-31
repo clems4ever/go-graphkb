@@ -30,8 +30,8 @@ type ExpressionVisitor interface {
 	OnIntegerLiteral(value int64) error
 	OnBooleanLiteral(value bool) error
 
-	OnEnterFunctionInvocation(name string) error
-	OnExitFunctionInvocation(name string) error
+	OnEnterFunctionInvocation(name string, distinct bool) error
+	OnExitFunctionInvocation(name string, distinct bool) error
 
 	OnEnterParenthesizedExpression() error
 	OnExitParenthesizedExpression() error
@@ -123,7 +123,8 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 		}
 	} else if q.Atom.FunctionInvocation != nil {
 		fnName := strings.ToUpper(q.Atom.FunctionInvocation.FunctionName)
-		err := ep.visitor.OnEnterFunctionInvocation(fnName)
+		distinct := q.Atom.FunctionInvocation.Distinct
+		err := ep.visitor.OnEnterFunctionInvocation(fnName, distinct)
 		if err != nil {
 			return err
 		}
@@ -134,7 +135,7 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 				return err
 			}
 		}
-		err = ep.visitor.OnExitFunctionInvocation(fnName)
+		err = ep.visitor.OnExitFunctionInvocation(fnName, distinct)
 		if err != nil {
 			return err
 		}
@@ -425,17 +426,21 @@ func (evb *ExpressionVisitorBase) OnStringLiteral(value string) error           
 func (evb *ExpressionVisitorBase) OnDoubleLiteral(value float64) error                    { return nil }
 func (evb *ExpressionVisitorBase) OnIntegerLiteral(value int64) error                     { return nil }
 func (evb *ExpressionVisitorBase) OnBooleanLiteral(value bool) error                      { return nil }
-func (evb *ExpressionVisitorBase) OnEnterFunctionInvocation(name string) error            { return nil }
-func (evb *ExpressionVisitorBase) OnExitFunctionInvocation(name string) error             { return nil }
-func (evb *ExpressionVisitorBase) OnEnterParenthesizedExpression() error                  { return nil }
-func (evb *ExpressionVisitorBase) OnExitParenthesizedExpression() error                   { return nil }
-func (evb *ExpressionVisitorBase) OnStringOperator(operator query.StringOperator) error   { return nil }
-func (evb *ExpressionVisitorBase) OnEnterUnaryExpression() error                          { return nil }
-func (evb *ExpressionVisitorBase) OnExitUnaryExpression() error                           { return nil }
-func (evb *ExpressionVisitorBase) OnEnterPowerOfExpression() error                        { return nil }
-func (evb *ExpressionVisitorBase) OnExitPowerOfExpression() error                         { return nil }
-func (evb *ExpressionVisitorBase) OnEnterMultipleDivideModuloExpression() error           { return nil }
-func (evb *ExpressionVisitorBase) OnExitMultipleDivideModuloExpression() error            { return nil }
+func (evb *ExpressionVisitorBase) OnEnterFunctionInvocation(name string, distinct bool) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnExitFunctionInvocation(name string, distinct bool) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnEnterParenthesizedExpression() error                { return nil }
+func (evb *ExpressionVisitorBase) OnExitParenthesizedExpression() error                 { return nil }
+func (evb *ExpressionVisitorBase) OnStringOperator(operator query.StringOperator) error { return nil }
+func (evb *ExpressionVisitorBase) OnEnterUnaryExpression() error                        { return nil }
+func (evb *ExpressionVisitorBase) OnExitUnaryExpression() error                         { return nil }
+func (evb *ExpressionVisitorBase) OnEnterPowerOfExpression() error                      { return nil }
+func (evb *ExpressionVisitorBase) OnExitPowerOfExpression() error                       { return nil }
+func (evb *ExpressionVisitorBase) OnEnterMultipleDivideModuloExpression() error         { return nil }
+func (evb *ExpressionVisitorBase) OnExitMultipleDivideModuloExpression() error          { return nil }
 func (evb *ExpressionVisitorBase) OnMultiplyDivideModuloOperator(operator query.MultiplyDivideModuloOperator) error {
 	return nil
 }

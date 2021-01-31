@@ -1,10 +1,11 @@
 package knowledge
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
 
-import "strings"
-
-import "github.com/clems4ever/go-graphkb/internal/query"
+	"github.com/clems4ever/go-graphkb/internal/query"
+)
 
 type ExpressionBuilder struct {
 	QueryGraph *QueryGraph
@@ -159,8 +160,12 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 	return nil
 }
 
-func (sev *SQLExpressionVisitor) OnExitFunctionInvocation(name string) error {
-	sev.functionInvocation = fmt.Sprintf("%s(%s)", name, sev.expression)
+func (sev *SQLExpressionVisitor) OnExitFunctionInvocation(name string, distinct bool) error {
+	distinctStr := ""
+	if distinct {
+		distinctStr = "DISTINCT "
+	}
+	sev.functionInvocation = fmt.Sprintf("%s(%s%s)", name, distinctStr, sev.expression)
 	sev.expression = ""
 	return nil
 }

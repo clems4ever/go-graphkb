@@ -1,8 +1,10 @@
 package knowledge
 
-import "github.com/clems4ever/go-graphkb/internal/query"
+import (
+	"fmt"
 
-import "fmt"
+	"github.com/clems4ever/go-graphkb/internal/query"
+)
 
 type ProjectionVisitor struct {
 	ExpressionVisitorBase
@@ -27,7 +29,8 @@ func (pv *ProjectionVisitor) ParseExpression(q *query.QueryExpression) error {
 	return nil
 }
 
-func (pv *ProjectionVisitor) OnEnterFunctionInvocation(name string) error {
+// OnEnterFunctionInvocation called when the EnterFunctionoInvocation is parsed. Name is the name of the function.
+func (pv *ProjectionVisitor) OnEnterFunctionInvocation(name string, distinct bool) error {
 	if name == "COUNT" {
 		pv.Aggregation = true
 		pv.funcInvoc = true
@@ -51,6 +54,7 @@ func (pv *ProjectionVisitor) OnVariable(name string) error {
 	default:
 		pv.etype = PropertyExprType
 	}
+
 	pv.TypeAndIndex = typeAndIndex
 	return nil
 }
@@ -67,6 +71,5 @@ func (pv *ProjectionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryPrope
 		pv.ExpressionType = pv.etype
 	}
 	pv.properties = nil
-	pv.funcInvoc = false
 	return nil
 }

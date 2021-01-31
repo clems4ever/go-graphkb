@@ -118,6 +118,17 @@ WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r
 LIMIT 10`,
 		},
 		QueryCase{
+			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.name, COUNT(DISTINCT n.name)",
+			SQL: `
+SELECT a0.name, COUNT(DISTINCT a1.name) FROM
+((SELECT a0.name, COUNT(DISTINCT a1.name) FROM assets a0, assets a1, relations r0
+WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a0.id AND r0.to_id = a1.id)))
+UNION ALL
+(SELECT a0.name, COUNT(DISTINCT a1.name) FROM assets a0, assets a1, relations r0
+WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id))))
+GROUP BY a0.name`,
+		},
+		QueryCase{
 			Cypher: "MATCH (v)-[r]-(n) RETURN n LIMIT 10",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0

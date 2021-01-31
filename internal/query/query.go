@@ -578,11 +578,16 @@ func (cl *BaseCypherVisitor) VisitOC_ParenthesizedExpression(c *parser.OC_Parent
 type QueryFunctionInvocation struct {
 	FunctionName string
 	Expressions  []QueryExpression
+	Distinct     bool
 }
 
 func (cl *BaseCypherVisitor) VisitOC_FunctionInvocation(c *parser.OC_FunctionInvocationContext) interface{} {
 	q := QueryFunctionInvocation{}
 	expressions := make([]QueryExpression, 0)
+	if c.DISTINCT() != nil {
+		q.Distinct = true
+	}
+
 	for i := range c.AllOC_Expression() {
 		expressions = append(expressions, c.OC_Expression(i).Accept(cl).(QueryExpression))
 	}
