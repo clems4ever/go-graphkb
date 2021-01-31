@@ -231,16 +231,23 @@ func (cl *BaseCypherVisitor) VisitOC_Skip(c *parser.OC_SkipContext) interface{} 
 func (cl *BaseCypherVisitor) VisitOC_ProjectionItems(c *parser.OC_ProjectionItemsContext) interface{} {
 	items := make([]QueryProjectionItem, 0)
 	for i := range c.AllOC_ProjectionItem() {
-		item := QueryProjectionItem{}
-		item.Expression = c.OC_ProjectionItem(i).Accept(cl).(QueryExpression)
-		item.Alias = c.OC_ProjectionItem(i).GetText()
+		item := c.OC_ProjectionItem(i).Accept(cl).(QueryProjectionItem)
 		items = append(items, item)
 	}
 	return items
 }
 
 func (cl *BaseCypherVisitor) VisitOC_ProjectionItem(c *parser.OC_ProjectionItemContext) interface{} {
-	return c.OC_Expression().Accept(cl)
+	item := QueryProjectionItem{}
+
+	item.Expression = c.OC_Expression().Accept(cl).(QueryExpression)
+
+	if c.OC_Variable() != nil {
+		item.Alias = c.OC_Variable().Accept(cl).(string)
+	} else {
+		item.Alias = c.GetText()
+	}
+	return item
 }
 
 func (cl *BaseCypherVisitor) VisitOC_ReadingClause(c *parser.OC_ReadingClauseContext) interface{} {
