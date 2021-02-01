@@ -81,19 +81,10 @@ func TestAndOrExpression(t *testing.T) {
 					},
 				},
 			},
-			AndOrExpression{
-				And: true,
-				Children: []AndOrExpression{
-					AndOrExpression{
-						And:        false,
-						Expression: "",
-					},
-				},
-			},
 		},
 	}
 
 	x, err := UnwindOrExpressions(exprs)
 	assert.NoError(t, err)
-	assert.Len(t, x, 4)
+	assert.Len(t, x, 1)
 }
