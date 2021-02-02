@@ -2,6 +2,7 @@ package knowledge
 
 import "github.com/clems4ever/go-graphkb/internal/query"
 
+// QueryWhereVisitor a visitor for the where clauses
 type QueryWhereVisitor struct {
 	ExpressionVisitorBase
 
@@ -25,6 +26,7 @@ func (qwv *QueryWhereVisitor) ParseExpression(q *query.QueryExpression) (string,
 	return expression, nil
 }
 
+// OnVariable handler called when a variable is visited in the where clause
 func (qwv *QueryWhereVisitor) OnVariable(name string) error {
 	qwv.Variables = append(qwv.Variables, name)
 	return nil

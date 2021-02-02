@@ -2,6 +2,7 @@ package knowledge
 
 import "github.com/clems4ever/go-graphkb/internal/query"
 
+// QueryLimitVisitor a visitor for the limit clause
 type QueryLimitVisitor struct {
 	ExpressionVisitorBase
 
@@ -26,6 +27,7 @@ func (qlv *QueryLimitVisitor) ParseExpression(q *query.QueryExpression) error {
 	return nil
 }
 
+// OnIntegerLiteral handler called when an integer literal is visited
 func (qlv *QueryLimitVisitor) OnIntegerLiteral(value int64) error {
 	qlv.Limit = value
 	return nil

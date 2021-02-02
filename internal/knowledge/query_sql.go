@@ -7,21 +7,27 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
 
+// SQLQueryTranslator represent an SQL translator object converting cypher queries into SQL
 type SQLQueryTranslator struct {
 	QueryGraph QueryGraph
 }
 
+// NewSQLQueryTranslator create an instance of SQL query translator
 func NewSQLQueryTranslator() *SQLQueryTranslator {
 	return &SQLQueryTranslator{QueryGraph: NewQueryGraph()}
 }
 
+// Projection represent the type and alias of one item in the RETURN statement (called a projection).
 type Projection struct {
 	Alias          string
 	ExpressionType ExpressionType
 }
 
+// SQLTranslation the resulting object of the translation
 type SQLTranslation struct {
-	Query           string
+	// Query is the SQL query built from the Cypher query
+	Query string
+	// ProjectionTypes helps the clients know how to serialize the results
 	ProjectionTypes []Projection
 }
 
@@ -228,10 +234,10 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		out := AndOrExpression{
 			And: true,
 			Children: []AndOrExpression{
-				AndOrExpression{
+				{
 					Expression: fmt.Sprintf("%s.from_id = a%d.id", alias, r.LeftIdx),
 				},
-				AndOrExpression{
+				{
 					Expression: fmt.Sprintf("%s.to_id = a%d.id", alias, r.RightIdx),
 				},
 			},
@@ -240,10 +246,10 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		in := AndOrExpression{
 			And: true,
 			Children: []AndOrExpression{
-				AndOrExpression{
+				{
 					Expression: fmt.Sprintf("%s.from_id = a%d.id", alias, r.RightIdx),
 				},
-				AndOrExpression{
+				{
 					Expression: fmt.Sprintf("%s.to_id = a%d.id", alias, r.LeftIdx),
 				},
 			},

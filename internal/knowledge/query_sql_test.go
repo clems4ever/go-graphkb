@@ -18,57 +18,57 @@ type QueryCase struct {
 
 func TestQueryTranslation(t *testing.T) {
 	cases := []QueryCase{
-		QueryCase{
+		{
 			Cypher: "MATCH (n:ip) RETURN n",
 			SQL: `SELECT a0.id, a0.value, a0.type FROM assets a0
 WHERE a0.type = 'ip'`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n:ip), (n:name) RETURN n",
 			Error:  "Variable 'n' already defined with a different type",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n:ip) RETURN n, n",
 			SQL: `SELECT a0.id, a0.value, a0.type, a0.id, a0.value, a0.type FROM assets a0
 WHERE a0.type = 'ip'`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE n.value = 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value = 'prod'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE NOT n.value = 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE NOT a0.value = 'prod'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE NOT n.value = 'prod' AND n.value = 'preprod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE NOT a0.value = 'prod' AND a0.value = 'preprod'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE n.value STARTS WITH 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value LIKE 'prod%'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE n.value ENDS WITH 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value LIKE '%prod'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (n) WHERE n.value CONTAINS 'prod' RETURN n",
 			SQL:    "SELECT a0.id, a0.value, a0.type FROM assets a0\nWHERE a0.value LIKE '%prod%'",
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)-[:has]->(n:name) RETURN n",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a0.id AND r0.to_id = a1.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)--(n:name) RETURN n",
 			SQL: `
 (SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
@@ -77,7 +77,7 @@ UNION ALL
 (SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id)))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN n",
 			SQL: `
 (SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
@@ -86,7 +86,7 @@ UNION ALL
 (SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id)))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN n LIMIT 10",
 			SQL: `
 (SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
@@ -96,7 +96,7 @@ UNION ALL
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id)))
 LIMIT 10`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.name, COUNT(n.name)",
 			SQL: `
 SELECT a0.name, COUNT(*) FROM
@@ -107,7 +107,7 @@ UNION ALL
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id))))
 GROUP BY a0.name`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN DISTINCT n.value LIMIT 10",
 			SQL: `
 (SELECT a1.value FROM assets a0, assets a1, relations r0
@@ -117,7 +117,7 @@ UNION
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id)))
 LIMIT 10`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.name, COUNT(DISTINCT n.name)",
 			SQL: `
 SELECT a0.name, COUNT(DISTINCT a1.name) FROM
@@ -128,44 +128,44 @@ UNION ALL
 WHERE ((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id))))
 GROUP BY a0.name`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v)-[r]-(n) RETURN n LIMIT 10",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (r0.from_id = a0.id AND r0.to_id = a1.id)
 LIMIT 10`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)<-[r]-(n:name), (v)-[r1]->(n) RETURN n",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0, relations r1
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND (r1.from_id = a0.id AND r1.to_id = a1.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n.value",
 			SQL: `
 SELECT a1.value FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)<-[r:has]-(n:name) RETURN v, r, n",
 			SQL: `
 SELECT a0.id, a0.value, a0.type, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)<-[r]-(n) RETURN v, r, n",
 			SQL: `
 SELECT a0.id, a0.value, a0.type, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (a0.type = 'variable' AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)<-[:has]-(:name)-[:is_in]->(:program) RETURN v",
 			SQL: `
 SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, assets a2, relations r0, relations r1
 WHERE ((((((a0.type = 'variable' AND a1.type = 'name') AND a2.type = 'program') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'is_in') AND (r1.from_id = a1.id AND r1.to_id = a2.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: `MATCH (p:port)<-[:bind]-(c:consul_service)-[:is_in]->(d:datacenter) WHERE d.value = 'pa4'
 MATCH (c)-[:is_in]->(e:environment) WHERE e.value = 'preprod'
 RETURN c`,
@@ -173,7 +173,7 @@ RETURN c`,
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, assets a2, assets a3, relations r0, relations r1, relations r2
 WHERE ((((((((((a0.type = 'port' AND a1.type = 'consul_service') AND a2.type = 'datacenter') AND a3.type = 'environment') AND r0.type = 'bind') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'is_in') AND (r1.from_id = a1.id AND r1.to_id = a2.id)) AND r2.type = 'is_in') AND (r2.from_id = a1.id AND r2.to_id = a3.id)) AND (a2.value = 'pa4' AND a3.value = 'preprod'))`,
 		},
-		QueryCase{
+		{
 			Cypher: `MATCH (p:port)<-[:bind]-(c:consul_service)-[:is_in]->(d:datacenter) WHERE d.value = 'pa4'
 MATCH (c)-[:is_in]->(e:environment) WHERE e.value <> 'preprod'
 RETURN c`,
@@ -181,14 +181,14 @@ RETURN c`,
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, assets a2, assets a3, relations r0, relations r1, relations r2
 WHERE ((((((((((a0.type = 'port' AND a1.type = 'consul_service') AND a2.type = 'datacenter') AND a3.type = 'environment') AND r0.type = 'bind') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'is_in') AND (r1.from_id = a1.id AND r1.to_id = a2.id)) AND r2.type = 'is_in') AND (r2.from_id = a1.id AND r2.to_id = a3.id)) AND (a2.value = 'pa4' AND a3.value <> 'preprod'))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n LIMIT 10",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id))
 LIMIT 10`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n SKIP 20 LIMIT 10",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
@@ -196,13 +196,13 @@ WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0
 LIMIT 10
 OFFSET 20`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN DISTINCT n",
 			SQL: `
 SELECT DISTINCT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: `MATCH (r:rack)<-[:is_in]-(cn:chef_name)-[:is_in]->(e:environment)
 WHERE r.value = '01.04'
 RETURN e.value, COUNT(cn.value)`,
@@ -211,19 +211,19 @@ SELECT a2.value, COUNT(*) FROM assets a0, assets a1, assets a2, relations r0, re
 WHERE (((((((a0.type = 'rack' AND a1.type = 'chef_name') AND a2.type = 'environment') AND r0.type = 'is_in') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'is_in') AND (r1.from_id = a1.id AND r1.to_id = a2.id)) AND a0.value = '01.04')
 GROUP BY a2.value`,
 		},
-		QueryCase{
+		{
 			Cypher: `MATCH (r:rack)<-[:is_in]-(cn:chef_name) RETURN COUNT(cn.value)`,
 			SQL: `
 SELECT COUNT(*) FROM assets a0, assets a1, relations r0
 WHERE (((a0.type = 'rack' AND a1.type = 'chef_name') AND r0.type = 'is_in') AND (r0.from_id = a1.id AND r0.to_id = a0.id))`,
 		},
-		QueryCase{
+		{
 			Cypher: "MATCH (v:variable)-[:has]->(n:name) WHERE v.value = '0x16' AND (n.value = 'myvar' OR n.value = 'myvar2') RETURN n",
 			SQL: `
 SELECT a1.id, a1.value, a1.type FROM assets a0, assets a1, relations r0
 WHERE ((((a0.type = 'variable' AND a1.type = 'name') AND r0.type = 'has') AND (r0.from_id = a0.id AND r0.to_id = a1.id)) AND (a0.value = '0x16' AND a1.value = 'myvar' OR a1.value = 'myvar2'))`,
 		},
-		QueryCase{
+		{
 			Cypher: `
 MATCH (ip:ip)<-[:observed]-(:device)
 WHERE (ip)<-[:scanned]-(:task)
