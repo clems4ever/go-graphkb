@@ -23,8 +23,8 @@ func TestShouldRelateAssets(t *testing.T) {
 	assert.Len(t, g.Relations(), 1)
 
 	assert.ElementsMatch(t, g.Assets(), []Asset{
-		Asset{Type: "from_type", Key: "from"},
-		Asset{Type: "to_type", Key: "to"},
+		{Type: "from_type", Key: "from"},
+		{Type: "to_type", Key: "to"},
 	})
 }
 
@@ -38,6 +38,6 @@ func TestShouldBindAsset(t *testing.T) {
 	assert.Len(t, g.Relations(), 0)
 
 	assert.ElementsMatch(t, g.Assets(), []Asset{
-		Asset{Type: "from_type", Key: "from"},
+		{Type: "from_type", Key: "from"},
 	})
 }
