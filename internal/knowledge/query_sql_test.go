@@ -232,6 +232,7 @@ RETURN ip`,
 SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, assets a2, relations r0, relations r1
 WHERE ((((((a0.type = 'ip' AND a1.type = 'device') AND a2.type = 'task') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'scanned') AND (r1.from_id = a2.id AND r1.to_id = a0.id))
 			`,
+			Selected: true,
 		},
 	}
 

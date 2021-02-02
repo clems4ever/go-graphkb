@@ -31,6 +31,7 @@ func (aoe AndOrExpression) String() string {
 	return "(empty)"
 }
 
+// BuildAndOrExpression build a string representation of AndOrExpression.
 func BuildAndOrExpression(tree AndOrExpression) (string, error) {
 	if tree.Expression != "" {
 		return tree.Expression, nil
@@ -69,6 +70,7 @@ func BuildAndOrExpression(tree AndOrExpression) (string, error) {
 	return "", nil
 }
 
+// CrossProductExpressions computes the cross product of 2 sets of expressions. This is used to transform OR expressions into a union of AND expressions.
 func CrossProductExpressions(and1 []AndOrExpression, and2 []AndOrExpression) []AndOrExpression {
 	outExpr := []AndOrExpression{}
 	for i := range and1 {
