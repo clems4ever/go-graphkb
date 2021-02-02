@@ -63,11 +63,6 @@ type SQLExpressionVisitor struct {
 	expression     string
 }
 
-func (sev *SQLExpressionVisitor) OnRelationshipsPattern(e query.QueryRelationshipsPattern) error {
-	fmt.Println("relationships pattern")
-	return fmt.Errorf("relationships")
-}
-
 func (sev *SQLExpressionVisitor) OnVariable(name string) error {
 	sev.variableName = new(string)
 	*sev.variableName = name
