@@ -7,11 +7,15 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
 
+// ExpressionType expression type
 type ExpressionType int
 
 const (
-	NodeExprType     ExpressionType = iota
-	EdgeExprType     ExpressionType = iota
+	// NodeExprType node expression type
+	NodeExprType ExpressionType = iota
+	// EdgeExprType edge expression type
+	EdgeExprType ExpressionType = iota
+	// PropertyExprType property expression type
 	PropertyExprType ExpressionType = iota
 )
 
@@ -77,16 +81,21 @@ type ExpressionVisitor interface {
 type ExpressionParser struct {
 	visitor    ExpressionVisitor
 	queryGraph *QueryGraph
+
+	// This ID is incremented for every pattern found in the expression
+	patternIDGenerator int
 }
 
 // NewExpressionParser create a new instance of expression parser.
 func NewExpressionParser(visitor ExpressionVisitor, queryGraph *QueryGraph) *ExpressionParser {
 	return &ExpressionParser{
-		visitor:    visitor,
-		queryGraph: queryGraph,
+		visitor:            visitor,
+		queryGraph:         queryGraph,
+		patternIDGenerator: 0,
 	}
 }
 
+// ParsePropertyOrLabelsExpression parse property or labels expression
 func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryPropertyOrLabelsExpression) error {
 	err := ep.visitor.OnEnterPropertyOrLabelsExpression(*q)
 	if err != nil {
@@ -159,10 +168,13 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 		}
 	} else if q.Atom.RelationshipsPattern != nil {
 		parser := NewPatternParser(ep.queryGraph)
-		err := parser.ParseRelationshipsPattern(q.Atom.RelationshipsPattern)
+		err := parser.ParseRelationshipsPattern(
+			q.Atom.RelationshipsPattern,
+			Scope{Context: WhereContext, ID: ep.patternIDGenerator})
 		if err != nil {
 			return err
 		}
+		ep.patternIDGenerator++
 	} else {
 		return fmt.Errorf("Unable to parse property or labels expression")
 	}
@@ -175,6 +187,7 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 	return nil
 }
 
+// ParseStringListNullOperatorExpression parse string list null operator expression
 func (ep *ExpressionParser) ParseStringListNullOperatorExpression(q *query.QueryStringListNullOperatorExpression) error {
 	err := ep.visitor.OnEnterStringListNullOperatorExpression(*q)
 	if err != nil {
@@ -216,6 +229,7 @@ func (ep *ExpressionParser) ParseStringListNullOperatorExpression(q *query.Query
 	return nil
 }
 
+// ParseUnaryAddOrSubtractExpression parse unary add or subtract expression
 func (ep *ExpressionParser) ParseUnaryAddOrSubtractExpression(q *query.QueryUnaryAddOrSubtractExpression) error {
 	err := ep.ParseStringListNullOperatorExpression(&q.StringListNullOperatorExpression)
 	if err != nil {
@@ -224,6 +238,7 @@ func (ep *ExpressionParser) ParseUnaryAddOrSubtractExpression(q *query.QueryUnar
 	return nil
 }
 
+// ParsePowerOfExpression parse power of expression
 func (ep *ExpressionParser) ParsePowerOfExpression(q *query.QueryPowerOfExpression) error {
 	err := ep.visitor.OnEnterPowerOfExpression()
 	if err != nil {
@@ -244,6 +259,7 @@ func (ep *ExpressionParser) ParsePowerOfExpression(q *query.QueryPowerOfExpressi
 	return nil
 }
 
+// ParseMultipleDivideModuloExpression parse multiple divide modulo expression
 func (ep *ExpressionParser) ParseMultipleDivideModuloExpression(q *query.QueryMultipleDivideModuloExpression) error {
 	err := ep.visitor.OnEnterMultipleDivideModuloExpression()
 	if err != nil {
@@ -273,6 +289,7 @@ func (ep *ExpressionParser) ParseMultipleDivideModuloExpression(q *query.QueryMu
 	return nil
 }
 
+// ParseAddOrSubtractExpression parse add or subtract expression
 func (ep *ExpressionParser) ParseAddOrSubtractExpression(q *query.QueryAddOrSubtractExpression) error {
 	err := ep.visitor.OnEnterAddOrSubtractExpression()
 	if err != nil {
@@ -301,6 +318,7 @@ func (ep *ExpressionParser) ParseAddOrSubtractExpression(q *query.QueryAddOrSubt
 	return nil
 }
 
+// ParseComparisonExpression parse comparison expression
 func (ep *ExpressionParser) ParseComparisonExpression(q *query.QueryComparisonExpression) error {
 	err := ep.visitor.OnEnterComparisonExpression()
 	if err != nil {
@@ -331,6 +349,7 @@ func (ep *ExpressionParser) ParseComparisonExpression(q *query.QueryComparisonEx
 	return nil
 }
 
+// ParseNotExpression parse not expression
 func (ep *ExpressionParser) ParseNotExpression(q *query.QueryNotExpression) error {
 	err := ep.visitor.OnEnterNotExpression(q.Not)
 	if err != nil {
@@ -349,6 +368,7 @@ func (ep *ExpressionParser) ParseNotExpression(q *query.QueryNotExpression) erro
 	return err
 }
 
+// ParseXorExpression parse xor expression
 func (ep *ExpressionParser) ParseXorExpression(q *query.QueryXorExpression) error {
 	err := ep.visitor.OnEnterXorExpression()
 	if err != nil {
@@ -380,6 +400,7 @@ func (ep *ExpressionParser) ParseXorExpression(q *query.QueryXorExpression) erro
 	return nil
 }
 
+// ParseOrExpression parse or expression
 func (ep *ExpressionParser) ParseOrExpression(q *query.QueryOrExpression) error {
 	var err error
 	err = ep.visitor.OnEnterOrExpression()
@@ -401,6 +422,7 @@ func (ep *ExpressionParser) ParseOrExpression(q *query.QueryOrExpression) error 
 	return nil
 }
 
+// ParseExpression parse expression
 func (ep *ExpressionParser) ParseExpression(q *query.QueryExpression) error {
 	err := ep.visitor.OnEnterExpression()
 	if err != nil {
@@ -416,75 +438,3 @@ func (ep *ExpressionParser) ParseExpression(q *query.QueryExpression) error {
 	}
 	return nil
 }
-
-type ExpressionVisitorBase struct{}
-
-func (evb *ExpressionVisitorBase) OnEnterRelationshipsPattern() error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitRelationshipsPattern() error {
-	return nil
-}
-
-func (evb *ExpressionVisitorBase) OnEnterNodePattern() error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitNodePattern() error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterStringListNullOperatorExpression(e query.QueryStringListNullOperatorExpression) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitStringListNullOperatorExpression(e query.QueryStringListNullOperatorExpression) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnVariable(name string) error                           { return nil }
-func (evb *ExpressionVisitorBase) OnVariablePropertiesPath(propertiesPath []string) error { return nil }
-func (evb *ExpressionVisitorBase) OnStringLiteral(value string) error                     { return nil }
-func (evb *ExpressionVisitorBase) OnDoubleLiteral(value float64) error                    { return nil }
-func (evb *ExpressionVisitorBase) OnIntegerLiteral(value int64) error                     { return nil }
-func (evb *ExpressionVisitorBase) OnBooleanLiteral(value bool) error                      { return nil }
-func (evb *ExpressionVisitorBase) OnEnterFunctionInvocation(name string, distinct bool) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitFunctionInvocation(name string, distinct bool) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterParenthesizedExpression() error                { return nil }
-func (evb *ExpressionVisitorBase) OnExitParenthesizedExpression() error                 { return nil }
-func (evb *ExpressionVisitorBase) OnStringOperator(operator query.StringOperator) error { return nil }
-func (evb *ExpressionVisitorBase) OnEnterUnaryExpression() error                        { return nil }
-func (evb *ExpressionVisitorBase) OnExitUnaryExpression() error                         { return nil }
-func (evb *ExpressionVisitorBase) OnEnterPowerOfExpression() error                      { return nil }
-func (evb *ExpressionVisitorBase) OnExitPowerOfExpression() error                       { return nil }
-func (evb *ExpressionVisitorBase) OnEnterMultipleDivideModuloExpression() error         { return nil }
-func (evb *ExpressionVisitorBase) OnExitMultipleDivideModuloExpression() error          { return nil }
-func (evb *ExpressionVisitorBase) OnMultiplyDivideModuloOperator(operator query.MultiplyDivideModuloOperator) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterAddOrSubtractExpression() error { return nil }
-func (evb *ExpressionVisitorBase) OnExitAddOrSubtractExpression() error  { return nil }
-func (evb *ExpressionVisitorBase) OnAddOrSubtractOperator(operator query.AddOrSubtractOperator) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterComparisonExpression() error { return nil }
-func (evb *ExpressionVisitorBase) OnExitComparisonExpression() error  { return nil }
-func (evb *ExpressionVisitorBase) OnComparisonOperator(operator query.ComparisonOperator) error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnEnterNotExpression(not bool) error { return nil }
-func (evb *ExpressionVisitorBase) OnExitNotExpression(not bool) error  { return nil }
-func (evb *ExpressionVisitorBase) OnEnterAndExpression() error         { return nil }
-func (evb *ExpressionVisitorBase) OnExitAndExpression() error          { return nil }
-func (evb *ExpressionVisitorBase) OnEnterXorExpression() error         { return nil }
-func (evb *ExpressionVisitorBase) OnExitXorExpression() error          { return nil }
-func (evb *ExpressionVisitorBase) OnEnterOrExpression() error          { return nil }
-func (evb *ExpressionVisitorBase) OnExitOrExpression() error           { return nil }
-func (evb *ExpressionVisitorBase) OnEnterExpression() error            { return nil }
-func (evb *ExpressionVisitorBase) OnExitExpression() error             { return nil }

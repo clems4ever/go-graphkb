@@ -136,7 +136,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	for _, x := range query.QuerySinglePartQuery.QueryMatches {
 		parser := NewPatternParser(&sqt.QueryGraph)
 		for _, y := range x.PatternElements {
-			err := parser.ParsePatternElement(&y)
+			err := parser.ParsePatternElement(&y, MatchScope)
 			if err != nil {
 				return nil, err
 			}

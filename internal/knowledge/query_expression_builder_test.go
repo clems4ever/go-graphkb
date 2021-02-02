@@ -45,11 +45,11 @@ func TestShouldBuildExpression(t *testing.T) {
 
 			_, _, err := qg.PushNode(query.QueryNodePattern{
 				Variable: "a",
-			})
+			}, MatchScope)
 			require.NoError(t, err)
 			_, _, err = qg.PushNode(query.QueryNodePattern{
 				Variable: "b",
-			})
+			}, MatchScope)
 			require.NoError(t, err)
 
 			require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestShouldBuildExpression(t *testing.T) {
 				RelationshipDetail: &query.QueryRelationshipDetail{
 					Variable: "r",
 				},
-			}, 0, 0)
+			}, 0, 0, MatchScope)
 			require.NoError(t, err)
 
 			expr := CypherToExpr(tc.Cypher)

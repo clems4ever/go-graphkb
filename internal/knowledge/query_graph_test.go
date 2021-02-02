@@ -11,21 +11,34 @@ type QueryGraphSuite struct {
 	suite.Suite
 }
 
+var WhereScope = Scope{Context: WhereContext, ID: 0}
+
+var ScopeSetWithMatchScope = map[Scope]struct{}{
+	MatchScope: {},
+}
+
+var ScopeSetWithWhereScope = map[Scope]struct{}{
+	WhereScope: {},
+}
+
+var ScopeSetWithMatchAndWhereScope = map[Scope]struct{}{
+	MatchScope: {},
+	WhereScope: {},
+}
+
 func (s *QueryGraphSuite) TestShouldPushUnamedUntypedNode() {
 	g := NewQueryGraph()
-	n0, idx0, err := g.PushNode(query.QueryNodePattern{
-		Variable: "",
-		Labels:   nil,
-	})
+	n0, idx0, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: nil},
+		MatchScope)
 	s.Require().NoError(err)
 
-	n1, idx1, err := g.PushNode(query.QueryNodePattern{
-		Variable: "",
-		Labels:   nil,
-	})
+	n1, idx1, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: nil},
+		MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryNode{}
+	qn := QueryNode{Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(&qn, n0)
 	s.Assert().Equal(0, idx0)
@@ -34,27 +47,69 @@ func (s *QueryGraphSuite) TestShouldPushUnamedUntypedNode() {
 	s.Assert().Equal(1, idx1)
 }
 
+func (s *QueryGraphSuite) TestShouldPushNodeWithWhereScope() {
+	g := NewQueryGraph()
+	n0, idx0, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: nil},
+		WhereScope)
+	s.Require().NoError(err)
+
+	n1, idx1, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: nil},
+		WhereScope)
+	s.Require().NoError(err)
+
+	qn := QueryNode{Scopes: ScopeSetWithWhereScope}
+
+	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(0, idx0)
+
+	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(1, idx1)
+}
+
+func (s *QueryGraphSuite) TestShouldPushNodeWithMultipleScopes() {
+	g := NewQueryGraph()
+	n0, idx0, err := g.PushNode(
+		query.QueryNodePattern{Variable: "a", Labels: nil},
+		MatchScope)
+	s.Require().NoError(err)
+
+	n1, idx1, err := g.PushNode(
+		query.QueryNodePattern{Variable: "a", Labels: nil},
+		WhereScope)
+	s.Require().NoError(err)
+
+	qn := QueryNode{Scopes: ScopeSetWithMatchAndWhereScope}
+
+	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(0, idx0)
+
+	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(0, idx1)
+}
+
 func (s *QueryGraphSuite) TestShouldPushNamedUntypedNode() {
 	g := NewQueryGraph()
 	n0, idx0, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   nil,
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	n1, idx1, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var2",
 		Labels:   nil,
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	n2, idx2, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   nil,
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryNode{}
+	qn := QueryNode{Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(&qn, n0)
 	s.Assert().Equal(0, idx0)
@@ -71,17 +126,17 @@ func (s *QueryGraphSuite) TestShouldPushUnamedTypedNode() {
 	n0, idx0, err := g.PushNode(query.QueryNodePattern{
 		Variable: "",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	n1, idx1, err := g.PushNode(query.QueryNodePattern{
 		Variable: "",
 		Labels:   []string{"t1", "t3"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryNode{Labels: []string{"t1", "t2"}}
-	q1 := QueryNode{Labels: []string{"t1", "t3"}}
+	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope}
+	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -95,13 +150,13 @@ func (s *QueryGraphSuite) TestCannotPushTwiceSameNodeWithDifferentTypes() {
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	_, _, err = g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   []string{"t1", "t3"},
-	})
+	}, MatchScope)
 	s.Require().EqualError(err, "Variable 'var1' already defined with a different type")
 }
 
@@ -110,17 +165,17 @@ func (s *QueryGraphSuite) TestShouldPushNamedTypedNode() {
 	n0, idx0, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	n1, idx1, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var2",
 		Labels:   []string{"t1", "t3"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryNode{Labels: []string{"t1", "t2"}}
-	q1 := QueryNode{Labels: []string{"t1", "t3"}}
+	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope}
+	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -140,21 +195,20 @@ func CreateRelationship(varName string, labels []string) query.QueryRelationship
 
 func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelation() {
 	g := NewQueryGraph()
-	_, _, err := g.PushNode(query.QueryNodePattern{
-		Variable: "",
-		Labels:   []string{"t1", "t2"},
-	})
+	_, _, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: []string{"t1", "t2"}},
+		MatchScope)
 	s.Require().NoError(err)
 
 	pattern := CreateRelationship("", nil)
 
-	n0, idx0, err := g.PushRelation(pattern, 0, 0)
+	n0, idx0, err := g.PushRelation(pattern, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	n1, idx1, err := g.PushRelation(pattern, 0, 0)
+	n1, idx1, err := g.PushRelation(pattern, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryRelation{Direction: Either}
+	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(&qn, n0)
 	s.Assert().Equal(0, idx0)
@@ -163,27 +217,75 @@ func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelation() {
 	s.Assert().Equal(1, idx1)
 }
 
+func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelationWithWhereScope() {
+	g := NewQueryGraph()
+	_, _, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: []string{"t1", "t2"}},
+		WhereScope)
+	s.Require().NoError(err)
+
+	pattern := CreateRelationship("", nil)
+
+	n0, idx0, err := g.PushRelation(pattern, 0, 0, WhereScope)
+	s.Require().NoError(err)
+
+	n1, idx1, err := g.PushRelation(pattern, 0, 0, WhereScope)
+	s.Require().NoError(err)
+
+	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithWhereScope}
+
+	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(0, idx0)
+
+	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(1, idx1)
+}
+
+func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelationWithMultipleScopes() {
+	g := NewQueryGraph()
+	_, _, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: []string{"t1", "t2"}},
+		WhereScope)
+	s.Require().NoError(err)
+
+	pattern := CreateRelationship("a", nil)
+
+	n0, idx0, err := g.PushRelation(pattern, 0, 0, WhereScope)
+	s.Require().NoError(err)
+
+	n1, idx1, err := g.PushRelation(pattern, 0, 0, MatchScope)
+	s.Require().NoError(err)
+
+	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchAndWhereScope}
+
+	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(0, idx0)
+
+	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(0, idx1)
+}
+
 func (s *QueryGraphSuite) TestShouldPushNamedUntypedRelation() {
 	g := NewQueryGraph()
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("var1", nil)
 	pattern1 := CreateRelationship("var2", nil)
 
-	n0, idx0, err := g.PushRelation(pattern0, 0, 0)
+	n0, idx0, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	n1, idx1, err := g.PushRelation(pattern1, 0, 0)
+	n1, idx1, err := g.PushRelation(pattern1, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	n2, idx2, err := g.PushRelation(pattern0, 0, 0)
+	n2, idx2, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryRelation{Direction: Either}
+	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(&qn, n0)
 	s.Assert().Equal(0, idx0)
@@ -200,20 +302,20 @@ func (s *QueryGraphSuite) TestShouldPushUnamedTypedRelation() {
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("", []string{"t1", "t2"})
 	pattern1 := CreateRelationship("", []string{"t1", "t3"})
 
-	n0, idx0, err := g.PushRelation(pattern0, 0, 0)
+	n0, idx0, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	n1, idx1, err := g.PushRelation(pattern1, 0, 0)
+	n1, idx1, err := g.PushRelation(pattern1, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either}
-	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either}
+	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either, Scopes: ScopeSetWithMatchScope}
+	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either, Scopes: ScopeSetWithMatchScope}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -227,38 +329,41 @@ func (s *QueryGraphSuite) TestCannotPushTwiceSameRelationWithDifferentTypes() {
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("var1", []string{"t1", "t2"})
 	pattern1 := CreateRelationship("var1", []string{"t1", "t3"})
 
-	_, _, err = g.PushRelation(pattern0, 0, 0)
+	_, _, err = g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	_, _, err = g.PushRelation(pattern1, 0, 0)
+	_, _, err = g.PushRelation(pattern1, 0, 0, MatchScope)
 	s.Require().EqualError(err, "Variable 'var1' already defined with a different type")
 }
 
 func (s *QueryGraphSuite) TestShouldPushNamedTypedRelation() {
 	g := NewQueryGraph()
-	_, _, err := g.PushNode(query.QueryNodePattern{
-		Variable: "",
-		Labels:   []string{"t1", "t2"},
-	})
+	_, _, err := g.PushNode(
+		query.QueryNodePattern{Variable: "", Labels: []string{"t1", "t2"}},
+		MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("var1", []string{"t1", "t2"})
 	pattern1 := CreateRelationship("var2", []string{"t1", "t3"})
 
-	n0, idx0, err := g.PushRelation(pattern0, 0, 0)
+	n0, idx0, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	n1, idx1, err := g.PushRelation(pattern1, 0, 0)
+	n1, idx1, err := g.PushRelation(pattern1, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either}
-	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either}
+	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either, Scopes: map[Scope]struct{}{
+		MatchScope: {},
+	}}
+	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either, Scopes: map[Scope]struct{}{
+		MatchScope: {},
+	}}
 
 	s.Assert().Equal(&q0, n0)
 	s.Assert().Equal(0, idx0)
@@ -272,11 +377,11 @@ func (s *QueryGraphSuite) TestCannotPushNodeThenRelationWithSameName() {
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("var1", []string{"t1", "t2"})
-	_, _, err = g.PushRelation(pattern0, 0, 0)
+	_, _, err = g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().EqualError(err, "Variable 'var1' is assigned to a different type")
 }
 
@@ -285,17 +390,17 @@ func (s *QueryGraphSuite) TestCannotPushRelationThenNodeWithSameName() {
 	_, _, err := g.PushNode(query.QueryNodePattern{
 		Variable: "var1",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().NoError(err)
 
 	pattern0 := CreateRelationship("var2", []string{"t1", "t2"})
-	_, _, err = g.PushRelation(pattern0, 0, 0)
+	_, _, err = g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
 	_, _, err = g.PushNode(query.QueryNodePattern{
 		Variable: "var2",
 		Labels:   []string{"t1", "t2"},
-	})
+	}, MatchScope)
 	s.Require().EqualError(err, "Variable 'var2' is assigned to a different type")
 }
 
@@ -303,7 +408,7 @@ func (s *QueryGraphSuite) TestCannotPushARelationBoundToUnexistingNode() {
 	g := NewQueryGraph()
 
 	pattern0 := CreateRelationship("var2", []string{"t1", "t2"})
-	_, _, err := g.PushRelation(pattern0, 0, 0)
+	_, _, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().EqualError(err, "Cannot push relation bound to an unexisting node")
 }
 

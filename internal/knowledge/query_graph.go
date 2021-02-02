@@ -30,6 +30,9 @@ type QueryNode struct {
 	Labels []string
 	// Constraint expressions
 	Constraints AndOrExpression
+
+	// The scopes this node belongs to (MATCH or WHERE)
+	Scopes map[Scope]struct{}
 }
 
 // QueryRelation represent a relation and its constraints
@@ -41,6 +44,9 @@ type QueryRelation struct {
 	LeftIdx   int
 	RightIdx  int
 	Direction RelationDirection
+
+	// The scopes this relations belongs to (MATCH or WHERE)
+	Scopes map[Scope]struct{}
 }
 
 // VariableType represent the type of a variable in the cypher query.
@@ -57,6 +63,22 @@ const (
 type TypeAndIndex struct {
 	Type  VariableType
 	Index int
+}
+
+// PatternContext the context of the pattern pushed
+type PatternContext int
+
+const (
+	// MatchContext the node or relation is coming from a MATCH clause
+	MatchContext PatternContext = iota
+	// WhereContext the node or relation is coming from a WHERE clause
+	WhereContext PatternContext = iota
+)
+
+// Scope represent the context of the pattern and the ID. This is useful to know wether the pattern comes from the MATCH clause or a WHERE clause.
+type Scope struct {
+	Context PatternContext
+	ID      int
 }
 
 // QueryGraph the representation of a query graph. This structure helps create the relations between nodes to facilitate SQL translation and projections
@@ -77,12 +99,12 @@ func NewQueryGraph() QueryGraph {
 }
 
 // PushNode push a node into the registry
-func (qg *QueryGraph) PushNode(q query.QueryNodePattern) (*QueryNode, int, error) {
+func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNode, int, error) {
 	// If pattern comes with a variable name, search in the index if it does not already exist
 	if q.Variable != "" {
 		typeAndIndex, ok := qg.VariablesIndex[q.Variable]
 
-		// If found, returns the node
+		// If found, add the scope and return the node
 		if ok {
 			if typeAndIndex.Type != NodeType {
 				return nil, -1, fmt.Errorf("Variable '%s' is assigned to a different type", q.Variable)
@@ -92,11 +114,13 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern) (*QueryNode, int, error
 			if !utils.AreStringSliceElementsEqual(n.Labels, q.Labels) && q.Labels != nil {
 				return nil, -1, fmt.Errorf("Variable '%s' already defined with a different type", q.Variable)
 			}
+			n.Scopes[scope] = struct{}{}
 			return &n, typeAndIndex.Index, nil
 		}
 	}
 
-	qn := QueryNode{Labels: q.Labels}
+	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{})}
+	qn.Scopes[scope] = struct{}{}
 	newIdx := len(qg.Nodes)
 
 	qg.Nodes = append(qg.Nodes, qn)
@@ -111,7 +135,7 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern) (*QueryNode, int, error
 }
 
 // PushRelation push a relation into the registry
-func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, rightIdx int) (*QueryRelation, int, error) {
+func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, rightIdx int, scope Scope) (*QueryRelation, int, error) {
 	var varName string
 	var labels []string
 
@@ -132,6 +156,7 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 			if !utils.AreStringSliceElementsEqual(r.Labels, labels) {
 				return nil, -1, fmt.Errorf("Variable '%s' already defined with a different type", varName)
 			}
+			r.Scopes[scope] = struct{}{}
 			return &r, typeAndIndex.Index, nil
 		}
 	}
@@ -162,7 +187,9 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 		LeftIdx:   leftIdx,
 		RightIdx:  rightIdx,
 		Direction: direction,
+		Scopes:    make(map[Scope]struct{}),
 	}
+	qr.Scopes[scope] = struct{}{}
 	newIdx := len(qg.Relations)
 
 	qg.Relations = append(qg.Relations, qr)
