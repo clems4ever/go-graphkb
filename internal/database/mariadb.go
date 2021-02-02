@@ -745,7 +745,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 		case knowledge.NodeExprType:
 			items, err := q.Get(3)
 			if err != nil {
-				return nil
+				return fmt.Errorf("Unable to get 3 items to build a node: %v", err)
 			}
 
 			asset := knowledge.Asset{
@@ -761,7 +761,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 		case knowledge.EdgeExprType:
 			items, err := q.Get(3)
 			if err != nil {
-				return nil
+				return fmt.Errorf("Unable to get 3 items to build an edge: %v", err)
 			}
 
 			r := knowledge.RelationWithID{
@@ -773,7 +773,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 		case knowledge.PropertyExprType:
 			items, err := q.Get(1)
 			if err != nil {
-				return nil
+				return fmt.Errorf("Unable to get 1 property item: %v", err)
 			}
 			output[i] = items[0]
 		}
