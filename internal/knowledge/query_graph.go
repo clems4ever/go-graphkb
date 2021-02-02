@@ -8,15 +8,10 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/utils"
 )
 
+// ErrVariableNotFound error thrown when a variable does not exist
 var ErrVariableNotFound = errors.New("Unable to find variable")
 
-// QueryNode represent a node and its constraints
-type QueryNode struct {
-	Labels []string
-	// Constraint expressions
-	Constraints AndOrExpression
-}
-
+// RelationDirection the direction of a relation
 type RelationDirection int
 
 const (
@@ -24,11 +19,18 @@ const (
 	Left RelationDirection = iota
 	// Right relation
 	Right RelationDirection = iota
-	// There is a relation but we don't know in which direction
+	// Either there is a relation but we don't know in which direction
 	Either RelationDirection = iota
-	// There is a relation in both directions
+	// Both there is a relation in both directions
 	Both RelationDirection = iota
 )
+
+// QueryNode represent a node and its constraints
+type QueryNode struct {
+	Labels []string
+	// Constraint expressions
+	Constraints AndOrExpression
+}
 
 // QueryRelation represent a relation and its constraints
 type QueryRelation struct {
@@ -41,18 +43,23 @@ type QueryRelation struct {
 	Direction RelationDirection
 }
 
+// VariableType represent the type of a variable in the cypher query.
 type VariableType int
 
 const (
-	NodeType     VariableType = iota
+	// NodeType variable of type node
+	NodeType VariableType = iota
+	// RelationType variable of type relation
 	RelationType VariableType = iota
 )
 
+// TypeAndIndex type and index of a variable from the cypher query
 type TypeAndIndex struct {
 	Type  VariableType
 	Index int
 }
 
+// QueryGraph the representation of a query graph. This structure helps create the relations between nodes to facilitate SQL translation and projections
 type QueryGraph struct {
 	Nodes     []QueryNode
 	Relations []QueryRelation
@@ -60,6 +67,7 @@ type QueryGraph struct {
 	VariablesIndex map[string]TypeAndIndex
 }
 
+// NewQueryGraph create an instance of a query graph
 func NewQueryGraph() QueryGraph {
 	return QueryGraph{
 		Nodes:          []QueryNode{},
@@ -68,6 +76,7 @@ func NewQueryGraph() QueryGraph {
 	}
 }
 
+// PushNode push a node into the registry
 func (qg *QueryGraph) PushNode(q query.QueryNodePattern) (*QueryNode, int, error) {
 	// If pattern comes with a variable name, search in the index if it does not already exist
 	if q.Variable != "" {
@@ -101,6 +110,7 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern) (*QueryNode, int, error
 	return &qn, newIdx, nil
 }
 
+// PushRelation push a relation into the registry
 func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, rightIdx int) (*QueryRelation, int, error) {
 	var varName string
 	var labels []string
@@ -166,6 +176,7 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 	return &qr, newIdx, nil
 }
 
+// FindVariable find a variable by its name
 func (qg *QueryGraph) FindVariable(name string) (TypeAndIndex, error) {
 	v, ok := qg.VariablesIndex[name]
 	if !ok {
@@ -174,9 +185,10 @@ func (qg *QueryGraph) FindVariable(name string) (TypeAndIndex, error) {
 	return v, nil
 }
 
-func (gq *QueryGraph) FindNode(idx int) (*QueryNode, error) {
-	if idx >= len(gq.Nodes) {
+// GetNodeByID get a node by its id
+func (qg *QueryGraph) GetNodeByID(idx int) (*QueryNode, error) {
+	if idx >= len(qg.Nodes) {
 		return nil, fmt.Errorf("Index provided to find node is invalid")
 	}
-	return &gq.Nodes[idx], nil
+	return &qg.Nodes[idx], nil
 }

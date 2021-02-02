@@ -273,7 +273,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 					}
 				}
 				if !nodesConstrained {
-					n, err := sqt.QueryGraph.FindNode(r.LeftIdx)
+					n, err := sqt.QueryGraph.GetNodeByID(r.LeftIdx)
 					if err != nil {
 						return nil, err
 					}
@@ -281,7 +281,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 						nodesConstrained = true
 					}
 
-					n, err = sqt.QueryGraph.FindNode(r.RightIdx)
+					n, err = sqt.QueryGraph.GetNodeByID(r.RightIdx)
 					if err != nil {
 						return nil, err
 					}
