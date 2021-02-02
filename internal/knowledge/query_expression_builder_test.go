@@ -70,95 +70,95 @@ func TestShouldBuildExpression(t *testing.T) {
 }
 
 var testCases = []ExpressionTestCase{
-	ExpressionTestCase{
+	{
 		Cypher: "(a.value)",
 		SQL:    "(a0.value)",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value OR b.value",
 		SQL:    "a0.value OR a1.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value AND b.value",
 		SQL:    "a0.value AND a1.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "NOT a.value",
 		SQL:    "NOT a0.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "NOT NOT a.value",
 		SQL:    "a0.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value CONTAINS 'abc'",
 		SQL:    "a0.value LIKE '%abc%'",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value STARTS WITH 'abc'",
 		SQL:    "a0.value LIKE 'abc%'",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value ENDS WITH 'abc'",
 		SQL:    "a0.value LIKE '%abc'",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "COUNT(a.value)",
-		SQL:    "COUNT(a0.value)",
+		SQL:    "COUNT(*)",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value < b.value",
 		SQL:    "a0.value < a1.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value = b.value",
 		SQL:    "a0.value = a1.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value <> b.value",
 		SQL:    "a0.value <> a1.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value = 'abc'",
 		SQL:    "a0.value = 'abc'",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a",
 		SQL:    "a0.id, a0.value, a0.type",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "r",
 		SQL:    "r0.from_id, r0.to_id, r0.type",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "a.value",
 		SQL:    "a0.value",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "'abc'",
 		SQL:    "'abc'",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "2",
 		SQL:    "2",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "2.5",
 		SQL:    "2.500000",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "true",
 		SQL:    "true",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "false",
 		SQL:    "false",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "TRUE",
 		SQL:    "true",
 	},
-	ExpressionTestCase{
+	{
 		Cypher: "FALSE",
 		SQL:    "false",
 	},
