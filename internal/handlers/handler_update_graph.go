@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,11 +8,13 @@ import (
 
 	"github.com/clems4ever/go-graphkb/internal/client"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
+	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/sources"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 )
 
-func handleUpdate(registry sources.Registry, fn func(source string, body io.Reader) error, sem *semaphore.Weighted) http.HandlerFunc {
+func handleUpdate(registry sources.Registry, fn func(source string, body io.Reader) error, sem *semaphore.Weighted, operationDescriptor string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ok, source, err := IsTokenValid(registry, r)
 		if err != nil {
@@ -21,7 +22,15 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 			return
 		}
 
+		promLabels := prometheus.Labels{
+			"source":    source,
+			"operation": operationDescriptor,
+		}
+
 		if !ok {
+			metrics.GraphUpdateRequestsUnauthorizedCounter.
+				With(promLabels).
+				Inc()
 			ReplyWithUnauthorized(w)
 			return
 		}
@@ -29,18 +38,32 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 		{
 			ok = sem.TryAcquire(1)
 			if !ok {
+				metrics.GraphUpdateRequestsRateLimitedCounter.
+					With(promLabels).
+					Inc()
 				ReplyWithTooManyRequests(w)
 				return
 			}
 			defer sem.Release(1)
 
+			metrics.GraphUpdateRequestsReceivedCounter.
+				With(promLabels).
+				Inc()
+
 			if err = fn(source, r.Body); err != nil {
+				metrics.GraphUpdateRequestsFailedCounter.
+					With(promLabels).
+					Inc()
 				ReplyWithInternalError(w, err)
 				return
 			}
+
+			metrics.GraphUpdateRequestsSucceededCounter.
+				With(promLabels).
+				Inc()
 		}
 
-		_, err = bytes.NewBufferString("Graph has been received and will be processed soon").WriteTo(w)
+		_, err = fmt.Fprint(w, "Graph update has been processed")
 		if err != nil {
 			ReplyWithInternalError(w, err)
 			return
@@ -57,9 +80,17 @@ func PutSchema(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, 
 		}
 
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
-		graphUpdater.UpdateSchema(source, requestBody.Schema)
+		err := graphUpdater.UpdateSchema(source, requestBody.Schema)
+		if err != nil {
+			return fmt.Errorf("Unable to update the schema: %v", err)
+		}
+
+		labels := prometheus.Labels{"source": source}
+		metrics.GraphUpdateSchemaUpdatedCounter.
+			With(labels).
+			Inc()
 		return nil
-	}, sem)
+	}, sem, "update_schema")
 }
 
 // PutAssets upsert several assets into the graph of the data source
@@ -75,8 +106,13 @@ func PutAssets(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, 
 		if err != nil {
 			return fmt.Errorf("Unable to insert assets: %v", err)
 		}
+		labels := prometheus.Labels{"source": source}
+		metrics.GraphUpdateAssetsInsertedCounter.
+			With(labels).
+			Add(float64(len(requestBody.Assets)))
+
 		return nil
-	}, sem)
+	}, sem, "insert_assets")
 }
 
 // PutRelations upsert multiple relations into the graph of the data source
@@ -92,8 +128,13 @@ func PutRelations(registry sources.Registry, graphUpdater *knowledge.GraphUpdate
 		if err != nil {
 			return fmt.Errorf("Unable to insert relation: %v", err)
 		}
+
+		labels := prometheus.Labels{"source": source}
+		metrics.GraphUpdateRelationsInsertedCounter.
+			With(labels).
+			Add(float64(len(requestBody.Relations)))
 		return nil
-	}, sem)
+	}, sem, "insert_relations")
 }
 
 // DeleteAssets delete multiple assets from the graph of the data source
@@ -109,8 +150,13 @@ func DeleteAssets(registry sources.Registry, graphUpdater *knowledge.GraphUpdate
 		if err != nil {
 			return fmt.Errorf("Unable to remove assets: %v", err)
 		}
+
+		labels := prometheus.Labels{"source": source}
+		metrics.GraphUpdateAssetsDeletedCounter.
+			With(labels).
+			Add(float64(len(requestBody.Assets)))
 		return nil
-	}, sem)
+	}, sem, "delete_assets")
 }
 
 // DeleteRelations remove multiple relations from the graph of the data source
@@ -126,6 +172,11 @@ func DeleteRelations(registry sources.Registry, graphUpdater *knowledge.GraphUpd
 		if err != nil {
 			return fmt.Errorf("Unable to remove relation: %v", err)
 		}
+
+		labels := prometheus.Labels{"source": source}
+		metrics.GraphUpdateRelationsDeletedCounter.
+			With(labels).
+			Add(float64(len(requestBody.Relations)))
 		return nil
-	}, sem)
+	}, sem, "delete_relations")
 }

@@ -11,42 +11,66 @@ var StartTimeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 	Help: "The timestamp of the time when the app started",
 })
 
-// ********************* GRAPH UPDATE ENQUEUING ******************
+// ********************* GRAPH UPDATE REQUESTS ******************
 
-// GraphUpdateEnqueuingRequestsReceivedCounter reports the number of authorized updates request received by the webserver
-var GraphUpdateEnqueuingRequestsReceivedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_update_enqueuing_requests_received_counter",
-	Help: "The number of graph update enqueuing requests received by the web server but not yet processed",
+// GraphUpdateRequestsReceivedCounter reports the number of authorized and not rate limited updates requests received by the webserver
+var GraphUpdateRequestsReceivedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_requests_received_counter",
+	Help: "The number of graph updates (insertion or removal of assets or relations) received. A request is considered received if authorization is valid and the request has not been rate limited",
+}, []string{"source", "operation"})
+
+// GraphUpdateRequestsRateLimitedCounter reports the number of unauthorized updates requests received by the webserver
+var GraphUpdateRequestsRateLimitedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_requests_rate_limited_counter",
+	Help: "The number of graph updates which were rate limited",
+}, []string{"source", "operation"})
+
+// GraphUpdateRequestsUnauthorizedCounter reports the number of unauthorized updates requests received by the webserver
+var GraphUpdateRequestsUnauthorizedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_requests_unauthorized_counter",
+	Help: "The number of graph updates which were unauthorized",
+}, []string{"source", "operation"})
+
+// GraphUpdateRequestsFailedCounter reports the number of failed update requests
+var GraphUpdateRequestsFailedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_requests_failed_counter",
+	Help: "The number of failed graph update",
+}, []string{"source", "operation"})
+
+// GraphUpdateRequestsSucceededCounter reports the number of successful update requests
+var GraphUpdateRequestsSucceededCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_requests_succeeded_counter",
+	Help: "The number of succeeded graph update",
+}, []string{"source", "operation"})
+
+// ********************* GRAPH UPDATE COUNTERS ******************
+
+// GraphUpdateSchemaUpdatedCounter reports the number of schema updated since the start of the process
+var GraphUpdateSchemaUpdatedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_schema_updated_counter",
+	Help: "The number of assets inserted since the start of the process",
 }, []string{"source"})
 
-// GraphUpdateEnqueuingRequestsFailedCounter reports the number of failed update requests
-var GraphUpdateEnqueuingRequestsFailedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_update_enqueuing_requests_failed_counter",
-	Help: "The number of failed graph update enqueuing requests",
-}, []string{"source", "status_code"})
-
-// GraphUpdateEnqueuingRequestsSucceededCounter reports the number of successful enqueuing requests
-var GraphUpdateEnqueuingRequestsSucceededCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_update_enqueuing_requests_succeeded_counter",
-	Help: "The number of successful graph update enqueuing requests",
+// GraphUpdateAssetsInsertedCounter reports the number of assets inserted since the start of the process
+var GraphUpdateAssetsInsertedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_assets_inserted_counter",
+	Help: "The number of assets inserted since the start of the process",
 }, []string{"source"})
 
-// ********************* GRAPH PROCESSING *************************
-
-// GraphUpdatesProcessingRequestedCounter reports the number of updates to be processed and imported into DB.
-var GraphUpdatesProcessingRequestedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_updates_processing_requested_counter",
-	Help: "The number of update requests to be processed and imported into DB",
+// GraphUpdateRelationsInsertedCounter reports the number of relations inserted since the start of the process
+var GraphUpdateRelationsInsertedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_relations_inserted_counter",
+	Help: "The number of relations inserted since the start of the process",
 }, []string{"source"})
 
-// GraphUpdatesProcessingSucceededCounter reports the number of updates which have successfully been processed
-var GraphUpdatesProcessingSucceededCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_updates_processing_succeeded_counter",
-	Help: "The number of update requests processed successfully",
+// GraphUpdateAssetsDeletedCounter reports the number of assets inserted since the start of the process
+var GraphUpdateAssetsDeletedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_assets_deleted_counter",
+	Help: "The number of assets deleted since the start of the process",
 }, []string{"source"})
 
-// GraphUpdatesProcessingFailedCounter reports the number of updates which failed to be processed
-var GraphUpdatesProcessingFailedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "go_graphkb_graph_updates_failed_counter",
-	Help: "The number of update requests which failed",
+// GraphUpdateRelationsDeletedCounter reports the number of relations deleted since the start of the process
+var GraphUpdateRelationsDeletedCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_graph_update_relations_deleted_counter",
+	Help: "The number of relations deleted since the start of the process",
 }, []string{"source"})
