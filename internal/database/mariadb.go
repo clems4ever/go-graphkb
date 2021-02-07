@@ -48,7 +48,7 @@ func (m *MariaDB) InitializeSchema() error {
 		
 			CONSTRAINT pk_source PRIMARY KEY (id),
 
-			UNIQUE unique_source_idx (name, auth_token)
+			UNIQUE unique_source (name, auth_token)
 		)`)
 	if err != nil {
 		return fmt.Errorf("Unable to create sources table: %v", err)
@@ -63,7 +63,8 @@ func (m *MariaDB) InitializeSchema() error {
 
 			CONSTRAINT pk_asset PRIMARY KEY (id),
 
-			UNIQUE unique_asset_idx (type, value),
+			UNIQUE unique_asset (type, value),
+
 			INDEX value_idx (value),
 			INDEX type_idx (type))`)
 	if err != nil {
@@ -81,6 +82,8 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
 			CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
 
+			UNIQUE unique_relation (from_id, to_id, type),
+
 			INDEX full_relation_type_from_to_idx (type, from_id, to_id),
 			INDEX full_relation_type_to_from_idx (type, to_id, from_id),
 			INDEX full_relation_from_type_to_idx (from_id, type, to_id),
@@ -97,6 +100,8 @@ func (m *MariaDB) InitializeSchema() error {
 			source_id INT NOT NULL,
 			relation_id BIGINT UNSIGNED NOT NULL,
 			update_time TIMESTAMP,
+
+			UNIQUE unique_relation_by_source (source_id, relation_id),
 		
 			CONSTRAINT pk_relations_by_source PRIMARY KEY (id),
 			CONSTRAINT fk_relations_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
@@ -113,6 +118,8 @@ func (m *MariaDB) InitializeSchema() error {
 			source_id INT NOT NULL,
 			asset_id BIGINT UNSIGNED NOT NULL,
 			update_time TIMESTAMP,
+
+			UNIQUE unique_asset_by_source (source_id, asset_id),
 		
 			CONSTRAINT pk_assets_by_source PRIMARY KEY (id),
 			CONSTRAINT fk_asset_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
