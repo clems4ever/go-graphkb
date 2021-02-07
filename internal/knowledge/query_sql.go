@@ -321,6 +321,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	var from []string
 
 	filterExpressions := AndOrExpression{And: true}
+	whereExpressions := AndOrExpression{And: true}
 	for _, x := range query.QuerySinglePartQuery.QueryMatches {
 		parser := NewPatternParser(&sqt.QueryGraph)
 		for _, y := range x.PatternElements {
@@ -328,17 +329,6 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Build the constraints for the patterns in MATCH clause
-		expr, f, err := buildSQLConstraintsFromPatterns(&sqt.QueryGraph, constrainedNodes, MatchScope)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to build SQL constraints from patterns in the MATCH clause: %v", err)
-		}
-		from = f
-
-		if expr.Expression != "" || len(expr.Children) > 0 {
-			filterExpressions.Children = append(filterExpressions.Children, *expr)
 		}
 
 		if x.Where != nil {
@@ -357,10 +347,25 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 
 			// We only append the expression if it's not empty
 			if whereExpression != "" {
-				filterExpressions.Children = append(filterExpressions.Children,
-					AndOrExpression{Expression: whereExpression})
+				whereExpressions.Children = append(whereExpressions.Children,
+					AndOrExpression{And: true, Expression: whereExpression})
 			}
 		}
+	}
+
+	// Build the constraints for the patterns in MATCH clause
+	expr, f, err := buildSQLConstraintsFromPatterns(&sqt.QueryGraph, constrainedNodes, MatchScope)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to build SQL constraints from patterns in the MATCH clause: %v", err)
+	}
+	from = f
+
+	if expr.Expression != "" || len(expr.Children) > 0 {
+		filterExpressions.Children = append(filterExpressions.Children, *expr)
+	}
+
+	if whereExpressions.Expression != "" || len(whereExpressions.Children) > 0 {
+		filterExpressions.Children = append(filterExpressions.Children, whereExpressions)
 	}
 
 	projections := make([]string, 0)
