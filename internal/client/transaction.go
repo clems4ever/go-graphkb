@@ -66,7 +66,7 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 		}
 		trials++
 		if trials == maxRetries {
-			return fmt.Errorf("Too many retries... Aborting")
+			return fmt.Errorf("Too many retries... Aborting: %v", err)
 		}
 	}
 }
@@ -87,9 +87,10 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	fmt.Println("Start uploading the graph...")
 
 	progress := pb.New(len(bulk.GetAssetRemovals()) + len(bulk.GetAssetUpserts()) + len(bulk.GetRelationRemovals()) + len(bulk.GetRelationUpserts()))
-	defer progress.Finish()
 
 	progress.Start()
+	defer progress.Finish()
+
 	p := utils.NewWorkerPool(cgt.parallelization)
 	defer p.Close()
 
@@ -113,7 +114,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 		}
 		f := p.Exec(func() error {
 			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to remove the relations %v: %v", relations, err)
+				return fmt.Errorf("Unable to remove the relations: %v", err)
 			}
 			progress.Add(len(relations))
 			return nil
@@ -128,7 +129,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 		}
 		f := p.Exec(func() error {
 			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to upsert the asset %v: %v", assets, err)
+				return fmt.Errorf("Unable to upsert the assets: %v", err)
 			}
 			progress.Add(len(assets))
 			return nil
@@ -153,7 +154,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 		}
 		f := p.Exec(func() error {
 			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to remove the asset %v: %v", assets, err)
+				return fmt.Errorf("Unable to remove the assets: %v", err)
 			}
 			progress.Add(len(assets))
 			return nil
@@ -168,7 +169,7 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 		}
 		f := p.Exec(func() error {
 			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to upsert the relation %v: %v", relations, err)
+				return fmt.Errorf("Unable to upsert the relations: %v", err)
 			}
 			progress.Add(len(relations))
 			return nil
