@@ -7,6 +7,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
 
+// ExpressionBuilder build a SQL part based on a Cypher expression
 type ExpressionBuilder struct {
 	QueryGraph *QueryGraph
 
@@ -14,6 +15,7 @@ type ExpressionBuilder struct {
 	visitor *SQLExpressionVisitor
 }
 
+// NewExpressionBuilder create a new instance of expression builder
 func NewExpressionBuilder(queryGraph *QueryGraph) *ExpressionBuilder {
 	visitor := SQLExpressionVisitor{}
 	visitor.queryGraph = queryGraph
@@ -24,6 +26,7 @@ func NewExpressionBuilder(queryGraph *QueryGraph) *ExpressionBuilder {
 	}
 }
 
+// Build the SQL expression from the Cypher expression
 func (eb *ExpressionBuilder) Build(q *query.QueryExpression) (string, error) {
 	err := eb.parser.ParseExpression(q)
 	if err != nil {
@@ -32,6 +35,7 @@ func (eb *ExpressionBuilder) Build(q *query.QueryExpression) (string, error) {
 	return eb.visitor.expression, nil
 }
 
+// SQLExpressionVisitor visitor used to build the SQL part from the Cypher expression.
 type SQLExpressionVisitor struct {
 	ExpressionVisitorBase
 
@@ -48,6 +52,10 @@ type SQLExpressionVisitor struct {
 	parenthesizedExpression string
 
 	functionInvocation string
+
+	// This expression should contain the EXIST(SELECT ...) expression
+	// a Cypher where clause containing a pattern is translated as SQL EXIST clause.
+	relationshipsPatternExpression string
 
 	propertyLabelsExpression string
 
@@ -156,10 +164,14 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 	} else if sev.parenthesizedExpression != "" {
 		sev.propertyLabelsExpression = fmt.Sprintf("(%s)", sev.parenthesizedExpression)
 		sev.parenthesizedExpression = ""
+	} else if sev.relationshipsPatternExpression != "" {
+		sev.propertyLabelsExpression = sev.relationshipsPatternExpression
+		sev.relationshipsPatternExpression = ""
 	}
 	return nil
 }
 
+// OnExitFunctionInvocation build the SQL snippet calling the function
 func (sev *SQLExpressionVisitor) OnExitFunctionInvocation(name string, distinct bool) error {
 	distinctStr := ""
 	if distinct {
@@ -171,6 +183,27 @@ func (sev *SQLExpressionVisitor) OnExitFunctionInvocation(name string, distinct 
 	}
 
 	sev.functionInvocation = fmt.Sprintf("%s(%s%s)", name, distinctStr, sev.expression)
+	sev.expression = ""
+	return nil
+}
+
+// OnExitRelationshipsPattern build the SQL query that will be put in the EXIST clause
+func (sev *SQLExpressionVisitor) OnExitRelationshipsPattern(q query.QueryRelationshipsPattern, id int) error {
+	scope := Scope{Context: WhereContext, ID: id}
+
+	// Build the constraints for the patterns in the WHERE clause
+	whereExpressions, from, err := buildSQLConstraintsFromPatterns(sev.queryGraph, nil, scope)
+	if err != nil {
+		return fmt.Errorf("Unable to deduce SQL constraints for EXISTS query")
+	}
+
+	// Build a SELECT query such as SELECT 1 FROM assets a0 WHERE a0.type = 'mytype'.
+	// This is then wrapped into an EXISTS SQL clause
+	query, err := buildBasicSingleSQLSelect(false, []string{"1"}, from, *whereExpressions)
+	if err != nil {
+		return fmt.Errorf("Unable to build SQL query for EXISTS query: %v", err)
+	}
+	sev.relationshipsPatternExpression = fmt.Sprintf("EXISTS (%s)", query)
 	sev.expression = ""
 	return nil
 }

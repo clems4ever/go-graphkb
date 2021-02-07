@@ -10,10 +10,11 @@ import (
 )
 
 type QueryCase struct {
-	Cypher   string
-	SQL      string
-	Error    string
-	Selected bool
+	Description string
+	Cypher      string
+	SQL         string
+	Error       string
+	Selected    bool
 }
 
 func TestQueryTranslation(t *testing.T) {
@@ -229,9 +230,31 @@ MATCH (ip:ip)<-[:observed]-(:device)
 WHERE (ip)<-[:scanned]-(:task)
 RETURN ip`,
 			SQL: `
-SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, assets a2, relations r0, relations r1
-WHERE ((((((a0.type = 'ip' AND a1.type = 'device') AND a2.type = 'task') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND r1.type = 'scanned') AND (r1.from_id = a2.id AND r1.to_id = a0.id))
-			`,
+SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, relations r0
+WHERE ((((a0.type = 'ip' AND a1.type = 'device') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND EXISTS (SELECT 1 FROM assets aw0, assets aw2, relations rw1
+WHERE (aw0.id = a0.id AND aw2.type = 'task' AND rw1.type = 'scanned' AND (rw1.from_id = aw2.id AND rw1.to_id = aw0.id))))`,
+		},
+		{
+			Cypher: `
+MATCH (ip:ip)<-[:observed]-(:device)
+WHERE NOT (ip)<-[:scanned]-(:task)
+RETURN ip`,
+			SQL: `
+SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, relations r0
+WHERE ((((a0.type = 'ip' AND a1.type = 'device') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND NOT EXISTS (SELECT 1 FROM assets aw0, assets aw2, relations rw1
+WHERE (aw0.id = a0.id AND aw2.type = 'task' AND rw1.type = 'scanned' AND (rw1.from_id = aw2.id AND rw1.to_id = aw0.id))))`,
+			Selected: true,
+		},
+		{
+			Description: "Combine a pattern and a simple comparison expression in the WHERE clause",
+			Cypher: `
+MATCH (ip:ip)<-[:observed]-(:device)
+WHERE (ip)<-[:scanned]-(:task) AND ip.value = '127.0.0.1'
+RETURN ip`,
+			SQL: `
+SELECT a0.id, a0.value, a0.type FROM assets a0, assets a1, relations r0
+WHERE ((((a0.type = 'ip' AND a1.type = 'device') AND r0.type = 'observed') AND (r0.from_id = a1.id AND r0.to_id = a0.id)) AND EXISTS (SELECT 1 FROM assets aw0, assets aw2, relations rw1
+WHERE (aw0.id = a0.id AND aw2.type = 'task' AND rw1.type = 'scanned' AND (rw1.from_id = aw2.id AND rw1.to_id = aw0.id))) AND a0.value = '127.0.0.1')`,
 			Selected: true,
 		},
 	}

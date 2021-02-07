@@ -721,13 +721,13 @@ func (cl *BaseCypherVisitor) VisitOC_PatternElement(c *parser.OC_PatternElementC
 
 type QueryPatternElementChain struct {
 	RelationshipPattern QueryRelationshipPattern
-	QueryNodePattern
+	NodePattern         QueryNodePattern
 }
 
 func (cl *BaseCypherVisitor) VisitOC_PatternElementChain(c *parser.OC_PatternElementChainContext) interface{} {
 	q := QueryPatternElementChain{}
 	q.RelationshipPattern = c.OC_RelationshipPattern().Accept(cl).(QueryRelationshipPattern)
-	q.QueryNodePattern = c.OC_NodePattern().Accept(cl).(QueryNodePattern)
+	q.NodePattern = c.OC_NodePattern().Accept(cl).(QueryNodePattern)
 	return q
 }
 

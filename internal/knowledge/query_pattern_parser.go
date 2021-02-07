@@ -25,7 +25,7 @@ func (ep *PatternParser) ParseRelationshipsPattern(q *query.QueryRelationshipsPa
 	}
 
 	for _, z := range q.QueryPatternElementChains {
-		_, i2, err := ep.queryGraph.PushNode(z.QueryNodePattern, scope)
+		_, i2, err := ep.queryGraph.PushNode(z.NodePattern, scope)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ func (ep *PatternParser) ParsePatternElement(q *query.QueryPatternElement, scope
 	}
 
 	for _, z := range q.QueryPatternElementChains {
-		_, i2, err := ep.queryGraph.PushNode(z.QueryNodePattern, scope)
+		_, i2, err := ep.queryGraph.PushNode(z.NodePattern, scope)
 		if err != nil {
 			return err
 		}

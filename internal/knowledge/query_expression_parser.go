@@ -19,64 +19,6 @@ const (
 	PropertyExprType ExpressionType = iota
 )
 
-// ExpressionVisitor a visitor of expression
-type ExpressionVisitor interface {
-	OnEnterPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error
-	OnExitPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error
-
-	OnEnterStringListNullOperatorExpression(e query.QueryStringListNullOperatorExpression) error
-	OnExitStringListNullOperatorExpression(e query.QueryStringListNullOperatorExpression) error
-
-	OnVariable(name string) error
-	OnVariablePropertiesPath(propertiesPath []string) error
-
-	OnStringLiteral(value string) error
-	OnDoubleLiteral(value float64) error
-	OnIntegerLiteral(value int64) error
-	OnBooleanLiteral(value bool) error
-
-	OnEnterFunctionInvocation(name string, distinct bool) error
-	OnExitFunctionInvocation(name string, distinct bool) error
-
-	OnEnterParenthesizedExpression() error
-	OnExitParenthesizedExpression() error
-
-	OnStringOperator(operator query.StringOperator) error
-
-	OnEnterUnaryExpression() error
-	OnExitUnaryExpression() error
-
-	OnEnterPowerOfExpression() error
-	OnExitPowerOfExpression() error
-
-	OnEnterMultipleDivideModuloExpression() error
-	OnExitMultipleDivideModuloExpression() error
-	OnMultiplyDivideModuloOperator(operator query.MultiplyDivideModuloOperator) error
-
-	OnEnterAddOrSubtractExpression() error
-	OnExitAddOrSubtractExpression() error
-	OnAddOrSubtractOperator(operator query.AddOrSubtractOperator) error
-
-	OnEnterComparisonExpression() error
-	OnExitComparisonExpression() error
-	OnComparisonOperator(operator query.ComparisonOperator) error
-
-	OnEnterNotExpression(not bool) error
-	OnExitNotExpression(not bool) error
-
-	OnEnterAndExpression() error
-	OnExitAndExpression() error
-
-	OnEnterXorExpression() error
-	OnExitXorExpression() error
-
-	OnEnterOrExpression() error
-	OnExitOrExpression() error
-
-	OnEnterExpression() error
-	OnExitExpression() error
-}
-
 // ExpressionParser is a parser of expression
 type ExpressionParser struct {
 	visitor    ExpressionVisitor
@@ -168,13 +110,30 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 		}
 	} else if q.Atom.RelationshipsPattern != nil {
 		parser := NewPatternParser(ep.queryGraph)
+		// Parse the pattern to push the nodes and relations into the query graph
 		err := parser.ParseRelationshipsPattern(
 			q.Atom.RelationshipsPattern,
 			Scope{Context: WhereContext, ID: ep.patternIDGenerator})
 		if err != nil {
 			return err
 		}
-		ep.patternIDGenerator++
+		defer func() { ep.patternIDGenerator++ }()
+
+		err = ep.visitor.OnEnterRelationshipsPattern(*q.Atom.RelationshipsPattern, ep.patternIDGenerator)
+		if err != nil {
+			return err
+		}
+
+		err = ep.ParseRelationshipsPattern(q.Atom.RelationshipsPattern)
+		if err != nil {
+			return err
+		}
+
+		err = ep.visitor.OnExitRelationshipsPattern(*q.Atom.RelationshipsPattern, ep.patternIDGenerator)
+		if err != nil {
+			return err
+		}
+
 	} else {
 		return fmt.Errorf("Unable to parse property or labels expression")
 	}
@@ -184,6 +143,27 @@ func (ep *ExpressionParser) ParsePropertyOrLabelsExpression(q *query.QueryProper
 		return err
 	}
 
+	return nil
+}
+
+// ParseRelationshipsPattern parse a query relationships pattern
+func (ep *ExpressionParser) ParseRelationshipsPattern(q *query.QueryRelationshipsPattern) error {
+	err := ep.visitor.OnNodePattern(q.QueryNodePattern)
+	if err != nil {
+		return err
+	}
+
+	for _, pc := range q.QueryPatternElementChains {
+		err = ep.visitor.OnRelationshipPattern(pc.RelationshipPattern)
+		if err != nil {
+			return err
+		}
+
+		err = ep.visitor.OnNodePattern(pc.NodePattern)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

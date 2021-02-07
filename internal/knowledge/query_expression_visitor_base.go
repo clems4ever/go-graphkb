@@ -7,19 +7,6 @@ import (
 // ExpressionVisitorBase expression visitor base interface
 type ExpressionVisitorBase struct{}
 
-func (evb *ExpressionVisitorBase) OnEnterRelationshipsPattern() error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitRelationshipsPattern() error {
-	return nil
-}
-
-func (evb *ExpressionVisitorBase) OnEnterNodePattern() error {
-	return nil
-}
-func (evb *ExpressionVisitorBase) OnExitNodePattern() error {
-	return nil
-}
 func (evb *ExpressionVisitorBase) OnEnterPropertyOrLabelsExpression(e query.QueryPropertyOrLabelsExpression) error {
 	return nil
 }
@@ -42,6 +29,18 @@ func (evb *ExpressionVisitorBase) OnEnterFunctionInvocation(name string, distinc
 	return nil
 }
 func (evb *ExpressionVisitorBase) OnExitFunctionInvocation(name string, distinct bool) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnEnterRelationshipsPattern(q query.QueryRelationshipsPattern, id int) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnExitRelationshipsPattern(q query.QueryRelationshipsPattern, id int) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnNodePattern(q query.QueryNodePattern) error {
+	return nil
+}
+func (evb *ExpressionVisitorBase) OnRelationshipPattern(q query.QueryRelationshipPattern) error {
 	return nil
 }
 func (evb *ExpressionVisitorBase) OnEnterParenthesizedExpression() error                { return nil }
