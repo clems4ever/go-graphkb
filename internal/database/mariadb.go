@@ -258,7 +258,7 @@ func hashRelation(relation knowledge.Relation) uint64 {
 func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID (asset insert): %v", err)
+		return fmt.Errorf("Unable to resolve source ID of source %s for inserting assets: %v", source, err)
 	}
 
 	tx, err := m.db.Begin()
@@ -303,7 +303,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID (relation insert): %v", err)
+		return fmt.Errorf("Unable to resolve source ID of source %s for inserting relations: %v", source, err)
 	}
 
 	tx, err := m.db.Begin()
@@ -351,7 +351,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+		return fmt.Errorf("Unable to resolve source ID of source %s for removing assets: %v", source, err)
 	}
 
 	tx, err := m.db.Begin()
@@ -392,7 +392,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID from name %s: %v", source, err)
+		return fmt.Errorf("Unable to resolve source ID of source %s for removing relations: %v", source, err)
 	}
 
 	tx, err := m.db.Begin()

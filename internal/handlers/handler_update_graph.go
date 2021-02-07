@@ -62,8 +62,8 @@ func PutSchema(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, 
 	}, sem)
 }
 
-// PutAsset upsert an asset into the graph of the data source
-func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
+// PutAssets upsert several assets into the graph of the data source
+func PutAssets(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.PutGraphAssetRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -73,14 +73,14 @@ func PutAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, s
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		err := graphUpdater.InsertAssets(source, requestBody.Assets)
 		if err != nil {
-			return fmt.Errorf("Unable to insert asset: %v", err)
+			return fmt.Errorf("Unable to insert assets: %v", err)
 		}
 		return nil
 	}, sem)
 }
 
-// PutRelation upsert a relation into the graph of the data source
-func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
+// PutRelations upsert multiple relations into the graph of the data source
+func PutRelations(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.PutGraphRelationRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -96,8 +96,8 @@ func PutRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 	}, sem)
 }
 
-// DeleteAsset delete an asset from the graph of the data source
-func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
+// DeleteAssets delete multiple assets from the graph of the data source
+func DeleteAssets(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.DeleteGraphAssetRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {
@@ -107,14 +107,14 @@ func DeleteAsset(registry sources.Registry, graphUpdater *knowledge.GraphUpdater
 		// TODO(c.michaud): verify compatibility of the schema with graph updates
 		err := graphUpdater.RemoveAssets(source, requestBody.Assets)
 		if err != nil {
-			return fmt.Errorf("Unable to remove asset: %v", err)
+			return fmt.Errorf("Unable to remove assets: %v", err)
 		}
 		return nil
 	}, sem)
 }
 
-// DeleteRelation upsert a relation into the graph of the data source
-func DeleteRelation(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
+// DeleteRelations remove multiple relations from the graph of the data source
+func DeleteRelations(registry sources.Registry, graphUpdater *knowledge.GraphUpdater, sem *semaphore.Weighted) http.HandlerFunc {
 	return handleUpdate(registry, func(source string, body io.Reader) error {
 		requestBody := client.DeleteGraphRelationRequestBody{}
 		if err := json.NewDecoder(body).Decode(&requestBody); err != nil {

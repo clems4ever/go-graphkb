@@ -50,7 +50,7 @@ func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error
 // InsertAssets insert multiple assets in the graph of the data source
 func (sl *GraphUpdater) InsertAssets(source string, assets []Asset) error {
 	if err := sl.graphDB.InsertAssets(source, assets); err != nil {
-		return fmt.Errorf("Unable to insert assets %v from source %s: %v", assets, source, err)
+		return fmt.Errorf("Unable to insert assets from source %s: %v", source, err)
 	}
 	return nil
 }
@@ -58,7 +58,7 @@ func (sl *GraphUpdater) InsertAssets(source string, assets []Asset) error {
 // InsertRelations insert multiple relations in the graph of the data source
 func (sl *GraphUpdater) InsertRelations(source string, relations []Relation) error {
 	if err := sl.graphDB.InsertRelations(source, relations); err != nil {
-		return fmt.Errorf("Unable to insert relations %v from source %s: %v", relations, source, err)
+		return fmt.Errorf("Unable to insert relations from source %s: %v", source, err)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (sl *GraphUpdater) InsertRelations(source string, relations []Relation) err
 // RemoveAssets remove multiple assets from the graph of the data source
 func (sl *GraphUpdater) RemoveAssets(source string, assets []Asset) error {
 	if err := sl.graphDB.RemoveAssets(source, assets); err != nil {
-		return fmt.Errorf("Unable to remove assets %v from source %s: %v", assets, source, err)
+		return fmt.Errorf("Unable to remove assets from source %s: %v", source, err)
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func (sl *GraphUpdater) RemoveAssets(source string, assets []Asset) error {
 // RemoveRelations remove multiple relations from the graph of the data source
 func (sl *GraphUpdater) RemoveRelations(source string, relations []Relation) error {
 	if err := sl.graphDB.RemoveRelations(source, relations); err != nil {
-		return fmt.Errorf("Unable to remove relation %v from source %s: %v", relations, source, err)
+		return fmt.Errorf("Unable to remove relations from source %s: %v", source, err)
 	}
 	return nil
 }
