@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/client"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
@@ -61,6 +62,10 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 			metrics.GraphUpdateRequestsSucceededCounter.
 				With(promLabels).
 				Inc()
+
+			metrics.LastSuccessfulDatasourceUpdateTime.
+				With(prometheus.Labels{"source": source}).
+				Set(float64(time.Now().Unix()))
 		}
 
 		_, err = fmt.Fprint(w, "Graph update has been processed")

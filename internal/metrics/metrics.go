@@ -74,3 +74,11 @@ var GraphUpdateRelationsDeletedCounter = promauto.NewCounterVec(prometheus.Count
 	Name: "go_graphkb_graph_update_relations_deleted_counter",
 	Help: "The number of relations deleted since the start of the process",
 }, []string{"source"})
+
+// ********************* SOURCES ******************
+
+// LastSuccessfulDatasourceUpdateTimestampGauge reports the timestamp of the last successful update operation for a given source
+var LastSuccessfulDatasourceUpdateTimestampGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "go_graphkb_last_successful_datasource_update_timestamp_gauge",
+	Help: "The timestamp of the last successful operation of the data source",
+}, []string{"source"})
