@@ -63,7 +63,7 @@ func handleUpdate(registry sources.Registry, fn func(source string, body io.Read
 				With(promLabels).
 				Inc()
 
-			metrics.LastSuccessfulDatasourceUpdateTime.
+			metrics.LastSuccessfulDatasourceUpdateTimestampGauge.
 				With(prometheus.Labels{"source": source}).
 				Set(float64(time.Now().Unix()))
 		}
