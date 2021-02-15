@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
@@ -11,6 +12,8 @@ type GraphAPI struct {
 	client *GraphClient
 
 	options GraphAPIOptions
+
+	currentGraph *knowledge.Graph
 }
 
 // GraphAPIOptions options to pass to build graph API
@@ -47,7 +50,16 @@ func NewGraphAPI(options GraphAPIOptions) *GraphAPI {
 
 // CreateTransaction create a full graph transaction. This kind of transaction will diff the new graph
 // with previous version of it.
-func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transaction {
+func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
+	if gapi.currentGraph == nil {
+		fmt.Println("transaction: fetching remote graph")
+		g, err := gapi.ReadCurrentGraph()
+		if err != nil {
+			return nil, fmt.Errorf("create transaction: %w", err)
+		}
+		gapi.currentGraph = g
+	}
+
 	var parallelization = gapi.options.Parallelization
 	if parallelization == 0 {
 		parallelization = 30
@@ -77,14 +89,28 @@ func (gapi *GraphAPI) CreateTransaction(currentGraph *knowledge.Graph) *Transact
 	transaction.newGraph = knowledge.NewGraph()
 	transaction.binder = knowledge.NewGraphBinder(transaction.newGraph)
 	transaction.client = gapi.client
-	transaction.currentGraph = currentGraph
+	transaction.currentGraph = gapi.currentGraph
 	transaction.parallelization = parallelization
 	transaction.chunkSize = chunkSize
 
 	transaction.retryCount = maxRetries
 	transaction.retryDelay = retryDelay
 	transaction.retryBackoffFactor = retryBackoff
-	return transaction
+
+	transaction.onError = func(err error) {
+		// there was an error, we don't know the remote graph state.
+		// we clear the cached copy to refresh in on the next run.
+		fmt.Println("transaction: clearing graph cache because of error:", err)
+		gapi.currentGraph = nil
+	}
+
+	transaction.onSuccess = func(g *knowledge.Graph) {
+		// tx was successful, we updated to local graph cache to
+		// speed up the next tx.
+		gapi.currentGraph = g
+	}
+
+	return transaction, nil
 }
 
 // ReadCurrentGraph read the current graph stored in graph kb

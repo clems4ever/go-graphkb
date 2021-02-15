@@ -36,6 +36,9 @@ type Transaction struct {
 	retryCount         int
 	retryDelay         time.Duration
 	retryBackoffFactor float64
+
+	onSuccess func(*knowledge.Graph)
+	onError   func(error)
 }
 
 // Relate create a relation between two assets
@@ -72,12 +75,14 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 }
 
 // Commit commit the transaction and gives ownership to the source for caching.
-func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
+func (cgt *Transaction) Commit() error {
 	sg := cgt.newGraph.ExtractSchema()
 
 	fmt.Println("Start uploading the schema of the graph...")
 	if err := cgt.client.UpdateSchema(sg); err != nil {
-		return nil, fmt.Errorf("Unable to update the schema of the graph: %v", err)
+		err := fmt.Errorf("Unable to update the schema of the graph: %v", err)
+		cgt.onError(err)
+		return err
 	}
 
 	fmt.Println("Finished uploading the schema of the graph...")
@@ -141,7 +146,8 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	for _, f := range futures {
 		err := <-f
 		if err != nil {
-			return nil, err
+			cgt.onError(err)
+			return err
 		}
 	}
 
@@ -181,13 +187,14 @@ func (cgt *Transaction) Commit() (*knowledge.Graph, error) {
 	for _, f := range futures {
 		err := <-f
 		if err != nil {
-			return nil, err
+			cgt.onError(err)
+			return err
 		}
 	}
 
 	fmt.Println("Finished uploading the graph...")
 
-	g := cgt.newGraph
+	cgt.onSuccess(cgt.newGraph)
 	cgt.newGraph = knowledge.NewGraph()
-	return g, nil // give ownership of the transaction graph so that it can be cached if needed
+	return nil
 }

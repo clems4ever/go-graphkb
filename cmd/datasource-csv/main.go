@@ -41,12 +41,10 @@ func (cs *CSVSource) Publish() error {
 
 	r := csv.NewReader(file)
 
-	previousGraph, err := cs.graphAPI.ReadCurrentGraph()
+	tx, err := cs.graphAPI.CreateTransaction()
 	if err != nil {
-		return fmt.Errorf("Unable to read previous graph: %v", err)
+		return err
 	}
-
-	tx := cs.graphAPI.CreateTransaction(previousGraph)
 
 	header := true
 
@@ -74,8 +72,10 @@ func (cs *CSVSource) Publish() error {
 		tx.Relate(record[1], relationType, record[4])
 	}
 
-	_, err = tx.Commit()
-	fmt.Println("CSV data has been sent successfully")
+	err = tx.Commit()
+	if err == nil {
+		fmt.Println("CSV data has been sent successfully")
+	}
 	return err
 }
 
