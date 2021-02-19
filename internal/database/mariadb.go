@@ -16,6 +16,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/golang-collections/go-datastructures/queue"
+	"github.com/sirupsen/logrus"
 )
 
 // MariaDB mariadb as graph storage backend
@@ -58,8 +59,8 @@ func (m *MariaDB) InitializeSchema() error {
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS assets (
 			id BIGINT UNSIGNED NOT NULL,
-			value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-			type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+			value VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+			type VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
 			CONSTRAINT pk_asset PRIMARY KEY (id),
 
@@ -73,10 +74,10 @@ func (m *MariaDB) InitializeSchema() error {
 
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS relations (
-			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			id BIGINT UNSIGNED NOT NULL,
 			from_id BIGINT UNSIGNED NOT NULL,
 			to_id BIGINT UNSIGNED NOT NULL,
-			type VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+			type VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
 			CONSTRAINT pk_relation PRIMARY KEY (id),
 			CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
@@ -96,14 +97,11 @@ func (m *MariaDB) InitializeSchema() error {
 
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS relations_by_source (
-			id INT NOT NULL AUTO_INCREMENT,
 			source_id INT NOT NULL,
 			relation_id BIGINT UNSIGNED NOT NULL,
 			update_time TIMESTAMP,
 
-			UNIQUE unique_relation_by_source (source_id, relation_id),
-		
-			CONSTRAINT pk_relations_by_source PRIMARY KEY (id),
+			CONSTRAINT pk_relation_by_source PRIMARY KEY (source_id, relation_id),
 			CONSTRAINT fk_relations_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
 			CONSTRAINT fk_relations_by_source_relation_id FOREIGN KEY (relation_id) REFERENCES relations (id) ON DELETE CASCADE,
 		
@@ -114,14 +112,11 @@ func (m *MariaDB) InitializeSchema() error {
 
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS assets_by_source (
-			id INT NOT NULL AUTO_INCREMENT,
 			source_id INT NOT NULL,
 			asset_id BIGINT UNSIGNED NOT NULL,
 			update_time TIMESTAMP,
-
-			UNIQUE unique_asset_by_source (source_id, asset_id),
 		
-			CONSTRAINT pk_assets_by_source PRIMARY KEY (id),
+			CONSTRAINT pk_assets_by_source PRIMARY KEY (source_id, asset_id),
 			CONSTRAINT fk_asset_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
 			CONSTRAINT fk_asset_by_source_asset_id FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
 		
@@ -275,6 +270,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 		if err != nil {
 			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 				// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
+				logrus.Debugf("Asset duplicate %d (%s - %s) detected", h, asset.Type, asset.Key)
 			} else {
 				tx.Rollback()
 				return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
@@ -504,48 +500,60 @@ WHERE abs.source_id = ?
 
 // FlushAll flush the database
 func (m *MariaDB) FlushAll() error {
-	_, err := m.db.ExecContext(context.Background(), "DROP TABLE relations_by_source")
+	tx, err := m.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE relations_by_source")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	_, err = m.db.ExecContext(context.Background(), "DROP TABLE assets_by_source")
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE assets_by_source")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	_, err = m.db.ExecContext(context.Background(), "DROP TABLE relations")
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE relations")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	_, err = m.db.ExecContext(context.Background(), "DROP TABLE assets")
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE assets")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	_, err = m.db.ExecContext(context.Background(), "DROP TABLE graph_schema")
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE graph_schema")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	_, err = m.db.ExecContext(context.Background(), "DROP TABLE query_history")
+	_, err = tx.ExecContext(context.Background(), "DROP TABLE query_history")
 	if err != nil {
 		if !isUnknownTableError(err) {
+			tx.Rollback()
 			return err
 		}
 	}
-	return nil
+
+	return tx.Commit()
 }
 
 // CountAssets count the total number of assets in db.

@@ -1,9 +1,9 @@
-FROM golang:1.13-alpine
+FROM golang:1.15
 
 ARG USER_ID
 ARG GROUP_ID
 
-RUN addgroup --gid ${GROUP_ID} dev && \
-    adduser --uid ${USER_ID} -G dev -D dev
+RUN groupadd --gid ${GROUP_ID} dev && \
+    useradd --uid ${USER_ID} -s /bin/bash -m -g dev dev
 
 USER dev
