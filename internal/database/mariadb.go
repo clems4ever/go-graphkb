@@ -269,10 +269,9 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 		if err != nil {
 			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 				// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
-				logrus.Debugf("Asset duplicate %d (%s - %s) detected", h, asset.Type, asset.Key)
 			} else {
 				tx.Rollback()
-				return fmt.Errorf("Unable to insert asset %v in DB from source %s: %v", asset, source, err)
+				return fmt.Errorf("Unable to insert asset %v (%d) in DB from source %s: %v", asset, h, source, err)
 			}
 		}
 
@@ -283,7 +282,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 				// TODO(c.michaud): update the update_time?
 			} else {
 				tx.Rollback()
-				return fmt.Errorf("Unable to insert binding between asset %s and source %s: %v", asset, source, err)
+				return fmt.Errorf("Unable to insert binding between asset %s (%d) and source %s: %v", asset, h, source, err)
 			}
 		}
 	}
@@ -320,7 +319,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 				// If the entry is duplicated, it's fine but we still need insert a line into relations_by_source.
 			} else {
 				tx.Rollback()
-				return fmt.Errorf("Unable insert relation %v in DB from source %s: %v", relation, source, err)
+				return fmt.Errorf("Unable insert relation %v (%d) in DB from source %s: %v", relation, rH, source, err)
 			}
 		}
 
@@ -331,7 +330,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 				// TODO(c.michaud): update the update_time?
 			} else {
 				tx.Rollback()
-				return fmt.Errorf("Unable to insert binding between relation %v and source %s: %v", relation, source, err)
+				return fmt.Errorf("Unable to insert binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
 			}
 		}
 	}
@@ -362,7 +361,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 			h, sourceID)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("Unable to remove binding between asset %v and source %s: %v", asset, source, err)
+			return fmt.Errorf("Unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
 		}
 
 		_, err = tx.ExecContext(context.Background(),
@@ -372,7 +371,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 			h, h)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("Unable to remove asset %v from source %s: %v", asset, source, err)
+			return fmt.Errorf("Unable to remove asset %v (%d) from source %s: %v", asset, h, source, err)
 		}
 
 	}
@@ -403,7 +402,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 			rH, sourceID)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("Unable to remove binding between relation %v and source %s: %v", relation, source, err)
+			return fmt.Errorf("Unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
 		}
 
 		_, err = tx.ExecContext(context.Background(),
@@ -413,7 +412,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 			rH, rH)
 		if err != nil {
 			tx.Rollback()
-			return fmt.Errorf("Unable to remove relation %v from source %s: %v", relation, source, err)
+			return fmt.Errorf("Unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
 		}
 	}
 
