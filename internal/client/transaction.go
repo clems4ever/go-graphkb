@@ -113,6 +113,8 @@ func (cgt *Transaction) Commit() error {
 	assetRemovalsChunks := utils.ChunkSlice(bulk.GetAssetRemovals(), chunkSize).([][]interface{})
 	assetInsertionChunks := utils.ChunkSlice(bulk.GetAssetUpserts(), chunkSize).([][]interface{})
 
+	now := time.Now()
+
 	for _, rels := range relationRemovalsChunks {
 		relations := []knowledge.Relation{}
 		for _, r := range rels {
@@ -193,7 +195,9 @@ func (cgt *Transaction) Commit() error {
 		}
 	}
 
-	logrus.Debug("Finished uploading the graph...")
+	elapsed := time.Since(now)
+
+	logrus.Debugf("Finished uploading the graph in %f seconds...", elapsed.Seconds())
 
 	cgt.onSuccess(cgt.newGraph)
 	cgt.newGraph = knowledge.NewGraph()
