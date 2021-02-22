@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"reflect"
 	"strconv"
 	"time"
@@ -17,6 +18,8 @@ import (
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/sirupsen/logrus"
 )
+
+var zeroBytes = []byte{0}
 
 // MariaDB mariadb as graph storage backend
 type MariaDB struct {
@@ -45,7 +48,7 @@ func (m *MariaDB) InitializeSchema() error {
 			id INTEGER AUTO_INCREMENT NOT NULL,
 			name VARCHAR(64) NOT NULL,
 			auth_token VARCHAR(64) NOT NULL,
-		
+
 			CONSTRAINT pk_source PRIMARY KEY (id),
 
 			UNIQUE unique_source (name, auth_token)
@@ -101,7 +104,7 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT pk_relation_by_source PRIMARY KEY (source_id, relation_id),
 			CONSTRAINT fk_relations_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
 			CONSTRAINT fk_relations_by_source_relation_id FOREIGN KEY (relation_id) REFERENCES relations (id) ON DELETE CASCADE,
-		
+
 			INDEX source_idx (source_id))`)
 	if err != nil {
 		return fmt.Errorf("Unable to create relations_by_source table: %v", err)
@@ -112,11 +115,11 @@ func (m *MariaDB) InitializeSchema() error {
 			source_id INT NOT NULL,
 			asset_id BIGINT UNSIGNED NOT NULL,
 			update_time TIMESTAMP,
-		
+
 			CONSTRAINT pk_assets_by_source PRIMARY KEY (source_id, asset_id),
 			CONSTRAINT fk_asset_by_source_source_id FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
 			CONSTRAINT fk_asset_by_source_asset_id FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
-		
+
 			INDEX source_idx (source_id))`)
 	if err != nil {
 		return fmt.Errorf("Unable to create assets_by_source tables: %v", err)
@@ -208,41 +211,41 @@ func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
 	return m.resolveSourceIDFromDB(sourceName)
 }
 
+func writeAsset(w io.Writer, asset knowledge.Asset) error {
+	_, err := w.Write([]byte(asset.Type))
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(zeroBytes)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(asset.Key))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func hashAsset(asset knowledge.Asset) uint64 {
 	h := fnv.New64()
-
-	b := []byte{}
-	b = append(b, []byte(asset.Type)...)
-	b = append(b, []byte(asset.Key)...)
-
-	h.Write(b)
+	writeAsset(h, asset)
 	return h.Sum64()
 }
 
 func hashRelation(relation knowledge.Relation) uint64 {
 	h := fnv.New64()
 
-	hFrom := hashAsset(knowledge.Asset(relation.From))
-	hTo := hashAsset(knowledge.Asset(relation.To))
+	rel := []byte(relation.Type)
 
-	fromB := []byte{
-		byte(0xff & hFrom),
-		byte(0xff & (hFrom >> 8)),
-		byte(0xff & (hFrom >> 16)),
-		byte(0xff & (hFrom >> 24))}
+	writeAsset(h, knowledge.Asset(relation.From))
 
-	toB := []byte{
-		byte(0xff & hTo),
-		byte(0xff & (hTo >> 8)),
-		byte(0xff & (hTo >> 16)),
-		byte(0xff & (hTo >> 24))}
+	h.Write(zeroBytes)
+	h.Write(rel)
+	h.Write(zeroBytes)
 
-	b := []byte{}
-	b = append(b, fromB...)
-	b = append(b, []byte(relation.Type)...)
-	b = append(b, toB...)
+	writeAsset(h, knowledge.Asset(relation.To))
 
-	h.Write(b)
 	return h.Sum64()
 }
 
