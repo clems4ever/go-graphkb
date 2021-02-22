@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/sources"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 
 	auth "github.com/abbot/go-http-auth"
@@ -53,8 +53,7 @@ func getSourceGraph(registry sources.Registry, db schema.Persistor) http.Handler
 		sg := schema.NewSchemaGraph()
 		for _, sname := range sources {
 			if !utils.IsStringInSlice(sname, availableSources) {
-				w.WriteHeader(http.StatusBadRequest)
-				fmt.Printf("Source %s is not available", sname)
+				handlers.ReplyWithBadRequest(w, fmt.Errorf("Source %s does not exist", sname))
 				return
 			}
 			g, err := db.LoadSchema(context.Background(), sname)
@@ -112,7 +111,7 @@ func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 		response.RelationsCount = relationsCount
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 	}
@@ -127,7 +126,6 @@ func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.Han
 		}
 
 		if !ok {
-			fmt.Println("Unauthorized access with token", r.URL.Query()["token"])
 			handlers.ReplyWithUnauthorized(w)
 			return
 		}
@@ -231,15 +229,15 @@ func StartServer(listenInterface string,
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
-		fmt.Printf("Listening on %s with TLS enabled, the connection is secure [concurrency=%d]\n", listenInterface, concurrency)
+		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d]\n", listenInterface, concurrency)
 		err = http.ListenAndServeTLS(listenInterface, viper.GetString("server_tls_cert"),
 			viper.GetString("server_tls_key"), r)
 	} else {
-		fmt.Printf("[WARNING] Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]\n",
+		logrus.Warnf("Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]\n",
 			listenInterface, concurrency)
 		err = http.ListenAndServe(listenInterface, r)
 	}
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }

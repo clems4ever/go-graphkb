@@ -11,6 +11,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // Transaction represent a transaction generating updates by diffing the provided graph against
@@ -62,7 +63,7 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 		err := fn()
 		if err != nil {
 			backoffTime := time.Duration(int(math.Pow(backoffFactor, float64(trials)))) * delay
-			fmt.Printf("Sleeping for %d seconds\n", backoffTime/time.Second)
+			logrus.Info("Sleeping for %f seconds\n", backoffTime/time.Second)
 			time.Sleep(backoffTime)
 		} else {
 			return nil
@@ -78,18 +79,18 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 func (cgt *Transaction) Commit() error {
 	sg := cgt.newGraph.ExtractSchema()
 
-	fmt.Println("Start uploading the schema of the graph...")
+	logrus.Debug("Start uploading the schema of the graph...")
 	if err := cgt.client.UpdateSchema(sg); err != nil {
 		err := fmt.Errorf("Unable to update the schema of the graph: %v", err)
 		cgt.onError(err)
 		return err
 	}
 
-	fmt.Println("Finished uploading the schema of the graph...")
+	logrus.Debug("Finished uploading the schema of the graph...")
 
 	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
 
-	fmt.Println("Start uploading the graph...")
+	logrus.Debug("Start uploading the graph...")
 
 	progress := pb.New(len(bulk.GetAssetRemovals()) + len(bulk.GetAssetUpserts()) + len(bulk.GetRelationRemovals()) + len(bulk.GetRelationUpserts()))
 
@@ -103,7 +104,7 @@ func (cgt *Transaction) Commit() error {
 
 	chunkSize := cgt.chunkSize
 
-	fmt.Printf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d\n",
+	logrus.Debug("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d\n",
 		len(bulk.GetAssetUpserts()), len(bulk.GetAssetRemovals()),
 		len(bulk.GetRelationUpserts()), len(bulk.GetRelationRemovals()))
 
@@ -192,7 +193,7 @@ func (cgt *Transaction) Commit() error {
 		}
 	}
 
-	fmt.Println("Finished uploading the graph...")
+	logrus.Debug("Finished uploading the graph...")
 
 	cgt.onSuccess(cgt.newGraph)
 	cgt.newGraph = knowledge.NewGraph()

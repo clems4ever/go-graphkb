@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"log"
 	"reflect"
 	"strconv"
 	"time"
@@ -31,7 +30,7 @@ func NewMariaDB(username string, password string, host string, databaseName stri
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s", username, password,
 		host, databaseName, strconv.FormatBool(allowCleartextPassword)))
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	db.SetMaxIdleConns(10)
 	db.SetMaxOpenConns(10)
@@ -426,7 +425,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 
 // ReadGraph read source subgraph
 func (m *MariaDB) ReadGraph(sourceName string, graph *knowledge.Graph) error {
-	fmt.Printf("Start reading graph of data source with name %s\n", sourceName)
+	logrus.Debugf("Start reading graph of data source with name %s", sourceName)
 	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", sourceName, err)
@@ -507,7 +506,7 @@ WHERE abs.source_id = ?
 	}
 
 	elapsed := time.Since(now)
-	fmt.Printf("Read graph of data source with name %s in %fs\n", sourceName, elapsed.Seconds())
+	logrus.Debugf("Read graph of data source with name %s in %fs\n", sourceName, elapsed.Seconds())
 	return nil
 }
 
@@ -607,7 +606,7 @@ func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*kno
 		// Query can take 35 seconds max before being aborted...
 		sql.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sql.Query)
 	}
-	fmt.Println(sql.Query)
+	logrus.Debug("Query to be executed: ", sql.Query)
 
 	rows, err := m.db.QueryContext(ctx, sql.Query)
 	if err != nil {

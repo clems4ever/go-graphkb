@@ -2,13 +2,13 @@ package utils
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -60,7 +60,7 @@ func (hc *HTTPClient) doFromCache(req *http.Request) (*http.Response, error) {
 	url = strings.ReplaceAll(url, ":", "_")
 	cacheFile := path.Join(hc.CacheDir, url)
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
-		fmt.Printf("Caching HTTP response of %s\n", req.URL.String())
+		logrus.Debugf("Caching HTTP response of %s\n", req.URL.String())
 		res, err := hc.Client.Do(req)
 		if err != nil {
 			return nil, err
@@ -89,7 +89,7 @@ func (hc *HTTPClient) doFromCache(req *http.Request) (*http.Response, error) {
 		return res, nil
 	}
 
-	fmt.Printf("Using HTTP cache for %s\n", req.URL.String())
+	logrus.Debugf("Using HTTP cache for %s\n", req.URL.String())
 	f, err := os.Open(cacheFile)
 	if err != nil {
 		return nil, err

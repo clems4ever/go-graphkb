@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/database"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/server"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,10 +20,10 @@ var Database *database.MariaDB
 // ConfigPath string
 var ConfigPath string
 
-func main() {
-	// Display the code line where log.Fatal appeared for troubleshooting
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+// LogLevel the log level
+var LogLevel string
 
+func main() {
 	// Also read env variables prefixed with GRAPHKB_.
 	viper.SetEnvPrefix("GRAPHKB")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -61,13 +61,30 @@ func main() {
 	}
 
 	rootCmd.PersistentFlags().StringVar(&ConfigPath, "config", "config.yml", "Provide the path to the configuration file (required)")
+	rootCmd.PersistentFlags().StringVar(&LogLevel, "log-level", "info", "The log level among 'debug', 'info', 'warn', 'error'")
 
 	cobra.OnInitialize(onInit)
 
 	rootCmd.AddCommand(cleanCmd, listenCmd, countCmd, readCmd, queryCmd)
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
+}
+
+func logLevelParamToSeverity(level string) logrus.Level {
+	switch level {
+	case "debug":
+		return logrus.DebugLevel
+	case "info":
+		return logrus.InfoLevel
+	case "warn":
+		return logrus.WarnLevel
+	case "error":
+		return logrus.ErrorLevel
+	}
+	logrus.Fatal("Provided level %s is not a valid option")
+	// This should never be reached but needed by the compiler
+	return logrus.InfoLevel
 }
 
 func onInit() {
@@ -78,11 +95,13 @@ func onInit() {
 		panic(fmt.Errorf("Cannot read configuration file from %s", ConfigPath))
 	}
 
-	fmt.Println("Using config file:", viper.ConfigFileUsed())
+	logrus.Info("Using config file: ", viper.ConfigFileUsed())
+	logrus.SetLevel(logLevelParamToSeverity(LogLevel))
+	logrus.Info("Using log severity: ", LogLevel)
 
 	dbName := viper.GetString("mariadb_database")
 	if dbName == "" {
-		log.Fatal("Please provide database_name option in your configuration file")
+		logrus.Fatal("Please provide database_name option in your configuration file")
 	}
 	Database = database.NewMariaDB(
 		viper.GetString("mariadb_username"),
@@ -95,26 +114,26 @@ func onInit() {
 func count(cmd *cobra.Command, args []string) {
 	countAssets, err := Database.CountAssets()
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	countRelations, err := Database.CountRelations()
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	fmt.Printf("%d assets\n%d relations\n", countAssets, countRelations)
 }
 
 func flush(cmd *cobra.Command, args []string) {
 	if err := Database.FlushAll(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
-	fmt.Println("Successul flush")
+	logrus.Info("Successul flush")
 }
 
 func listen(cmd *cobra.Command, args []string) {
 	if err := Database.InitializeSchema(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	listenInterface := viper.GetString("server_listen")
@@ -130,7 +149,7 @@ func read(cmd *cobra.Command, args []string) {
 	g := knowledge.NewGraph()
 	err := Database.ReadGraph(args[0], g)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	fmt.Printf("assets = %d\nrelations = %d\n", len(g.Assets()), len(g.Relations()))
@@ -144,7 +163,7 @@ func queryFunc(cmd *cobra.Command, args []string) {
 
 	r, err := q.Query(ctx, args[0])
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	resultsCount := 0
@@ -152,7 +171,7 @@ func queryFunc(cmd *cobra.Command, args []string) {
 		var m interface{}
 		err := r.Cursor.Read(context.Background(), &m)
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 
 		doc := m.([]interface{})

@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -38,8 +37,7 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 
 		if requestBody.Query == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Println("Empty query parameter")
-			_, err = w.Write([]byte("Empty query parameter"))
+			_, err = w.Write([]byte("Empty 'query' parameter"))
 			if err != nil {
 				ReplyWithInternalError(w, err)
 			}
