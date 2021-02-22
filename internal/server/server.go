@@ -94,13 +94,13 @@ func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 			RelationsCount int64 `json:"relations_count"`
 		}
 
-		assetsCount, err := database.CountAssets()
+		assetsCount, err := database.CountAssets(r.Context())
 		if err != nil {
 			handlers.ReplyWithInternalError(w, err)
 			return
 		}
 
-		relationsCount, err := database.CountRelations()
+		relationsCount, err := database.CountRelations(r.Context())
 		if err != nil {
 			handlers.ReplyWithInternalError(w, err)
 			return
@@ -131,7 +131,7 @@ func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.Han
 		}
 
 		g := knowledge.NewGraph()
-		if err := graphDB.ReadGraph(source, g); err != nil {
+		if err := graphDB.ReadGraph(r.Context(), source, g); err != nil {
 			handlers.ReplyWithInternalError(w, err)
 			return
 		}
@@ -150,7 +150,7 @@ func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.Han
 
 func flushDatabase(graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if err := graphDB.FlushAll(); err != nil {
+		if err := graphDB.FlushAll(r.Context()); err != nil {
 			handlers.ReplyWithInternalError(w, err)
 			return
 		}

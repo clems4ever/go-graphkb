@@ -249,7 +249,7 @@ func hashRelation(relation knowledge.Relation) uint64 {
 }
 
 // InsertAssets insert multiple assets into the graph of the given source
-func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
+func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting assets: %v", source, err)
@@ -263,7 +263,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 	for _, asset := range assets {
 		h := hashAsset(asset)
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
 			h, asset.Type, asset.Key)
 		if err != nil {
@@ -275,7 +275,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 			}
 		}
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
 		if err != nil {
 			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
@@ -294,7 +294,7 @@ func (m *MariaDB) InsertAssets(source string, assets []knowledge.Asset) error {
 }
 
 // InsertRelations upsert one relation into the graph of the given source
-func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation) error {
+func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting relations: %v", source, err)
@@ -311,7 +311,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 		aTo := hashAsset(knowledge.Asset(relation.To))
 		rH := hashRelation(relation)
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
 			rH, aFrom, aTo, relation.Type)
 		if err != nil {
@@ -323,7 +323,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 			}
 		}
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
 		if err != nil {
 			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
@@ -342,7 +342,7 @@ func (m *MariaDB) InsertRelations(source string, relations []knowledge.Relation)
 }
 
 // RemoveAssets remove one asset from the graph of the given source
-func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
+func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing assets: %v", source, err)
@@ -356,7 +356,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 	for _, asset := range assets {
 		h := hashAsset(asset)
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
 			h, sourceID)
 		if err != nil {
@@ -364,7 +364,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 			return fmt.Errorf("Unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
 		}
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`DELETE FROM assets WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM assets_by_source WHERE asset_id = ?
 		)`,
@@ -383,7 +383,7 @@ func (m *MariaDB) RemoveAssets(source string, assets []knowledge.Asset) error {
 }
 
 // RemoveRelations remove relations from the graph of the given source
-func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation) error {
+func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing relations: %v", source, err)
@@ -397,7 +397,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 	for _, relation := range relations {
 		rH := hashRelation(relation)
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
 			rH, sourceID)
 		if err != nil {
@@ -405,11 +405,10 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 			return fmt.Errorf("Unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
 		}
 
-		_, err = tx.ExecContext(context.Background(),
+		_, err = tx.ExecContext(ctx,
 			`DELETE FROM relations WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM relations_by_source WHERE relation_id = ?
-		)`,
-			rH, rH)
+		)`, rH, rH)
 		if err != nil {
 			tx.Rollback()
 			return fmt.Errorf("Unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
@@ -423,7 +422,7 @@ func (m *MariaDB) RemoveRelations(source string, relations []knowledge.Relation)
 }
 
 // ReadGraph read source subgraph
-func (m *MariaDB) ReadGraph(sourceName string, graph *knowledge.Graph) error {
+func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowledge.Graph) error {
 	logrus.Debugf("Start reading graph of data source with name %s", sourceName)
 	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
@@ -439,7 +438,7 @@ func (m *MariaDB) ReadGraph(sourceName string, graph *knowledge.Graph) error {
 
 	{
 		// Select all relations produced by this source
-		rows, err := tx.QueryContext(context.Background(), `
+		rows, err := tx.QueryContext(ctx, `
 SELECT a.type, a.value, b.type, b.value, r.type FROM relations_by_source rbs
 INNER JOIN relations r ON rbs.relation_id = r.id
 INNER JOIN assets a ON a.id=r.from_id
@@ -477,7 +476,7 @@ WHERE rbs.source_id = ?
 	{
 		// Select all assets produced by this source. This is useful in case there are some standalone nodes in the graph of the source.
 		// TODO(c.michaud): optimization could be done by only selecting assets without any relation since the others have already have been retrieved in the previous query.
-		rows, err := tx.QueryContext(context.Background(), `
+		rows, err := tx.QueryContext(ctx, `
 SELECT a.type, a.value FROM assets_by_source abs
 INNER JOIN assets a ON a.id=abs.asset_id
 WHERE abs.source_id = ?
@@ -510,13 +509,13 @@ WHERE abs.source_id = ?
 }
 
 // FlushAll flush the database
-func (m *MariaDB) FlushAll() error {
+func (m *MariaDB) FlushAll(ctx context.Context) error {
 	tx, err := m.db.Begin()
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE relations_by_source")
+	_, err = tx.ExecContext(ctx, "DROP TABLE relations_by_source")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -524,7 +523,7 @@ func (m *MariaDB) FlushAll() error {
 		}
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE assets_by_source")
+	_, err = tx.ExecContext(ctx, "DROP TABLE assets_by_source")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -532,7 +531,7 @@ func (m *MariaDB) FlushAll() error {
 		}
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE relations")
+	_, err = tx.ExecContext(ctx, "DROP TABLE relations")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -540,7 +539,7 @@ func (m *MariaDB) FlushAll() error {
 		}
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE assets")
+	_, err = tx.ExecContext(ctx, "DROP TABLE assets")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -548,7 +547,7 @@ func (m *MariaDB) FlushAll() error {
 		}
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE graph_schema")
+	_, err = tx.ExecContext(ctx, "DROP TABLE graph_schema")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -556,7 +555,7 @@ func (m *MariaDB) FlushAll() error {
 		}
 	}
 
-	_, err = tx.ExecContext(context.Background(), "DROP TABLE query_history")
+	_, err = tx.ExecContext(ctx, "DROP TABLE query_history")
 	if err != nil {
 		if !isUnknownTableError(err) {
 			tx.Rollback()
@@ -568,9 +567,9 @@ func (m *MariaDB) FlushAll() error {
 }
 
 // CountAssets count the total number of assets in db.
-func (m *MariaDB) CountAssets() (int64, error) {
+func (m *MariaDB) CountAssets(ctx context.Context) (int64, error) {
 	var count int64
-	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM assets")
+	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets")
 
 	err := row.Scan(&count)
 	if err != nil {
@@ -580,9 +579,9 @@ func (m *MariaDB) CountAssets() (int64, error) {
 }
 
 // CountRelations count the total number of relations in db.
-func (m *MariaDB) CountRelations() (int64, error) {
+func (m *MariaDB) CountRelations(ctx context.Context) (int64, error) {
 	var count int64
-	row := m.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM relations")
+	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM relations")
 
 	err := row.Scan(&count)
 	if err != nil {

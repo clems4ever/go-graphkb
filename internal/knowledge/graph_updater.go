@@ -27,8 +27,8 @@ func NewGraphUpdater(graphDB GraphDB, schemaPersistor schema.Persistor) *GraphUp
 }
 
 // UpdateSchema update the schema for the source with the one provided in the request
-func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error {
-	previousSchema, err := sl.schemaPersistor.LoadSchema(context.Background(), source)
+func (sl *GraphUpdater) UpdateSchema(ctx context.Context, source string, sg schema.SchemaGraph) error {
+	previousSchema, err := sl.schemaPersistor.LoadSchema(ctx, source)
 	if err != nil {
 		return fmt.Errorf("Unable to read schema from DB: %v", err)
 	}
@@ -37,7 +37,7 @@ func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error
 
 	if !schemaEqual {
 		logrus.Debug("The schema needs an update")
-		if err := sl.schemaPersistor.SaveSchema(context.Background(), source, sg); err != nil {
+		if err := sl.schemaPersistor.SaveSchema(ctx, source, sg); err != nil {
 			return fmt.Errorf("Unable to write schema in DB: %v", err)
 		}
 	}
@@ -45,32 +45,32 @@ func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error
 }
 
 // InsertAssets insert multiple assets in the graph of the data source
-func (sl *GraphUpdater) InsertAssets(source string, assets []Asset) error {
-	if err := sl.graphDB.InsertAssets(source, assets); err != nil {
+func (sl *GraphUpdater) InsertAssets(ctx context.Context, source string, assets []Asset) error {
+	if err := sl.graphDB.InsertAssets(ctx, source, assets); err != nil {
 		return fmt.Errorf("Unable to insert assets from source %s: %v", source, err)
 	}
 	return nil
 }
 
 // InsertRelations insert multiple relations in the graph of the data source
-func (sl *GraphUpdater) InsertRelations(source string, relations []Relation) error {
-	if err := sl.graphDB.InsertRelations(source, relations); err != nil {
+func (sl *GraphUpdater) InsertRelations(ctx context.Context, source string, relations []Relation) error {
+	if err := sl.graphDB.InsertRelations(ctx, source, relations); err != nil {
 		return fmt.Errorf("Unable to insert relations from source %s: %v", source, err)
 	}
 	return nil
 }
 
 // RemoveAssets remove multiple assets from the graph of the data source
-func (sl *GraphUpdater) RemoveAssets(source string, assets []Asset) error {
-	if err := sl.graphDB.RemoveAssets(source, assets); err != nil {
+func (sl *GraphUpdater) RemoveAssets(ctx context.Context, source string, assets []Asset) error {
+	if err := sl.graphDB.RemoveAssets(ctx, source, assets); err != nil {
 		return fmt.Errorf("Unable to remove assets from source %s: %v", source, err)
 	}
 	return nil
 }
 
 // RemoveRelations remove multiple relations from the graph of the data source
-func (sl *GraphUpdater) RemoveRelations(source string, relations []Relation) error {
-	if err := sl.graphDB.RemoveRelations(source, relations); err != nil {
+func (sl *GraphUpdater) RemoveRelations(ctx context.Context, source string, relations []Relation) error {
+	if err := sl.graphDB.RemoveRelations(ctx, source, relations); err != nil {
 		return fmt.Errorf("Unable to remove relations from source %s: %v", source, err)
 	}
 	return nil

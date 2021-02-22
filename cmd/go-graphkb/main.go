@@ -82,7 +82,7 @@ func logLevelParamToSeverity(level string) logrus.Level {
 	case "error":
 		return logrus.ErrorLevel
 	}
-	logrus.Fatal("Provided level %s is not a valid option")
+	logrus.Fatal("Provided level %s is not a valid option", level)
 	// This should never be reached but needed by the compiler
 	return logrus.InfoLevel
 }
@@ -112,12 +112,12 @@ func onInit() {
 }
 
 func count(cmd *cobra.Command, args []string) {
-	countAssets, err := Database.CountAssets()
+	countAssets, err := Database.CountAssets(context.Background())
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	countRelations, err := Database.CountRelations()
+	countRelations, err := Database.CountRelations(context.Background())
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func count(cmd *cobra.Command, args []string) {
 }
 
 func flush(cmd *cobra.Command, args []string) {
-	if err := Database.FlushAll(); err != nil {
+	if err := Database.FlushAll(context.Background()); err != nil {
 		logrus.Fatal(err)
 	}
 	logrus.Info("Successul flush")
@@ -147,7 +147,7 @@ func listen(cmd *cobra.Command, args []string) {
 
 func read(cmd *cobra.Command, args []string) {
 	g := knowledge.NewGraph()
-	err := Database.ReadGraph(args[0], g)
+	err := Database.ReadGraph(context.Background(), args[0], g)
 	if err != nil {
 		logrus.Fatal(err)
 	}
