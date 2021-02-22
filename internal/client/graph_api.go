@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
+	"github.com/sirupsen/logrus"
 )
 
 // GraphAPI represent the graph API from a data source point of view
@@ -52,7 +53,7 @@ func NewGraphAPI(options GraphAPIOptions) *GraphAPI {
 // with previous version of it.
 func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
 	if gapi.currentGraph == nil {
-		fmt.Println("transaction: fetching remote graph")
+		logrus.Debug("transaction: fetching remote graph")
 		g, err := gapi.ReadCurrentGraph()
 		if err != nil {
 			return nil, fmt.Errorf("create transaction: %w", err)
@@ -100,7 +101,7 @@ func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
 	transaction.onError = func(err error) {
 		// there was an error, we don't know the remote graph state.
 		// we clear the cached copy to refresh in on the next run.
-		fmt.Println("transaction: clearing graph cache because of error:", err)
+		logrus.Debug("transaction: clearing graph cache because of error:", err)
 		gapi.currentGraph = nil
 	}
 

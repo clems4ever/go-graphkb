@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/clems4ever/go-graphkb/graphkb"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -24,7 +25,7 @@ func NewCSVSource(graphAPI *graphkb.GraphAPI) *CSVSource {
 	csvSource.dataPath = viper.GetString("path")
 
 	if csvSource.dataPath == "" {
-		log.Fatal(fmt.Errorf("Unable to detect CSV file path in configuration. Check patch configuration is provided"))
+		logrus.Fatal("Unable to detect CSV file path in configuration. Check patch configuration is provided")
 	}
 
 	csvSource.graphAPI = graphAPI
@@ -74,7 +75,7 @@ func (cs *CSVSource) Publish() error {
 
 	err = tx.Commit()
 	if err == nil {
-		fmt.Println("CSV data has been sent successfully")
+		logrus.Info("CSV data has been sent successfully")
 	}
 	return err
 }
@@ -118,6 +119,6 @@ func main() {
 		"Provide the path to the configuration file (required)")
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }

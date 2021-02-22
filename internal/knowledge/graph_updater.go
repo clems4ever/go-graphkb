@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/sirupsen/logrus"
 )
 
 // SourceSubGraphUpdates represents the updates to perform on a source subgraph
@@ -29,19 +30,15 @@ func NewGraphUpdater(graphDB GraphDB, schemaPersistor schema.Persistor) *GraphUp
 func (sl *GraphUpdater) UpdateSchema(source string, sg schema.SchemaGraph) error {
 	previousSchema, err := sl.schemaPersistor.LoadSchema(context.Background(), source)
 	if err != nil {
-		fmt.Printf("[ERROR] Unable to read schema from DB: %v.\n", err)
-		fmt.Println("[WARNING] The graph has not been updated.")
-		return err
+		return fmt.Errorf("Unable to read schema from DB: %v", err)
 	}
 
 	schemaEqual := previousSchema.Equal(sg)
 
 	if !schemaEqual {
-		fmt.Println("The schema needs an update")
+		logrus.Debug("The schema needs an update")
 		if err := sl.schemaPersistor.SaveSchema(context.Background(), source, sg); err != nil {
-			fmt.Printf("[ERROR] Unable to write schema in DB: %v.\n", err)
-			fmt.Println("[WARNING] The graph has not been updated.")
-			return err
+			return fmt.Errorf("Unable to write schema in DB: %v", err)
 		}
 	}
 	return nil

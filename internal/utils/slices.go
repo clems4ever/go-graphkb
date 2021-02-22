@@ -1,9 +1,12 @@
 package utils
 
-import "reflect"
+import (
+	"reflect"
 
-import "log"
+	"github.com/sirupsen/logrus"
+)
 
+// IsStringInSlice check if string is in string slice
 func IsStringInSlice(s string, slice []string) bool {
 	for _, str := range slice {
 		if str == s {
@@ -13,6 +16,7 @@ func IsStringInSlice(s string, slice []string) bool {
 	return false
 }
 
+// AreStringSlicesEqual check equality between two slices
 func AreStringSlicesEqual(s1 []string, s2 []string) bool {
 	if len(s1) != len(s2) {
 		return false
@@ -26,6 +30,7 @@ func AreStringSlicesEqual(s1 []string, s2 []string) bool {
 	return true
 }
 
+// AreStringSliceElementsEqual check the same elements are in both slices but they can be in different order
 func AreStringSliceElementsEqual(s1 []string, s2 []string) bool {
 	if len(s1) != len(s2) {
 		return false
@@ -47,9 +52,10 @@ func AreStringSliceElementsEqual(s1 []string, s2 []string) bool {
 	return true
 }
 
+// ChunkSlice chunk a slice in smaller chunks of size chunkSize
 func ChunkSlice(s interface{}, chunkSize int) interface{} {
 	if reflect.ValueOf(s).Kind() != reflect.Slice {
-		log.Fatal("ChunkSlice only work on slices")
+		logrus.Fatal("ChunkSlice only work on slices")
 	}
 
 	sValue := reflect.ValueOf(s)
