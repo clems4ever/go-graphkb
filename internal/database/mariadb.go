@@ -63,8 +63,6 @@ func (m *MariaDB) InitializeSchema() error {
 
 			CONSTRAINT pk_asset PRIMARY KEY (id),
 
-			UNIQUE unique_asset (type, value),
-
 			INDEX value_idx (value),
 			INDEX type_idx (type))`)
 	if err != nil {
@@ -248,6 +246,26 @@ func hashRelation(relation knowledge.Relation) uint64 {
 	return h.Sum64()
 }
 
+// InTransaction make sure a function is properly using the transaction
+func InTransaction(db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p) // re-throw panic after Rollback
+		} else if err != nil {
+			tx.Rollback() // err is non-nil; don't change it
+		} else {
+			err = tx.Commit() // err is nil; if Commit returns error update err
+		}
+	}()
+	err = txFunc(tx)
+	return err
+}
+
 // InsertAssets insert multiple assets into the graph of the given source
 func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(source)
@@ -255,42 +273,33 @@ func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []know
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting assets: %v", source, err)
 	}
 
-	tx, err := m.db.Begin()
-	if err != nil {
-		return fmt.Errorf("Unable to create a transaction for inserting assets: %v", err)
-	}
+	return InTransaction(m.db, func(tx *sql.Tx) error {
+		for _, asset := range assets {
+			h := hashAsset(asset)
 
-	for _, asset := range assets {
-		h := hashAsset(asset)
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
+				h, asset.Type, asset.Key)
+			if err != nil {
+				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+					// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
+				} else {
+					return fmt.Errorf("Unable to insert asset %v (%d) in DB from source %s: %v", asset, h, source, err)
+				}
+			}
 
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO assets (id, type, value) VALUES (?, ?, ?)`,
-			h, asset.Type, asset.Key)
-		if err != nil {
-			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
-				// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
-			} else {
-				tx.Rollback()
-				return fmt.Errorf("Unable to insert asset %v (%d) in DB from source %s: %v", asset, h, source, err)
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
+			if err != nil {
+				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+					// TODO(c.michaud): update the update_time?
+				} else {
+					return fmt.Errorf("Unable to insert binding between asset %s (%d) and source %s: %v", asset, h, source, err)
+				}
 			}
 		}
-
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO assets_by_source (source_id, asset_id) VALUES (?, ?)`, sourceID, h)
-		if err != nil {
-			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
-				// TODO(c.michaud): update the update_time?
-			} else {
-				tx.Rollback()
-				return fmt.Errorf("Unable to insert binding between asset %s (%d) and source %s: %v", asset, h, source, err)
-			}
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Unable to commit assets upsert: %v", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // InsertRelations upsert one relation into the graph of the given source
@@ -300,45 +309,36 @@ func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations 
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting relations: %v", source, err)
 	}
 
-	tx, err := m.db.Begin()
-	if err != nil {
-		return fmt.Errorf("Unable to create a transaction for inserting relation: %v", err)
-	}
+	return InTransaction(m.db, func(tx *sql.Tx) error {
+		for _, relation := range relations {
+			// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
+			aFrom := hashAsset(knowledge.Asset(relation.From))
+			aTo := hashAsset(knowledge.Asset(relation.To))
+			rH := hashRelation(relation)
 
-	for _, relation := range relations {
-		// TODO(c.michaud): make the source compute the hash directly to reduce the size of the payload.
-		aFrom := hashAsset(knowledge.Asset(relation.From))
-		aTo := hashAsset(knowledge.Asset(relation.To))
-		rH := hashRelation(relation)
+			_, err = tx.ExecContext(ctx,
+				"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
+				rH, aFrom, aTo, relation.Type)
+			if err != nil {
+				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+					// If the entry is duplicated, it's fine but we still need insert a line into relations_by_source.
+				} else {
+					return fmt.Errorf("Unable insert relation %v (%d) in DB from source %s: %v", relation, rH, source, err)
+				}
+			}
 
-		_, err = tx.ExecContext(ctx,
-			"INSERT INTO relations (id, from_id, to_id, type) VALUES (?, ?, ?, ?)",
-			rH, aFrom, aTo, relation.Type)
-		if err != nil {
-			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
-				// If the entry is duplicated, it's fine but we still need insert a line into relations_by_source.
-			} else {
-				tx.Rollback()
-				return fmt.Errorf("Unable insert relation %v (%d) in DB from source %s: %v", relation, rH, source, err)
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
+			if err != nil {
+				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+					// TODO(c.michaud): update the update_time?
+				} else {
+					return fmt.Errorf("Unable to insert binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
+				}
 			}
 		}
-
-		_, err = tx.ExecContext(ctx,
-			`INSERT INTO relations_by_source (source_id, relation_id) VALUES (?, ?)`, sourceID, rH)
-		if err != nil {
-			if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
-				// TODO(c.michaud): update the update_time?
-			} else {
-				tx.Rollback()
-				return fmt.Errorf("Unable to insert binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
-			}
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Unable to commit assets upsert: %v", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // RemoveAssets remove one asset from the graph of the given source
@@ -348,38 +348,29 @@ func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []know
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing assets: %v", source, err)
 	}
 
-	tx, err := m.db.Begin()
-	if err != nil {
-		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
-	}
+	return InTransaction(m.db, func(tx *sql.Tx) error {
+		for _, asset := range assets {
+			h := hashAsset(asset)
 
-	for _, asset := range assets {
-		h := hashAsset(asset)
+			_, err = tx.ExecContext(ctx,
+				`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
+				h, sourceID)
+			if err != nil {
+				return fmt.Errorf("Unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
+			}
 
-		_, err = tx.ExecContext(ctx,
-			`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
-			h, sourceID)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
-		}
-
-		_, err = tx.ExecContext(ctx,
-			`DELETE FROM assets WHERE id = ? AND NOT EXISTS (
+			_, err = tx.ExecContext(ctx,
+				`DELETE FROM assets WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM assets_by_source WHERE asset_id = ?
 		)`,
-			h, h)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to remove asset %v (%d) from source %s: %v", asset, h, source, err)
+				h, h)
+			if err != nil {
+				return fmt.Errorf("Unable to remove asset %v (%d) from source %s: %v", asset, h, source, err)
+			}
+
 		}
-
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Unable to commit assets insert: %v", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // RemoveRelations remove relations from the graph of the given source
@@ -388,37 +379,27 @@ func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations 
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing relations: %v", source, err)
 	}
+	return InTransaction(m.db, func(tx *sql.Tx) error {
+		for _, relation := range relations {
+			rH := hashRelation(relation)
 
-	tx, err := m.db.Begin()
-	if err != nil {
-		return fmt.Errorf("Unable to create a transaction for upserting assets: %v", err)
-	}
+			_, err = tx.ExecContext(ctx,
+				`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
+				rH, sourceID)
+			if err != nil {
+				return fmt.Errorf("Unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
+			}
 
-	for _, relation := range relations {
-		rH := hashRelation(relation)
-
-		_, err = tx.ExecContext(ctx,
-			`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
-			rH, sourceID)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
-		}
-
-		_, err = tx.ExecContext(ctx,
-			`DELETE FROM relations WHERE id = ? AND NOT EXISTS (
+			_, err = tx.ExecContext(ctx,
+				`DELETE FROM relations WHERE id = ? AND NOT EXISTS (
 			SELECT * FROM relations_by_source WHERE relation_id = ?
 		)`, rH, rH)
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
+			if err != nil {
+				return fmt.Errorf("Unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
+			}
 		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Unable to commit relation removal: %v", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // ReadGraph read source subgraph
@@ -431,76 +412,71 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowl
 
 	now := time.Now()
 
-	tx, err := m.db.Begin()
+	err = InTransaction(m.db, func(tx *sql.Tx) error {
+		{
+			// Select all relations produced by this source
+			rows, err := tx.QueryContext(ctx, `
+	SELECT a.type, a.value, b.type, b.value, r.type FROM relations_by_source rbs
+	INNER JOIN relations r ON rbs.relation_id = r.id
+	INNER JOIN assets a ON a.id=r.from_id
+	INNER JOIN assets b ON b.id=r.to_id
+	WHERE rbs.source_id = ?
+		`, sourceID)
+
+			if err != nil {
+				return fmt.Errorf("Unable to retrieve relations: %v", err)
+			}
+
+			defer rows.Close()
+
+			for rows.Next() {
+				var FromType, ToType, FromKey, ToKey, Type string
+				if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
+					return err
+				}
+				fromAsset := knowledge.Asset{
+					Type: schema.AssetType(FromType),
+					Key:  FromKey,
+				}
+				toAsset := knowledge.Asset{
+					Type: schema.AssetType(ToType),
+					Key:  ToKey,
+				}
+				graph.AddRelation(
+					graph.AddAsset(fromAsset.Type, fromAsset.Key),
+					schema.RelationKeyType(Type),
+					graph.AddAsset(toAsset.Type, toAsset.Key))
+			}
+		}
+
+		{
+			// Select all assets produced by this source. This is useful in case there are some standalone nodes in the graph of the source.
+			// TODO(c.michaud): optimization could be done by only selecting assets without any relation since the others have already have been retrieved in the previous query.
+			rows, err := tx.QueryContext(ctx, `
+	SELECT a.type, a.value FROM assets_by_source abs
+	INNER JOIN assets a ON a.id=abs.asset_id
+	WHERE abs.source_id = ?
+		`, sourceID)
+
+			if err != nil {
+				return fmt.Errorf("Unable to retrieve assets: %v", err)
+			}
+
+			defer rows.Close()
+
+			for rows.Next() {
+				var Key, Type string
+				if err := rows.Scan(&Type, &Key); err != nil {
+					return fmt.Errorf("Unable to read standalone asset: %v", err)
+				}
+				graph.AddAsset(schema.AssetType(Type), Key)
+			}
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("Unable to create transaction: %v", err)
-	}
-
-	{
-		// Select all relations produced by this source
-		rows, err := tx.QueryContext(ctx, `
-SELECT a.type, a.value, b.type, b.value, r.type FROM relations_by_source rbs
-INNER JOIN relations r ON rbs.relation_id = r.id
-INNER JOIN assets a ON a.id=r.from_id
-INNER JOIN assets b ON b.id=r.to_id
-WHERE rbs.source_id = ?
-	`, sourceID)
-
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to retrieve relations: %v", err)
-		}
-
-		defer rows.Close()
-
-		for rows.Next() {
-			var FromType, ToType, FromKey, ToKey, Type string
-			if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
-				return err
-			}
-			fromAsset := knowledge.Asset{
-				Type: schema.AssetType(FromType),
-				Key:  FromKey,
-			}
-			toAsset := knowledge.Asset{
-				Type: schema.AssetType(ToType),
-				Key:  ToKey,
-			}
-			graph.AddRelation(
-				graph.AddAsset(fromAsset.Type, fromAsset.Key),
-				schema.RelationKeyType(Type),
-				graph.AddAsset(toAsset.Type, toAsset.Key))
-		}
-	}
-
-	{
-		// Select all assets produced by this source. This is useful in case there are some standalone nodes in the graph of the source.
-		// TODO(c.michaud): optimization could be done by only selecting assets without any relation since the others have already have been retrieved in the previous query.
-		rows, err := tx.QueryContext(ctx, `
-SELECT a.type, a.value FROM assets_by_source abs
-INNER JOIN assets a ON a.id=abs.asset_id
-WHERE abs.source_id = ?
-	`, sourceID)
-
-		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("Unable to retrieve assets: %v", err)
-		}
-
-		defer rows.Close()
-
-		for rows.Next() {
-			var Key, Type string
-			if err := rows.Scan(&Type, &Key); err != nil {
-				tx.Rollback()
-				return fmt.Errorf("Unable to read standalone asset: %v", err)
-			}
-			graph.AddAsset(schema.AssetType(Type), Key)
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return fmt.Errorf("Unable to commit transaction: %v", err)
+		return fmt.Errorf("Unable to handle transaction: %v", err)
 	}
 
 	elapsed := time.Since(now)
@@ -510,60 +486,50 @@ WHERE abs.source_id = ?
 
 // FlushAll flush the database
 func (m *MariaDB) FlushAll(ctx context.Context) error {
-	tx, err := m.db.Begin()
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.ExecContext(ctx, "DROP TABLE relations_by_source")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+	return InTransaction(m.db, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, "DROP TABLE relations_by_source")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
 
-	_, err = tx.ExecContext(ctx, "DROP TABLE assets_by_source")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+		_, err = tx.ExecContext(ctx, "DROP TABLE assets_by_source")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
 
-	_, err = tx.ExecContext(ctx, "DROP TABLE relations")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+		_, err = tx.ExecContext(ctx, "DROP TABLE relations")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
 
-	_, err = tx.ExecContext(ctx, "DROP TABLE assets")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+		_, err = tx.ExecContext(ctx, "DROP TABLE assets")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
 
-	_, err = tx.ExecContext(ctx, "DROP TABLE graph_schema")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+		_, err = tx.ExecContext(ctx, "DROP TABLE graph_schema")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
 
-	_, err = tx.ExecContext(ctx, "DROP TABLE query_history")
-	if err != nil {
-		if !isUnknownTableError(err) {
-			tx.Rollback()
-			return err
+		_, err = tx.ExecContext(ctx, "DROP TABLE query_history")
+		if err != nil {
+			if !isUnknownTableError(err) {
+				return err
+			}
 		}
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 // CountAssets count the total number of assets in db.
