@@ -434,9 +434,14 @@ func (m *MariaDB) ReadGraph(sourceName string, graph *knowledge.Graph) error {
 
 	now := time.Now()
 
+	tx, err := m.db.Begin()
+	if err != nil {
+		return fmt.Errorf("Unable to create transaction: %v", err)
+	}
+
 	{
 		// Select all relations produced by this source
-		rows, err := m.db.QueryContext(context.Background(), `
+		rows, err := tx.QueryContext(context.Background(), `
 SELECT a.type, a.value, b.type, b.value, r.type FROM relations_by_source rbs
 INNER JOIN relations r ON rbs.relation_id = r.id
 INNER JOIN assets a ON a.id=r.from_id
@@ -445,6 +450,7 @@ WHERE rbs.source_id = ?
 	`, sourceID)
 
 		if err != nil {
+			tx.Rollback()
 			return fmt.Errorf("Unable to retrieve relations: %v", err)
 		}
 
@@ -472,13 +478,15 @@ WHERE rbs.source_id = ?
 
 	{
 		// Select all assets produced by this source. This is useful in case there are some standalone nodes in the graph of the source.
-		rows, err := m.db.QueryContext(context.Background(), `
+		// TODO(c.michaud): optimization could be done by only selecting assets without any relation since the others have already have been retrieved in the previous query.
+		rows, err := tx.QueryContext(context.Background(), `
 SELECT a.type, a.value FROM assets_by_source abs
 INNER JOIN assets a ON a.id=abs.asset_id
 WHERE abs.source_id = ?
 	`, sourceID)
 
 		if err != nil {
+			tx.Rollback()
 			return fmt.Errorf("Unable to retrieve assets: %v", err)
 		}
 
@@ -487,10 +495,15 @@ WHERE abs.source_id = ?
 		for rows.Next() {
 			var Key, Type string
 			if err := rows.Scan(&Type, &Key); err != nil {
-				return err
+				tx.Rollback()
+				return fmt.Errorf("Unable to read standalone asset: %v", err)
 			}
 			graph.AddAsset(schema.AssetType(Type), Key)
 		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("Unable to commit transaction: %v", err)
 	}
 
 	elapsed := time.Since(now)
