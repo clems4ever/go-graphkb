@@ -12,6 +12,7 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
+	"github.com/sirupsen/logrus"
 )
 
 // ErrTooManyRequests error representing too many requests to the API
@@ -64,7 +65,7 @@ func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
 	if res.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("Unauthorized access. Check your auth token")
 	} else if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return nil, handleUnexpectedResponse(res)
 	}
 
 	b, err := ioutil.ReadAll(res.Body)
@@ -106,7 +107,7 @@ func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return handleUnexpectedResponse(res)
 	}
 	return nil
 }
@@ -137,7 +138,7 @@ func (gc *GraphClient) InsertAssets(assets []knowledge.Asset) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return handleUnexpectedResponse(res)
 	}
 	return nil
 }
@@ -168,7 +169,7 @@ func (gc *GraphClient) DeleteAssets(assets []knowledge.Asset) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return handleUnexpectedResponse(res)
 	}
 	return nil
 }
@@ -199,7 +200,7 @@ func (gc *GraphClient) InsertRelations(relations []knowledge.Relation) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return handleUnexpectedResponse(res)
 	}
 	return nil
 }
@@ -230,7 +231,16 @@ func (gc *GraphClient) DeleteRelations(relations []knowledge.Relation) error {
 	} else if res.StatusCode == http.StatusTooManyRequests {
 		return ErrTooManyRequests
 	} else if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected status code 200 and got %d: %s", res.StatusCode, res.Status)
+		return handleUnexpectedResponse(res)
 	}
 	return nil
+}
+
+func handleUnexpectedResponse(res *http.Response) error {
+	bodyBytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		logrus.Errorf("Unable to read error payload: %v", err)
+	}
+	bodyString := string(bodyBytes)
+	return fmt.Errorf("Unexpected HTTP status %d with content %s: %s", res.StatusCode, res.Status, bodyString)
 }
