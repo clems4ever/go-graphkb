@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/VividCortex/mysqlerr v0.0.0-20201215173831-4c396ae82aac
 	github.com/abbot/go-http-auth v0.4.0
-	github.com/antlr/antlr4 v0.0.0-20200103163232-691acdc23f1f
+	github.com/antlr/antlr4 v0.0.0-20210221031308-60fd27ff93a8
 	github.com/deckarep/golang-set v1.7.1
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/golang-collections/go-datastructures v0.0.0-20150211160725-59788d5eb259
