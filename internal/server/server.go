@@ -204,6 +204,7 @@ func StartServer(listenInterface string,
 		flushDatabaseHandler = AuthMiddleware(flushDatabaseHandler)
 	}
 
+	r.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 	r.HandleFunc("/api/sources", listSourcesHandler).Methods("GET")
 	r.HandleFunc("/api/schema", getSourceGraphHandler).Methods("GET")
 	r.HandleFunc("/api/database", getDatabaseDetailsHandler).Methods("GET")
