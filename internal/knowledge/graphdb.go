@@ -19,7 +19,7 @@ type GraphDB interface {
 
 	InitializeSchema() error
 
-	ReadGraph(ctx context.Context, source string, graph *Graph) error
+	ReadGraph(ctx context.Context, source string, encoder *GraphEncoder) error
 
 	// Atomic operations on the graph
 	InsertAssets(ctx context.Context, source string, assets []Asset) error

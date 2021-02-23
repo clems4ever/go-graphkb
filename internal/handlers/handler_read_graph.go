@@ -23,7 +23,7 @@ func GetGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.Han
 		}
 
 		g := knowledge.NewGraph()
-		if err := graphDB.ReadGraph(r.Context(), source, g); err != nil {
+		if err := graphDB.ReadGraph(r.Context(), source, knowledge.NewGraphEncoder(w)); err != nil {
 			ReplyWithInternalError(w, err)
 			return
 		}

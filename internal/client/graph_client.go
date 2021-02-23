@@ -68,13 +68,9 @@ func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
 		return nil, handleUnexpectedResponse(res)
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
+	graphDecoder := knowledge.NewGraphDecoder(res.Body)
 	graph := knowledge.NewGraph()
-	err = json.Unmarshal(b, graph)
+	err = graphDecoder.Decode(graph)
 	if err != nil {
 		return nil, err
 	}

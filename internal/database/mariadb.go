@@ -406,7 +406,7 @@ func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations 
 }
 
 // ReadGraph read source subgraph
-func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowledge.Graph) error {
+func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *knowledge.GraphEncoder) error {
 	logrus.Debugf("Start reading graph of data source with name %s", sourceName)
 	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
@@ -437,18 +437,25 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowl
 				if err := rows.Scan(&FromType, &FromKey, &ToType, &ToKey, &Type); err != nil {
 					return err
 				}
-				fromAsset := knowledge.Asset{
+				fromAsset := knowledge.AssetKey{
 					Type: schema.AssetType(FromType),
 					Key:  FromKey,
 				}
-				toAsset := knowledge.Asset{
+				toAsset := knowledge.AssetKey{
 					Type: schema.AssetType(ToType),
 					Key:  ToKey,
 				}
-				graph.AddRelation(
-					graph.AddAsset(fromAsset.Type, fromAsset.Key),
-					schema.RelationKeyType(Type),
-					graph.AddAsset(toAsset.Type, toAsset.Key))
+
+				relation := knowledge.Relation{
+					Type: schema.RelationKeyType(Type),
+					From: fromAsset,
+					To:   toAsset,
+				}
+
+				err = encoder.EncodeRelation(relation)
+				if err != nil {
+					return fmt.Errorf("Unable to write relation %v: %v", relation, err)
+				}
 			}
 		}
 
@@ -472,7 +479,16 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowl
 				if err := rows.Scan(&Type, &Key); err != nil {
 					return fmt.Errorf("Unable to read standalone asset: %v", err)
 				}
-				graph.AddAsset(schema.AssetType(Type), Key)
+
+				asset := knowledge.Asset{
+					Type: schema.AssetType(Type),
+					Key:  Key,
+				}
+
+				err := encoder.EncodeAsset(asset)
+				if err != nil {
+					return fmt.Errorf("Unable to write asset %v: %v", asset, err)
+				}
 			}
 		}
 

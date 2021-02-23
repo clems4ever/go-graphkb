@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -149,11 +150,15 @@ func listen(cmd *cobra.Command, args []string) {
 
 func read(cmd *cobra.Command, args []string) {
 	g := knowledge.NewGraph()
-	err := Database.ReadGraph(context.Background(), args[0], g)
+	buff := bytes.NewBuffer(nil)
+
+	encoder := knowledge.NewGraphEncoder(buff)
+	err := Database.ReadGraph(context.Background(), args[0], encoder)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
+	knowledge.NewGraphDecoder(buff).Decode(g)
 	fmt.Printf("assets = %d\nrelations = %d\n", len(g.Assets()), len(g.Relations()))
 }
 
