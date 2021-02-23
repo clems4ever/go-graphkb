@@ -117,37 +117,6 @@ func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
 	}
 }
 
-func getGraphRead(registry sources.Registry, graphDB knowledge.GraphDB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ok, source, err := handlers.IsTokenValid(registry, r)
-		if err != nil {
-			handlers.ReplyWithInternalError(w, err)
-			return
-		}
-
-		if !ok {
-			handlers.ReplyWithUnauthorized(w)
-			return
-		}
-
-		g := knowledge.NewGraph()
-		if err := graphDB.ReadGraph(r.Context(), source, g); err != nil {
-			handlers.ReplyWithInternalError(w, err)
-			return
-		}
-
-		gJSON, err := json.Marshal(g)
-		if err != nil {
-			handlers.ReplyWithInternalError(w, err)
-			return
-		}
-
-		if _, err := w.Write(gJSON); err != nil {
-			handlers.ReplyWithInternalError(w, err)
-		}
-	}
-}
-
 func flushDatabase(graphDB knowledge.GraphDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := graphDB.FlushAll(r.Context()); err != nil {
@@ -176,7 +145,7 @@ func StartServer(listenInterface string,
 	schemaPersistor schema.Persistor,
 	sourcesRegistry sources.Registry,
 	queryHistorizer history.Historizer,
-	concurrency int64) {
+	writeConcurrency int64) {
 
 	r := mux.NewRouter()
 
@@ -213,9 +182,9 @@ func StartServer(listenInterface string,
 
 	r.Handle("/metrics", promhttp.Handler())
 
-	r.HandleFunc("/api/graph/read", getGraphRead(sourcesRegistry, database)).Methods("GET")
+	r.HandleFunc("/api/graph/read", handlers.GetGraphRead(sourcesRegistry, database)).Methods("GET")
 
-	sem := semaphore.NewWeighted(concurrency)
+	sem := semaphore.NewWeighted(writeConcurrency)
 
 	r.HandleFunc("/api/graph/schema", handlers.PutSchema(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
 	r.HandleFunc("/api/graph/assets", handlers.PutAssets(sourcesRegistry, graphUpdater, sem)).Methods("PUT")
@@ -230,12 +199,12 @@ func StartServer(listenInterface string,
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
-		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d", listenInterface, concurrency)
+		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d", listenInterface, writeConcurrency)
 		err = http.ListenAndServeTLS(listenInterface, viper.GetString("server_tls_cert"),
 			viper.GetString("server_tls_key"), r)
 	} else {
 		logrus.Warnf("Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]",
-			listenInterface, concurrency)
+			listenInterface, writeConcurrency)
 		err = http.ListenAndServe(listenInterface, r)
 	}
 	if err != nil {
