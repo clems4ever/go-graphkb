@@ -483,7 +483,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, graph *knowl
 	}
 
 	elapsed := time.Since(now)
-	logrus.Debugf("Read graph of data source with name %s in %fs\n", sourceName, elapsed.Seconds())
+	logrus.Debugf("Read graph of data source with name %s in %fs", sourceName, elapsed.Seconds())
 	return nil
 }
 

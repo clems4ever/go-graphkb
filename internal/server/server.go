@@ -230,11 +230,11 @@ func StartServer(listenInterface string,
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
-		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d]\n", listenInterface, concurrency)
+		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d", listenInterface, concurrency)
 		err = http.ListenAndServeTLS(listenInterface, viper.GetString("server_tls_cert"),
 			viper.GetString("server_tls_key"), r)
 	} else {
-		logrus.Warnf("Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]\n",
+		logrus.Warnf("Listening on %s with TLS disabled. Use `server_tls_cert` option to setup a certificate [concurrency=%d]",
 			listenInterface, concurrency)
 		err = http.ListenAndServe(listenInterface, r)
 	}

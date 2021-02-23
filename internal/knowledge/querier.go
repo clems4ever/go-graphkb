@@ -70,7 +70,7 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 		return nil, translation.Query, err
 	}
 
-	logrus.Debugf("Found results in %dms\n", s.Execution/time.Millisecond)
+	logrus.Debugf("Found results in %dms", s.Execution/time.Millisecond)
 
 	result := &QuerierResult{
 		Cursor:      res.Cursor,

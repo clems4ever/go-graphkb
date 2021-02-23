@@ -64,7 +64,7 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 		if err != nil {
 			logrus.Error(err)
 			backoffTime := time.Duration(int(math.Pow(backoffFactor, float64(trials)))) * delay
-			logrus.Info("Sleeping for %f seconds\n", backoffTime/time.Second)
+			logrus.Info("Sleeping for %f seconds", backoffTime/time.Second)
 			time.Sleep(backoffTime)
 		} else {
 			return nil
@@ -105,7 +105,7 @@ func (cgt *Transaction) Commit() error {
 
 	chunkSize := cgt.chunkSize
 
-	logrus.Debug("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d\n",
+	logrus.Debugf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d",
 		len(bulk.GetAssetUpserts()), len(bulk.GetAssetRemovals()),
 		len(bulk.GetRelationUpserts()), len(bulk.GetRelationRemovals()))
 
