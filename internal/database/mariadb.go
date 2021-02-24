@@ -83,8 +83,6 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT fk_from FOREIGN KEY (from_id) REFERENCES assets (id),
 			CONSTRAINT fk_to FOREIGN KEY (to_id) REFERENCES assets (id),
 
-			UNIQUE unique_relation (from_id, to_id, type),
-
 			INDEX full_relation_type_from_to_idx (type, from_id, to_id),
 			INDEX full_relation_type_to_from_idx (type, to_id, from_id),
 			INDEX full_relation_from_type_to_idx (from_id, type, to_id),
