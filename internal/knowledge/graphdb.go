@@ -19,18 +19,20 @@ type GraphDB interface {
 
 	InitializeSchema() error
 
-	ReadGraph(ctx context.Context, source string, encoder *GraphEncoder) error
+	ReadGraph(ctx context.Context, sourceName string, encoder *GraphEncoder) error
 
 	// Atomic operations on the graph
-	InsertAssets(ctx context.Context, source string, assets []Asset) error
-	InsertRelations(ctx context.Context, source string, relations []Relation) error
-	RemoveAssets(ctx context.Context, source string, assets []Asset) error
-	RemoveRelations(ctx context.Context, source string, relations []Relation) error
+	InsertAssets(ctx context.Context, sourceName string, assets []Asset) error
+	InsertRelations(ctx context.Context, sourceName string, relations []Relation) error
+	RemoveAssets(ctx context.Context, sourceName string, assets []Asset) error
+	RemoveRelations(ctx context.Context, sourceName string, relations []Relation) error
 
 	FlushAll(ctx context.Context) error
 
 	CountAssets(ctx context.Context) (int64, error)
+	CountAssetsBySource(ctx context.Context, sourceName string) (int64, error)
 	CountRelations(ctx context.Context) (int64, error)
+	CountRelationsBySource(ctx context.Context, sourceName string) (int64, error)
 
 	Query(ctx context.Context, query SQLTranslation) (*GraphQueryResult, error)
 }

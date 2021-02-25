@@ -197,6 +197,8 @@ func StartServer(listenInterface string,
 
 	metrics.StartTimeGauge.Set(float64(time.Now().Unix()))
 
+	startGraphSizeMonitoring(getMonitoringIntervalSeconds(), database, sourcesRegistry)
+
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
 		logrus.Infof("Listening on %s with TLS enabled, the connection is secure [concurrency=%d", listenInterface, writeConcurrency)

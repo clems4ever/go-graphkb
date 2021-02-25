@@ -11,6 +11,20 @@ var StartTimeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 	Help: "The timestamp of the time when the app started",
 })
 
+// ********************* GRAPH METRICS ******************
+
+// GraphAssetsTotalGauge reports the number of nodes in the graph
+var GraphAssetsTotalGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "go_graphkb_graph_assets_total_gauge",
+	Help: "The number of nodes in the graph",
+}, []string{"source"})
+
+// GraphRelationsTotalGauge reports the number of nodes in the graph
+var GraphRelationsTotalGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "go_graphkb_graph_relations_total_gauge",
+	Help: "The number of edges in the graph",
+}, []string{"source"})
+
 // ********************* GRAPH UPDATE REQUESTS ******************
 
 // GraphUpdateRequestsReceivedCounter reports the number of authorized and not rate limited updates requests received by the webserver
