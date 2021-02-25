@@ -553,25 +553,40 @@ func (m *MariaDB) FlushAll(ctx context.Context) error {
 func (m *MariaDB) CountAssets(ctx context.Context) (int64, error) {
 	var count int64
 	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets")
+	return count, row.Scan(&count)
+}
 
-	err := row.Scan(&count)
+// CountAssetsBySource count the total number of assets in db by source
+func (m *MariaDB) CountAssetsBySource(ctx context.Context, sourceName string) (int64, error) {
+	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
 	}
-	return count, nil
+
+	var count int64
+	row := m.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM assets_by_source WHERE source_id = ?", sourceID)
+
+	return count, row.Scan(&count)
 }
 
 // CountRelations count the total number of relations in db.
 func (m *MariaDB) CountRelations(ctx context.Context) (int64, error) {
 	var count int64
 	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM relations")
+	return count, row.Scan(&count)
+}
 
-	err := row.Scan(&count)
+// CountRelationsBySource count the total number of relations in db by source.
+func (m *MariaDB) CountRelationsBySource(ctx context.Context, sourceName string) (int64, error) {
+	sourceID, err := m.resolveSourceID(sourceName)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
 	}
 
-	return count, nil
+	var count int64
+	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM relations_by_source WHERE source_id = ?", sourceID)
+	return count, row.Scan(&count)
 }
 
 // Close close the connection to maria
