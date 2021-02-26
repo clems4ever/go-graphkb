@@ -13,17 +13,29 @@ var StartTimeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 
 // ********************* GRAPH METRICS ******************
 
-// GraphAssetsTotalGauge reports the number of nodes in the graph
+// GraphAssetsTotalGauge reports the number of nodes in the graph of a given source
 var GraphAssetsTotalGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "go_graphkb_graph_assets_total_gauge",
-	Help: "The number of nodes in the graph",
+	Help: "The number of nodes in the graph for a given source",
 }, []string{"source"})
 
-// GraphRelationsTotalGauge reports the number of nodes in the graph
+// GraphRelationsTotalGauge reports the number of nodes in the graph of a given source
 var GraphRelationsTotalGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
 	Name: "go_graphkb_graph_relations_total_gauge",
-	Help: "The number of edges in the graph",
+	Help: "The number of edges in the graph for a given source",
 }, []string{"source"})
+
+// GraphAssetsAggregatedGauge reports the number of nodes in the graph with the various sources merged
+var GraphAssetsAggregatedGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "go_graphkb_graph_assets_aggregated_gauge",
+	Help: "The number of nodes in the graph with the various datasource graphs merged",
+})
+
+// GraphRelationsAggregatedGauge reports the number of nodes in the graph with the various sources merged
+var GraphRelationsAggregatedGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "go_graphkb_graph_relations_aggregated_gauge",
+	Help: "The number of edges in the graph with the various datasource graphs merged",
+})
 
 // ********************* GRAPH UPDATE REQUESTS ******************
 

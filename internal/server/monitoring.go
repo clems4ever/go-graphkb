@@ -24,16 +24,32 @@ func getMonitoringIntervalSeconds() time.Duration {
 func startGraphSizeMonitoring(interval time.Duration, database knowledge.GraphDB, sourcesRegistry sources.Registry) {
 	logrus.Infof("Monitoring of the graph size will happen every %ds", int(interval/time.Second))
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), interval)
-		defer cancel()
-
 		for {
+			ctx, cancel := context.WithTimeout(context.Background(), interval)
+			defer cancel()
+
 			logrus.Debug("Start monitoring the graph size...")
+			assetsCount, err := database.CountAssets(ctx)
+			if err != nil {
+				metrics.GraphAssetsAggregatedGauge.Set(-1)
+			} else {
+				metrics.GraphAssetsAggregatedGauge.Set(float64(assetsCount))
+			}
+
+			relationsCount, err := database.CountRelations(ctx)
+			if err != nil {
+				metrics.GraphRelationsAggregatedGauge.Set(-1)
+			} else {
+				metrics.GraphRelationsAggregatedGauge.Set(float64(relationsCount))
+			}
+
 			sources, err := sourcesRegistry.ListSources(ctx)
 			if err != nil {
 				logrus.Errorf("Unable to list sources for monitoring: %v", err)
-				continue
+				metrics.GraphAssetsTotalGauge.Reset()
+				metrics.GraphRelationsTotalGauge.Reset()
 			}
+
 			for s := range sources {
 				assetsCount, err := database.CountAssetsBySource(ctx, s)
 				if err != nil {
