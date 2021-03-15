@@ -2,11 +2,16 @@ package client
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // GraphAPI represent the graph API from a data source point of view
 type GraphAPI struct {
@@ -15,6 +20,8 @@ type GraphAPI struct {
 	options GraphAPIOptions
 
 	currentGraph *knowledge.Graph
+	// Stores the date after which the graph will be considered stale
+	currentGraphStaleAfter time.Time
 }
 
 // GraphAPIOptions options to pass to build graph API
@@ -39,6 +46,11 @@ type GraphAPIOptions struct {
 
 	// The backoff factor (default is 1.01)
 	RetryBackoffFactor float64
+
+	// The API stores the lastly pushed graph in memory to avoid fetching the entire data at every run which can be heavy on
+	// DB if importers run very incrementally. The anti entropy duration is a duration before forcing a synchronization against
+	// the server even though the graph is still stored in memory.
+	AntiEntropyDuration time.Duration
 }
 
 // NewGraphAPI create an emitter of graph
@@ -52,13 +64,17 @@ func NewGraphAPI(options GraphAPIOptions) *GraphAPI {
 // CreateTransaction create a full graph transaction. This kind of transaction will diff the new graph
 // with previous version of it.
 func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
-	if gapi.currentGraph == nil {
+	if gapi.currentGraph == nil || gapi.currentGraphStaleAfter.Before(time.Now()) {
 		logrus.Debug("transaction: fetching remote graph")
 		g, err := gapi.ReadCurrentGraph()
 		if err != nil {
 			return nil, fmt.Errorf("create transaction: %w", err)
 		}
 		gapi.currentGraph = g
+
+		quarter := int64(gapi.options.AntiEntropyDuration) / 4
+		randDelta := time.Duration(rand.Int63n(quarter*2) - quarter)
+		gapi.currentGraphStaleAfter = time.Now().Add(gapi.options.AntiEntropyDuration).Add(randDelta)
 	}
 
 	var parallelization = gapi.options.Parallelization
