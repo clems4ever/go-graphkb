@@ -56,6 +56,7 @@ func postAssetSources(database knowledge.GraphDB, fetcherFn func(context.Context
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
 			ReplyWithInternalError(w, err)
+			return
 		}
 	}
 }

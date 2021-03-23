@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { makeStyles, Grid, Snackbar, Paper, useTheme } from '@material-ui/core';
 import GraphExplorer from '../components/GraphExplorer';
 import QueryField from '../components/QueryField';
-import { postQuery, getSources, postAssetsSources, postRelationsSources } from "../services/SourceGraph";
-import { QueryAssetsSources, QueryResultSetWithSources } from '../models/QueryResultSet';
+import { postQuery, getSources } from "../services/SourceGraph";
+import { QueryResultSetWithSources } from '../models/QueryResultSet';
 import ResultsTable from '../components/ResultsTable';
-import { Asset, AssetWithSources } from '../models/Asset';
+import { Asset } from '../models/Asset';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faProjectDiagram, faDatabase, IconDefinition } from '@fortawesome/free-solid-svg-icons'
 import SchemaGraphDialog from '../components/SchemaGraphDialog';
@@ -14,7 +14,6 @@ import DatabaseDialog from '../components/DatabaseDialog';
 import SearchField from '../components/SearchField';
 import MuiAlert from '@material-ui/lab/Alert';
 import { useQueryParam, StringParam, withDefault } from 'use-query-params';
-import { Relation, RelationWithSources } from '../models/Relation';
 
 function Alert(props: any) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -45,75 +44,7 @@ const ExplorerView = () => {
             setIsQueryLoading(true);
             try {
                 const res = await postQuery(submittedQuery);
-
-                const assetsIds = new Set<string>();
-                const relationsIds = new Set<string>();
-                res.items.forEach((row) => {
-                    row.forEach((col, i) => {
-                        if (res.columns[i].type === 'asset') {
-                            const r = col as Asset;
-                            assetsIds.add(r._id);
-                        } else if (res.columns[i].type === 'relation') {
-                            const r = col as Relation;
-                            relationsIds.add(r._id);
-                        }
-                    });
-                });
-
-
-                // Prepare the queries for all bulks of ids
-                let remaining = assetsIds.size;
-                const assetsPromises: Promise<QueryAssetsSources>[] = [];
-                let ids = Array.from(assetsIds);
-                while (remaining > 0) {
-                    const first = assetsIds.size - remaining;
-                    const slice = ids.slice(first, first + Math.min(10000, remaining));
-                    assetsPromises.push(postAssetsSources(Array.from(slice)));
-                    remaining -= slice.length;
-                }
-
-                const relationsPromises: Promise<QueryAssetsSources>[] = [];
-                remaining = relationsIds.size;
-                ids = Array.from(relationsIds);
-                while (remaining > 0) {
-                    const first = relationsIds.size - remaining;
-                    const slice = ids.slice(first, first + Math.min(10000, remaining));
-                    relationsPromises.push(postRelationsSources(Array.from(slice)));
-                    remaining -= slice.length;
-                }
-
-                const [resAssets, resRelations] = await Promise.all([Promise.all(assetsPromises), Promise.all(relationsPromises)]);
-
-                const assetsSources: {[id: string]: string[]} = {};
-                const relationsSources: {[id: string]: string[]} = {};
-
-                resAssets.forEach(x => Object.keys(x.results).forEach(k => assetsSources[k] = x.results[k]));
-                resRelations.forEach(x => Object.keys(x.results).forEach(k => relationsSources[k] = x.results[k]));
-                
-                const items =  res.items.map((row) => {
-                    return row.map((it, i) => {
-                        if (res.columns[i].type === 'asset') {
-                            const r = it as Asset;
-                            const sources = assetsSources[r._id];
-                            return {sources: sources, ...r} as AssetWithSources;
-                        }
-                        else if (res.columns[i].type === 'relation') {
-                            const r = it as Relation;
-                            const sources = relationsSources[r._id];
-                            return {sources: sources, ...r} as RelationWithSources;
-                        } else {
-                            return it as string;
-                        }
-                    });
-                });
-
-                const queryResult: QueryResultSetWithSources = {
-                    columns: res.columns,
-                    items: items,
-                    execution_time_ms: res.execution_time_ms,
-                };
-
-                setQueryResult(queryResult);
+                setQueryResult(res);
             } catch (err) {
                 console.error(err);
                 setError(err);

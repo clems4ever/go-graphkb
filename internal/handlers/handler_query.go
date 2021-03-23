@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -14,7 +15,8 @@ import (
 func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type QueryRequestBody struct {
-			Query string `json:"q"`
+			Query          string `json:"q"`
+			IncludeSources bool   `json:"include_sources"`
 		}
 
 		type ColumnType struct {
@@ -82,6 +84,9 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 			})
 		}
 
+		assetIDs := make(map[string]struct{})
+		relationIDs := make(map[string]struct{})
+
 		items := make([][]interface{}, 0)
 		for res.Cursor.HasMore() {
 			var d interface{}
@@ -99,13 +104,77 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 				switch v := x.(type) {
 				case knowledge.AssetWithID:
 					rowDocs = append(rowDocs, v)
+					if requestBody.IncludeSources {
+						assetIDs[v.ID] = struct{}{}
+					}
 				case knowledge.RelationWithID:
 					rowDocs = append(rowDocs, v)
+					if requestBody.IncludeSources {
+						relationIDs[v.ID] = struct{}{}
+					}
 				default:
 					rowDocs = append(rowDocs, v)
 				}
 			}
 			items = append(items, rowDocs)
+		}
+
+		if requestBody.IncludeSources {
+			ids := []string{}
+			for k := range assetIDs {
+				ids = append(ids, k)
+			}
+			sourcesByID, err := database.GetAssetSources(r.Context(), ids)
+			if err != nil {
+				ReplyWithInternalError(w, err)
+				return
+			}
+
+			for i, row := range items {
+				for j, col := range row {
+					switch v := col.(type) {
+					case knowledge.AssetWithID:
+						sources, ok := sourcesByID[v.ID]
+						if !ok {
+							ReplyWithInternalError(w, fmt.Errorf("Unable to find sources of asset with ID %s", v.ID))
+							return
+						}
+						items[i][j] = AssetWithIDAndSources{
+							AssetWithID: v,
+							Sources:     sources,
+						}
+					}
+				}
+			}
+
+			ids = []string{}
+			for k := range relationIDs {
+				ids = append(ids, k)
+			}
+
+			sourcesByID, err = database.GetRelationSources(r.Context(), ids)
+			if err != nil {
+				ReplyWithInternalError(w, err)
+				return
+			}
+
+			for i, row := range items {
+				for j, col := range row {
+					switch v := col.(type) {
+					case knowledge.RelationWithID:
+						sources, ok := sourcesByID[v.ID]
+						if !ok {
+							ReplyWithInternalError(w, fmt.Errorf("Unable to find sources of relation with ID %s", v.ID))
+							return
+						}
+						items[i][j] = RelationWithIDAndSources{
+							RelationWithID: v,
+							Sources:        sources,
+						}
+					}
+				}
+			}
+
 		}
 
 		response := QueryResponseBody{

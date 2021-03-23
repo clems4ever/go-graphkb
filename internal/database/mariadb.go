@@ -9,11 +9,13 @@ import (
 	"io"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/VividCortex/mysqlerr"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
+	"github.com/clems4ever/go-graphkb/internal/utils"
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/golang-collections/go-datastructures/queue"
 	"github.com/sirupsen/logrus"
@@ -616,58 +618,85 @@ func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*kno
 }
 
 func (m *MariaDB) GetAssetSources(ctx context.Context, ids []string) (map[string][]string, error) {
-	stmt, err := m.db.PrepareContext(ctx, `
-SELECT sources.name FROM sources
-INNER JOIN assets_by_source ON sources.id = assets_by_source.source_id
-WHERE asset_id = ?`)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to prepare statement for retrieving asset sources: %w", err)
+	if len(ids) == 0 {
+		return nil, nil
 	}
+
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+
 	idsSet := make(map[string][]string)
-	for _, id := range ids {
-		row, err := stmt.QueryContext(ctx, id)
+	argsSlices := utils.ChunkSlice(args, 500).([][]interface{})
+
+	for _, argsSlice := range argsSlices {
+		stmt, err := m.db.PrepareContext(ctx, `
+SELECT asset_id, sources.name FROM sources
+INNER JOIN assets_by_source ON sources.id = assets_by_source.source_id
+WHERE asset_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to retrieve sources for asset id %s: %w", id, err)
+			return nil, fmt.Errorf("Unable to prepare statement for retrieving asset sources: %w", err)
+		}
+		row, err := stmt.QueryContext(ctx, argsSlice...)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve sources for assets: %w", err)
 		}
 
-		idsSet[id] = []string{}
-
 		var source string
+		var assetId uint64
+
 		for row.Next() {
-			err = row.Scan(&source)
+			err = row.Scan(&assetId, &source)
 			if err != nil {
 				return nil, fmt.Errorf("Unable to scan row of asset source: %w", err)
 			}
-			idsSet[id] = append(idsSet[id], source)
+			assetIdStr := fmt.Sprintf("%d", assetId)
+			if _, ok := idsSet[assetIdStr]; !ok {
+				idsSet[assetIdStr] = []string{}
+			}
+			idsSet[assetIdStr] = append(idsSet[assetIdStr], source)
 		}
 	}
 	return idsSet, nil
 }
 
 func (m *MariaDB) GetRelationSources(ctx context.Context, ids []string) (map[string][]string, error) {
-	stmt, err := m.db.PrepareContext(ctx, `
-	SELECT sources.name FROM sources
-	INNER JOIN relations_by_source ON sources.id = relations_by_source.source_id
-	WHERE relation_id = ?`)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to prepare statement for retrieving relation sources: %w", err)
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		args[i] = id
 	}
 	idsSet := make(map[string][]string)
-	for _, id := range ids {
-		row, err := stmt.QueryContext(ctx, id)
+
+	argsSlices := utils.ChunkSlice(args, 500).([][]interface{})
+
+	for _, argsSlice := range argsSlices {
+		stmt, err := m.db.PrepareContext(ctx, `
+		SELECT relation_id, sources.name FROM sources
+		INNER JOIN relations_by_source ON sources.id = relations_by_source.source_id
+		WHERE relation_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to retrieve sources for relation id %s: %w", id, err)
+			return nil, fmt.Errorf("Unable to prepare statement for retrieving relation sources: %w", err)
+		}
+		row, err := stmt.QueryContext(ctx, argsSlice...)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve sources for relations: %w", err)
 		}
 
-		idsSet[id] = []string{}
-
 		var source string
+		var relationId string
 		for row.Next() {
-			err = row.Scan(&source)
+			err = row.Scan(&relationId, &source)
 			if err != nil {
 				return nil, fmt.Errorf("Unable to scan row of relation source: %w", err)
 			}
-			idsSet[id] = append(idsSet[id], source)
+			if _, ok := idsSet[relationId]; !ok {
+				idsSet[relationId] = []string{}
+			}
+			idsSet[relationId] = append(idsSet[relationId], source)
 		}
 	}
 	return idsSet, nil
