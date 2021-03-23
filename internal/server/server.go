@@ -193,6 +193,8 @@ func StartServer(listenInterface string,
 	r.HandleFunc("/api/graph/relations", handlers.DeleteRelations(sourcesRegistry, graphUpdater, sem)).Methods("DELETE")
 
 	r.HandleFunc("/api/query", postQueryHandler).Methods("POST")
+	r.HandleFunc("/api/query/assets/sources", handlers.PostQueryAssetsSources(database)).Methods("POST")
+	r.HandleFunc("/api/query/relations/sources", handlers.PostQueryRelationsSources(database)).Methods("POST")
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 
 	metrics.StartTimeGauge.Set(float64(time.Now().Unix()))

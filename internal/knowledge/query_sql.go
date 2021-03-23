@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
@@ -207,7 +206,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 }
 
 // Translate a Cypher query into a SQL model
-func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher, includeDataSourceInResults bool) (*SQLTranslation, error) {
+func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslation, error) {
 	constrainedNodes := make(map[int]bool)
 
 	filterExpressions := AndOrExpression{And: true}
@@ -222,7 +221,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher, includeDataSo
 		}
 
 		if x.Where != nil {
-			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph, includeDataSourceInResults)
+			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph)
 			whereExpression, err := whereVisitor.ParseExpression(x.Where)
 			if err != nil {
 				return nil, err
@@ -332,75 +331,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher, includeDataSo
 		Offset:          offset,
 	}
 
-	if includeDataSourceInResults {
-		from = []SQLFrom{}
-		whereExpr := AndOrExpression{
-			And:      true,
-			Children: []AndOrExpression{},
-		}
-
-		for i := range innerSQL.Projections {
-			if innerSQL.Projections[i].Function != nil {
-				innerSQL.Projections[i].Alias = fmt.Sprintf("%s_%s",
-					strings.ReplaceAll(innerSQL.Projections[i].Variable, ".", "_"), innerSQL.Projections[i].Function.Name)
-			} else {
-				innerSQL.Projections[i].Alias = strings.ReplaceAll(innerSQL.Projections[i].Variable, ".", "_")
-			}
-		}
-
-		var projItems []SQLProjection
-
-		projItems = append(projItems, SQLProjection{Variable: "s0.*"})
-
-		for i := range sqt.QueryGraph.Nodes {
-			alias := fmt.Sprintf("a%d", i)
-			sourceAlias := fmt.Sprintf("%s_s", alias)
-			from = append(from, SQLFrom{Value: "assets_by_source", Alias: fmt.Sprintf("%s_bs", alias)})
-			from = append(from, SQLFrom{Value: "sources", Alias: sourceAlias})
-
-			projItems = append(projItems, SQLProjection{Variable: fmt.Sprintf("%s.name", sourceAlias)})
-
-			whereExpr.Children = append(whereExpr.Children, AndOrExpression{
-				And: true,
-				Children: []AndOrExpression{
-					{Expression: fmt.Sprintf("%s_bs.asset_id = %s_id", alias, alias)},
-					{Expression: fmt.Sprintf("%s_bs.source_id = %s_s.id", alias, alias)},
-				},
-			})
-		}
-
-		for i := range sqt.QueryGraph.Relations {
-			alias := fmt.Sprintf("r%d", i)
-			sourceAlias := fmt.Sprintf("%s_s", alias)
-			from = append(from, SQLFrom{Value: "relations_by_source", Alias: fmt.Sprintf("%s_bs", alias)})
-			from = append(from, SQLFrom{Value: "sources", Alias: sourceAlias})
-
-			projItems = append(projItems, SQLProjection{Variable: fmt.Sprintf("%s.name", sourceAlias)})
-
-			whereExpr.Children = append(whereExpr.Children, AndOrExpression{
-				And: true,
-				Children: []AndOrExpression{
-					{Expression: fmt.Sprintf("%s_bs.relation_id = %s_id", alias, alias)},
-					{Expression: fmt.Sprintf("%s_bs.source_id = %s_s.id", alias, alias)},
-				},
-			})
-		}
-
-		sqlQuery, err = buildSQLSelect(SQLStructure{
-			Distinct:    false,
-			Projections: projItems,
-			FromEntries: from,
-			FromStructures: []SQLInnerStructure{
-				{
-					Alias:     "s0",
-					Structure: innerSQL,
-				},
-			},
-			WhereExpression: whereExpr,
-		})
-	} else {
-		sqlQuery, err = buildSQLSelect(innerSQL)
-	}
+	sqlQuery, err = buildSQLSelect(innerSQL)
 
 	if err != nil {
 		return nil, err

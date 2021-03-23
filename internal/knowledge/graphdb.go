@@ -27,6 +27,9 @@ type GraphDB interface {
 	RemoveAssets(ctx context.Context, sourceName string, assets []Asset) error
 	RemoveRelations(ctx context.Context, sourceName string, relations []Relation) error
 
+	GetAssetSources(ctx context.Context, ids []string) (map[string][]string, error)
+	GetRelationSources(ctx context.Context, ids []string) (map[string][]string, error)
+
 	FlushAll(ctx context.Context) error
 
 	CountAssets(ctx context.Context) (int64, error)
@@ -34,7 +37,7 @@ type GraphDB interface {
 	CountRelations(ctx context.Context) (int64, error)
 	CountRelationsBySource(ctx context.Context, sourceName string) (int64, error)
 
-	Query(ctx context.Context, query SQLTranslation, includeDataSourceInResults bool) (*GraphQueryResult, error)
+	Query(ctx context.Context, query SQLTranslation) (*GraphQueryResult, error)
 }
 
 // Cursor is a cursor over the results

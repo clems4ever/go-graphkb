@@ -26,9 +26,9 @@ func NewQuerier(db GraphDB, historizer history.Historizer) *Querier {
 	return &Querier{GraphDB: db, historizer: historizer}
 }
 
-// Query run a query against the graph DB. If includeDataSourceInResults is set, the data source name is also part of the results.
-func (q *Querier) Query(ctx context.Context, queryString string, includeDataSourceInResults bool) (*QuerierResult, error) {
-	qr, sql, err := q.queryInternal(ctx, queryString, includeDataSourceInResults)
+// Query run a query against the graph DB.
+func (q *Querier) Query(ctx context.Context, queryString string) (*QuerierResult, error) {
+	qr, sql, err := q.queryInternal(ctx, queryString)
 	if err != nil {
 		saveErr := q.historizer.SaveFailedQuery(ctx, queryString, sql, err)
 		if saveErr != nil {
@@ -44,7 +44,7 @@ func (q *Querier) Query(ctx context.Context, queryString string, includeDataSour
 	return qr, nil
 }
 
-func (q *Querier) queryInternal(ctx context.Context, cypherQuery string, includeDataSourceInResults bool) (*QuerierResult, string, error) {
+func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*QuerierResult, string, error) {
 	s := Statistics{}
 
 	var err error
@@ -58,14 +58,14 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string, include
 		return nil, "", err
 	}
 
-	translation, err := NewSQLQueryTranslator().Translate(queryCypher, includeDataSourceInResults)
+	translation, err := NewSQLQueryTranslator().Translate(queryCypher)
 	if err != nil {
 		return nil, "", err
 	}
 
 	var res *GraphQueryResult
 	s.Execution = MeasureDuration(func() {
-		res, err = q.GraphDB.Query(ctx, *translation, includeDataSourceInResults)
+		res, err = q.GraphDB.Query(ctx, *translation)
 	})
 
 	if err != nil {

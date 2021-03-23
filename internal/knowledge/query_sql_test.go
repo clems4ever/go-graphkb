@@ -342,7 +342,7 @@ WHERE a0.type = 'ip' AND a1.type = 'device' AND r0.type = 'observed' AND r0.from
 			q, err := query.TransformCypher(c.Cypher)
 			require.NoError(t, err)
 
-			sql, err := translator.Translate(q, c.IncludeDataSourceInResults)
+			sql, err := translator.Translate(q)
 			if c.Error != "" {
 				require.Error(t, err, "Error on test case %s", c.Cypher)
 				if err != nil {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Dialog, useTheme, makeStyles, List, ListItem, ListItemIcon, Checkbox, ListItemText, Switch } from "@material-ui/core";
+import { Dialog, useTheme, makeStyles, List, ListItem, ListItemIcon, Checkbox, ListItemText } from "@material-ui/core";
 import SchemaGraphExplorer from "./SchemaGraphExplorer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";

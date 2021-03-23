@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Fragment, useCallback } from "react";
-import { QueryResultSet } from "../models/QueryResultSet";
+import { QueryResultSetWithSources } from "../models/QueryResultSet";
 import { Relation } from "../models/Relation";
 import { Asset } from "../models/Asset";
 import D3Graph from "./D3Graph";
@@ -8,7 +8,7 @@ import { makeStyles, useTheme } from "@material-ui/core";
 
 
 export interface Props {
-    result: QueryResultSet | undefined;
+    result: QueryResultSetWithSources | undefined;
     backgroundColor: string;
 
     onAssetDoubleClick: (asset: Asset) => void;

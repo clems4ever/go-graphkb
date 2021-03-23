@@ -595,7 +595,7 @@ func (m *MariaDB) Close() error {
 }
 
 // Query the database with provided intermediate query representation
-func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation, includeDataSourceInResults bool) (*knowledge.GraphQueryResult, error) {
+func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*knowledge.GraphQueryResult, error) {
 	deadline, ok := ctx.Deadline()
 	// If there is a deadline, we make sure the query stops right after it has been reached.
 	if ok {
@@ -610,9 +610,67 @@ func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation, inclu
 	}
 
 	res := new(knowledge.GraphQueryResult)
-	res.Cursor = NewMariaDBCursor(rows, sql.ProjectionTypes, includeDataSourceInResults)
+	res.Cursor = NewMariaDBCursor(rows, sql.ProjectionTypes)
 	res.Projections = sql.ProjectionTypes
 	return res, nil
+}
+
+func (m *MariaDB) GetAssetSources(ctx context.Context, ids []string) (map[string][]string, error) {
+	stmt, err := m.db.PrepareContext(ctx, `
+SELECT sources.name FROM sources
+INNER JOIN assets_by_source ON sources.id = assets_by_source.source_id
+WHERE asset_id = ?`)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to prepare statement for retrieving asset sources: %w", err)
+	}
+	idsSet := make(map[string][]string)
+	for _, id := range ids {
+		row, err := stmt.QueryContext(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve sources for asset id %s: %w", id, err)
+		}
+
+		idsSet[id] = []string{}
+
+		var source string
+		for row.Next() {
+			err = row.Scan(&source)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to scan row of asset source: %w", err)
+			}
+			idsSet[id] = append(idsSet[id], source)
+		}
+	}
+	return idsSet, nil
+}
+
+func (m *MariaDB) GetRelationSources(ctx context.Context, ids []string) (map[string][]string, error) {
+	stmt, err := m.db.PrepareContext(ctx, `
+	SELECT sources.name FROM sources
+	INNER JOIN relations_by_source ON sources.id = relations_by_source.source_id
+	WHERE relation_id = ?`)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to prepare statement for retrieving relation sources: %w", err)
+	}
+	idsSet := make(map[string][]string)
+	for _, id := range ids {
+		row, err := stmt.QueryContext(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to retrieve sources for relation id %s: %w", id, err)
+		}
+
+		idsSet[id] = []string{}
+
+		var source string
+		for row.Next() {
+			err = row.Scan(&source)
+			if err != nil {
+				return nil, fmt.Errorf("Unable to scan row of relation source: %w", err)
+			}
+			idsSet[id] = append(idsSet[id], source)
+		}
+	}
+	return idsSet, nil
 }
 
 // SaveSuccessfulQuery log an entry to mark a successful query
@@ -706,16 +764,14 @@ func (m *MariaDB) ListSources(ctx context.Context) (map[string]string, error) {
 type MariaDBCursor struct {
 	*sql.Rows
 
-	Projections                []knowledge.Projection
-	IncludeDataSourceInResults bool
+	Projections []knowledge.Projection
 }
 
 // NewMariaDBCursor create a new instance of MariaDBCursor
-func NewMariaDBCursor(rows *sql.Rows, projections []knowledge.Projection, includeDataSourceInResults bool) *MariaDBCursor {
+func NewMariaDBCursor(rows *sql.Rows, projections []knowledge.Projection) *MariaDBCursor {
 	return &MariaDBCursor{
-		Rows:                       rows,
-		Projections:                projections,
-		IncludeDataSourceInResults: includeDataSourceInResults,
+		Rows:        rows,
+		Projections: projections,
 	}
 }
 
@@ -726,16 +782,6 @@ func (mc *MariaDBCursor) HasMore() bool {
 
 // Read read one more item from the cursor
 func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
-	type RelationWithIDAndSource struct {
-		Source string `json:"source,omitempty"`
-		knowledge.RelationWithID
-	}
-
-	type AssetWithIDAndSource struct {
-		Source string `json:"source,omitempty"`
-		knowledge.AssetWithID
-	}
-
 	var err error
 	var fArr []string
 
@@ -789,11 +835,9 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 				Key:  fmt.Sprintf("%v", reflect.ValueOf(items[1])),
 			}
 
-			awi := AssetWithIDAndSource{
-				AssetWithID: knowledge.AssetWithID{
-					ID:    reflect.ValueOf(items[0]).String(),
-					Asset: asset,
-				},
+			awi := knowledge.AssetWithID{
+				ID:    reflect.ValueOf(items[0]).String(),
+				Asset: asset,
 			}
 			output[i] = awi
 		case knowledge.EdgeExprType:
@@ -803,12 +847,11 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 				return fmt.Errorf("Unable to get %d items to build an edge: %v", itemCount, err)
 			}
 
-			r := RelationWithIDAndSource{
-				RelationWithID: knowledge.RelationWithID{
-					From: reflect.ValueOf(items[1]).String(),
-					To:   reflect.ValueOf(items[2]).String(),
-					Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[3]))),
-				},
+			r := knowledge.RelationWithID{
+				ID:   reflect.ValueOf(items[0]).String(),
+				From: reflect.ValueOf(items[1]).String(),
+				To:   reflect.ValueOf(items[2]).String(),
+				Type: schema.RelationKeyType(fmt.Sprintf("%v", reflect.ValueOf(items[3]))),
 			}
 			output[i] = r
 		case knowledge.PropertyExprType:
@@ -817,29 +860,6 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 				return fmt.Errorf("Unable to get 1 property item: %v", err)
 			}
 			output[i] = items[0]
-		}
-	}
-
-	if mc.IncludeDataSourceInResults {
-		for i, pt := range mc.Projections {
-			switch pt.ExpressionType {
-			case knowledge.NodeExprType:
-				a := output[i].(AssetWithIDAndSource)
-				items, err := q.Get(1)
-				if err != nil {
-					return fmt.Errorf("Unable to get source property from queue: %w", err)
-				}
-				a.Source = reflect.ValueOf(items[0]).String()
-				output[i] = a
-			case knowledge.EdgeExprType:
-				r := output[i].(RelationWithIDAndSource)
-				items, err := q.Get(1)
-				if err != nil {
-					return fmt.Errorf("Unable to get source property from queue: %w", err)
-				}
-				r.Source = reflect.ValueOf(items[0]).String()
-				output[i] = r
-			}
 		}
 	}
 

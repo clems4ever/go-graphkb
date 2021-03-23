@@ -6,16 +6,14 @@ import "github.com/clems4ever/go-graphkb/internal/query"
 type QueryWhereVisitor struct {
 	ExpressionVisitorBase
 
-	Variables                  []string
-	queryGraph                 *QueryGraph
-	includeDataSourceInResults bool
+	Variables  []string
+	queryGraph *QueryGraph
 }
 
 // NewQueryWhereVisitor create an instance of query where visitor.
-func NewQueryWhereVisitor(queryGraph *QueryGraph, includeDataSourceInResults bool) *QueryWhereVisitor {
+func NewQueryWhereVisitor(queryGraph *QueryGraph) *QueryWhereVisitor {
 	return &QueryWhereVisitor{
-		queryGraph:                 queryGraph,
-		includeDataSourceInResults: includeDataSourceInResults,
+		queryGraph: queryGraph,
 	}
 }
 

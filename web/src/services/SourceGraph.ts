@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Asset } from "../models/Asset";
-import { QueryResultSet } from "../models/QueryResultSet";
+import { QueryAssetsSources, QueryRelationsSources, QueryResultSet } from "../models/QueryResultSet";
 import { DatabaseDetails } from "../models/DatabaseDetails";
 
 export async function getSources() {
@@ -51,7 +51,28 @@ export async function searchAssets(query: string, from: number = 0, size: number
 export async function postQuery(query: string) {
     const res = await axios.post<QueryResultSet>("/api/query", {
         q: query,
-        include_data_source: true,
+    }, { validateStatus: s => s === 200 || s === 500 || s === 400 });
+
+    if (res.status !== 200) {
+        throw new Error(`${res.data} (${res.status})`);
+    }
+    return res.data;
+}
+
+export async function postAssetsSources(ids: string[]) {
+    const res = await axios.post<QueryAssetsSources>("/api/query/assets/sources", {
+        ids: ids,
+    }, { validateStatus: s => s === 200 || s === 500 || s === 400 });
+
+    if (res.status !== 200) {
+        throw new Error(`${res.data} (${res.status})`);
+    }
+    return res.data;
+}
+
+export async function postRelationsSources(ids: string[]) {
+    const res = await axios.post<QueryRelationsSources>("/api/query/relations/sources", {
+        ids: ids,
     }, { validateStatus: s => s === 200 || s === 500 || s === 400 });
 
     if (res.status !== 200) {

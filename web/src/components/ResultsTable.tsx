@@ -1,12 +1,12 @@
 import React, { useState, useEffect, memo } from "react";
-import { QueryResultSet, TypedDoc, ColumnType } from "../models/QueryResultSet";
+import { ColumnType, QueryResultSetWithSources, TypedDocWithSources } from "../models/QueryResultSet";
 import MaterialTable from "material-table"
-import { Asset } from "../models/Asset";
-import { Relation } from "../models/Relation";
-import { makeStyles, Theme, useTheme } from "@material-ui/core";
+import { AssetWithSources } from "../models/Asset";
+import { RelationWithSources } from "../models/Relation";
+import { makeStyles, Theme, Tooltip, Typography, useTheme } from "@material-ui/core";
 
 export interface Props {
-    results: QueryResultSet | undefined;
+    results: QueryResultSetWithSources | undefined;
     isLoading: boolean;
 }
 
@@ -14,33 +14,52 @@ function computeColumns(columns: ColumnType[]) {
     return columns.map((v, i) => ({ title: `${v.name} (${v.type})`, field: `col-${i}`, export: true }));
 }
 
-function cellToValue(row: TypedDoc[], colIdx: number, columns: ColumnType[], theme: Theme): string | JSX.Element {
+function cellToValue(row: TypedDocWithSources[], colIdx: number, columns: ColumnType[], theme: Theme): string | JSX.Element {
     const v = row[colIdx];
     if (columns[colIdx].type === "property") {
         return v as string;
     } else if (columns[colIdx].type === "asset") {
-        const d = v as Asset;
+        const d = v as AssetWithSources;
         const key = (d.key === '') ? '(empty)' : d.key;
         return (
-            <p>
+            <div>
                 <span style={{color: "yellow"}}>{d.type}</span><br/>
-                <span>{key}</span><br/>
-                <span style={{fontSize: theme.typography.fontSize * 0.8, color: "#a1ff8d"}}>source: {d.source}</span>
-            </p>
+                <span>{key}</span><br />
+                <Tooltip title={<ul style={{listStyleType: "none", marginLeft: 0, paddingLeft: 0}}>{d.sources.map((x, i) => <li key={`li-${i}`}>{x}</li>)}</ul>}>
+                <Typography style={{
+                    fontSize: theme.typography.fontSize * 0.8,
+                    color: "#a1ff8d",
+                    maxWidth: 200,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"}
+                }>
+                    sources: {d.sources.join(', ')}
+                </Typography>
+                </Tooltip>
+            </div>
         );
     } else if (columns[colIdx].type === "relation") {
-        const d = v as Relation;
+        const d = v as RelationWithSources;
         return (
-            <p>
-                <span>{d.type}</span><br/>
-                <span style={{fontSize: theme.typography.fontSize * 0.8, color: "#a1ff8d"}}>source: {d.source}</span>
-            </p>
+            <div>
+                <span>{d.type}</span><br />
+                <Tooltip title={<ul style={{listStyleType: "none", marginLeft: 0, paddingLeft: 0}}>{d.sources.map((x, i) => <li key={`li-${i}`}>{x}</li>)}</ul>}>
+                    <Typography style={{
+                        fontSize: theme.typography.fontSize * 0.8,
+                        color: "#a1ff8d",
+                        textOverflow: "ellipsis"
+                    }}>
+                        sources: {d.sources.join(',')}
+                    </Typography>
+                </Tooltip>
+            </div>
         );
     }
     return "unknown";
 }
 
-function columnToValue(results: QueryResultSet, rowIdx: number, theme: Theme): { [k: string]: string | JSX.Element } {
+function columnToValue(results: QueryResultSetWithSources, rowIdx: number, theme: Theme): { [k: string]: string | JSX.Element } {
     const values = {} as { [k: string]: string | JSX.Element };
     results.items[rowIdx].forEach((v, i) => {
         const x = cellToValue(results.items[rowIdx], i, results.columns, theme);
@@ -49,7 +68,7 @@ function columnToValue(results: QueryResultSet, rowIdx: number, theme: Theme): {
     return values;
 }
 
-function computeValues(results: QueryResultSet, theme: Theme) {
+function computeValues(results: QueryResultSetWithSources, theme: Theme) {
     if (results.items.length === 0) {
         return [];
     }
