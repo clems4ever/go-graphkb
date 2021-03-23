@@ -32,19 +32,6 @@ func TestEncodeAssets(t *testing.T) {
 		string(buff.Bytes()))
 }
 
-func TestEncodeRelations(t *testing.T) {
-	buff := bytes.NewBuffer(nil)
-
-	encoder := NewGraphEncoder(buff)
-
-	assert.NoError(t, encoder.EncodeRelation(Relation1))
-	assert.NoError(t, encoder.EncodeRelation(Relation2))
-
-	assert.Equal(t,
-		"R{\"type\":\"is_linked_to\",\"from\":{\"type\":\"type1\",\"key\":\"value1\"},\"to\":{\"type\":\"type2\",\"key\":\"value2\"}}\nR{\"type\":\"has_relation_with\",\"from\":{\"type\":\"type1\",\"key\":\"value1\"},\"to\":{\"type\":\"type2\",\"key\":\"value2\"}}\n",
-		string(buff.Bytes()))
-}
-
 func TestEncodeAssetsAndRelations(t *testing.T) {
 	buff := bytes.NewBuffer(nil)
 
@@ -54,7 +41,7 @@ func TestEncodeAssetsAndRelations(t *testing.T) {
 	assert.NoError(t, encoder.EncodeRelation(Relation2))
 
 	assert.Equal(t,
-		"A{\"type\":\"type3\",\"key\":\"value3\"}\nR{\"type\":\"has_relation_with\",\"from\":{\"type\":\"type1\",\"key\":\"value1\"},\"to\":{\"type\":\"type2\",\"key\":\"value2\"}}\n",
+		"R{\"type\":\"is_linked_to\",\"from\":{\"type\":\"type1\",\"key\":\"value1\"},\"to\":{\"type\":\"type2\",\"key\":\"value2\"}}\nR{\"type\":\"has_relation_with\",\"from\":{\"type\":\"type1\",\"key\":\"value1\"},\"to\":{\"type\":\"type2\",\"key\":\"value2\"}}\n",
 		string(buff.Bytes()))
 }
 

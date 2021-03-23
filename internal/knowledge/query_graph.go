@@ -1,15 +1,11 @@
 package knowledge
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/clems4ever/go-graphkb/internal/utils"
 )
-
-// ErrVariableNotFound error thrown when a variable does not exist
-var ErrVariableNotFound = errors.New("Unable to find variable")
 
 // RelationDirection the direction of a relation
 type RelationDirection int
@@ -207,7 +203,7 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 func (qg *QueryGraph) FindVariable(name string) (TypeAndIndex, error) {
 	v, ok := qg.VariablesIndex[name]
 	if !ok {
-		return TypeAndIndex{}, ErrVariableNotFound
+		return TypeAndIndex{}, fmt.Errorf("Unable to find variable: %s", name)
 	}
 	return v, nil
 }

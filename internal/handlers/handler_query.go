@@ -15,6 +15,8 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 	return func(w http.ResponseWriter, r *http.Request) {
 		type QueryRequestBody struct {
 			Query string `json:"q"`
+			// If set, the name of the data source is returned with the item
+			IncludeDataSource bool `json:"include_data_source"`
 		}
 
 		type ColumnType struct {
@@ -48,7 +50,7 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		res, err := querier.Query(ctx, requestBody.Query)
+		res, err := querier.Query(ctx, requestBody.Query, requestBody.IncludeDataSource)
 		if err != nil {
 			ReplyWithInternalError(w, err)
 			return

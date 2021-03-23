@@ -128,7 +128,7 @@ var testCases = []ExpressionTestCase{
 	},
 	{
 		Cypher: "r",
-		SQL:    "r0.from_id, r0.to_id, r0.type",
+		SQL:    "r0.id, r0.from_id, r0.to_id, r0.type",
 	},
 	{
 		Cypher: "a.value",

@@ -12,62 +12,36 @@ type AndOrExpression struct {
 	Expression string
 }
 
-func (aoe AndOrExpression) String() string {
+func (aoe AndOrExpression) stringInternal(outer bool) string {
 	if aoe.Expression != "" {
 		return aoe.Expression
+	} else if len(aoe.Children) == 1 {
+		return aoe.Children[0].stringInternal(false)
+	} else if len(aoe.Children) > 1 && aoe.And {
+		children := []string{}
+		for _, c := range aoe.Children {
+			children = append(children, c.stringInternal(false))
+		}
+		if outer {
+			return strings.Join(children, " AND ")
+		}
+		return fmt.Sprintf("(%s)", strings.Join(children, " AND "))
+	} else if len(aoe.Children) > 1 && !aoe.And {
+		children := []string{}
+		for _, c := range aoe.Children {
+			children = append(children, c.stringInternal(false))
+		}
+		if outer {
+			return strings.Join(children, " OR ")
+		}
+		return fmt.Sprintf("(%s)", strings.Join(children, " OR "))
 	}
 
-	if len(aoe.Children) > 0 {
-		op := " AND "
-		if !aoe.And {
-			op = " OR "
-		}
-		exprs := make([]string, 0)
-		for _, e := range aoe.Children {
-			exprs = append(exprs, e.String())
-		}
-		return strings.Join(exprs, op)
-	}
-	return "(empty)"
+	return ""
 }
 
-// BuildAndOrExpression build a string representation of AndOrExpression.
-func BuildAndOrExpression(tree AndOrExpression) (string, error) {
-	if tree.Expression != "" {
-		return tree.Expression, nil
-	} else if tree.And {
-		exprs := make([]string, 0)
-		for i := range tree.Children {
-			expr, err := BuildAndOrExpression(tree.Children[i])
-			if err != nil {
-				return "", err
-			}
-			if expr != "" {
-				exprs = append(exprs, expr)
-			}
-		}
-		if len(exprs) > 1 {
-			return fmt.Sprintf("(%s)", strings.Join(exprs, " AND ")), nil
-		}
-		return strings.Join(exprs, " AND "), nil
-	} else if !tree.And {
-		exprs := make([]string, 0)
-		for i := range tree.Children {
-			expr, err := BuildAndOrExpression(tree.Children[i])
-			if err != nil {
-				return "", err
-			}
-
-			if expr != "" {
-				exprs = append(exprs, expr)
-			}
-		}
-		if len(exprs) > 1 {
-			return fmt.Sprintf("(%s)", strings.Join(exprs, " OR ")), nil
-		}
-		return strings.Join(exprs, " OR "), nil
-	}
-	return "", nil
+func (aoe AndOrExpression) String() string {
+	return aoe.stringInternal(true)
 }
 
 // CrossProductExpressions computes the cross product of 2 sets of expressions. This is used to transform OR expressions into a union of AND expressions.
@@ -118,4 +92,46 @@ func UnwindOrExpressions(tree AndOrExpression) ([]AndOrExpression, error) {
 		return exprs, nil
 	}
 	return nil, fmt.Errorf("Unable to detect kind of node")
+}
+
+func FlattenAndOrExpressions(tree AndOrExpression) (AndOrExpression, error) {
+	if tree.Expression != "" {
+		return tree, nil
+	} else if len(tree.Children) == 1 {
+		c, err := FlattenAndOrExpressions(tree.Children[0])
+		if err != nil {
+			return AndOrExpression{}, err
+		}
+		return c, nil
+	} else if len(tree.Children) > 1 && !tree.And {
+		orExpr := AndOrExpression{And: false, Children: []AndOrExpression{}}
+		for _, c := range tree.Children {
+			fc, err := FlattenAndOrExpressions(c)
+			if err != nil {
+				return AndOrExpression{}, err
+			}
+			if fc.Expression != "" || len(fc.Children) > 0 && fc.And {
+				orExpr.Children = append(orExpr.Children, fc)
+			} else if len(fc.Children) > 0 && !fc.And {
+				orExpr.Children = append(orExpr.Children, fc.Children...)
+			}
+		}
+		return orExpr, nil
+	} else if len(tree.Children) > 1 && tree.And {
+		andExpr := AndOrExpression{And: true, Children: []AndOrExpression{}}
+		for _, c := range tree.Children {
+			fc, err := FlattenAndOrExpressions(c)
+			if err != nil {
+				return AndOrExpression{}, err
+			}
+			if fc.Expression != "" || len(fc.Children) > 0 && !fc.And {
+				andExpr.Children = append(andExpr.Children, fc)
+			} else if len(fc.Children) > 0 && fc.And {
+				andExpr.Children = append(andExpr.Children, fc.Children...)
+			}
+		}
+		return andExpr, nil
+	}
+
+	return AndOrExpression{}, fmt.Errorf("An AndOrExpression should have an expression of at least one child")
 }

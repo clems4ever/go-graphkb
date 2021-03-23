@@ -88,3 +88,153 @@ func TestAndOrExpression(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, x, 1)
 }
+
+func TestFlattenAndOrExpression_Init(t *testing.T) {
+	exprs := AndOrExpression{
+		And:      true,
+		Children: []AndOrExpression{{Expression: "a"}, {Expression: "b"}},
+	}
+	actualExpr, err := FlattenAndOrExpressions(exprs)
+	assert.NoError(t, err)
+	assert.Equal(t, AndOrExpression{
+		And:      true,
+		Children: []AndOrExpression{{Expression: "a"}, {Expression: "b"}}},
+		actualExpr)
+	assert.Equal(t, "a AND b", actualExpr.String())
+}
+
+func TestFlattenAndOrExpression_FlattenAnd(t *testing.T) {
+	exprs := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{Expression: "a"},
+			{And: true, Children: []AndOrExpression{{Expression: "b"}, {Expression: "c"}}},
+		},
+	}
+	actualExpr, err := FlattenAndOrExpressions(exprs)
+	assert.NoError(t, err)
+	assert.Equal(t, AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{Expression: "a"}, {Expression: "b"}, {Expression: "c"},
+		},
+	}, actualExpr)
+	assert.Equal(t, "a AND b AND c", actualExpr.String())
+}
+
+func TestFlattenAndOrExpression_FlattenMultipleAnds(t *testing.T) {
+	exprs := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{And: true, Children: []AndOrExpression{{Expression: "a"}}},
+			{And: true, Children: []AndOrExpression{{Expression: "b"}, {Expression: "c"}}},
+			{And: true, Children: []AndOrExpression{{And: true, Children: []AndOrExpression{{Expression: "d"}}}}},
+		},
+	}
+	actualExpr, err := FlattenAndOrExpressions(exprs)
+	assert.NoError(t, err)
+	assert.Equal(t, AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{Expression: "a"}, {Expression: "b"}, {Expression: "c"}, {Expression: "d"},
+		},
+	}, actualExpr)
+	assert.Equal(t, "a AND b AND c AND d", actualExpr.String())
+}
+
+func TestFlattenAndOrExpression_FlattenAndsAndOrsIntoAnds(t *testing.T) {
+	expr := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{And: true, Children: []AndOrExpression{{Expression: "a"}}},
+			{And: true, Children: []AndOrExpression{{Expression: "b"}, {Expression: "c"}}},
+			{And: false, Children: []AndOrExpression{
+				{And: true, Children: []AndOrExpression{
+					{And: true, Children: []AndOrExpression{{Expression: "d"}}},
+					{Expression: "e"}},
+				}},
+			},
+		},
+	}
+
+	expExpr := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{Expression: "a"},
+			{Expression: "b"},
+			{Expression: "c"},
+			{Expression: "d"},
+			{Expression: "e"},
+		},
+	}
+
+	actualExpr, err := FlattenAndOrExpressions(expr)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expExpr, actualExpr)
+	assert.Equal(t, "a AND b AND c AND d AND e", actualExpr.String())
+}
+
+func TestFlattenAndOrExpression_FlattenOrs(t *testing.T) {
+	expr := AndOrExpression{
+		And: false,
+		Children: []AndOrExpression{
+			{And: false, Children: []AndOrExpression{{Expression: "a"}}},
+			{And: false, Children: []AndOrExpression{{Expression: "b"}, {Expression: "c"}}},
+			{And: false, Children: []AndOrExpression{
+				{And: false, Children: []AndOrExpression{
+					{And: false, Children: []AndOrExpression{{Expression: "d"}}},
+					{Expression: "e"}},
+				}},
+			},
+		},
+	}
+
+	expExpr := AndOrExpression{
+		And: false,
+		Children: []AndOrExpression{
+			{Expression: "a"},
+			{Expression: "b"},
+			{Expression: "c"},
+			{Expression: "d"},
+			{Expression: "e"},
+		},
+	}
+
+	actualExpr, err := FlattenAndOrExpressions(expr)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expExpr, actualExpr)
+	assert.Equal(t, "a OR b OR c OR d OR e", actualExpr.String())
+}
+
+func TestFlattenAndOrExpression_FlattenAndsAndOrsIntoAndsAndOrs(t *testing.T) {
+	expr := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{And: true, Children: []AndOrExpression{{Expression: "a"}}},
+			{And: true, Children: []AndOrExpression{{Expression: "b"}, {Expression: "c"}}},
+			{And: false, Children: []AndOrExpression{
+				{And: true, Children: []AndOrExpression{{Expression: "d"}}},
+				{Expression: "e"},
+			},
+			},
+		},
+	}
+
+	expExpr := AndOrExpression{
+		And: true,
+		Children: []AndOrExpression{
+			{Expression: "a"},
+			{Expression: "b"},
+			{Expression: "c"},
+			{And: false, Children: []AndOrExpression{{Expression: "d"}, {Expression: "e"}}},
+		},
+	}
+
+	actualExpr, err := FlattenAndOrExpressions(expr)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expExpr, actualExpr)
+	assert.Equal(t, "a AND b AND c AND (d OR e)", actualExpr.String())
+}

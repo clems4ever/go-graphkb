@@ -17,8 +17,7 @@ type ExpressionBuilder struct {
 
 // NewExpressionBuilder create a new instance of expression builder
 func NewExpressionBuilder(queryGraph *QueryGraph) *ExpressionBuilder {
-	visitor := SQLExpressionVisitor{}
-	visitor.queryGraph = queryGraph
+	visitor := SQLExpressionVisitor{queryGraph: queryGraph}
 	return &ExpressionBuilder{
 		QueryGraph: queryGraph,
 		parser:     NewExpressionParser(&visitor, queryGraph),
@@ -127,9 +126,10 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 			properties = []string{"id", "value", "type"}
 		case RelationType:
 			alias = "r"
-			properties = []string{"from_id", "to_id", "type"}
+			properties = []string{"id", "from_id", "to_id", "type"}
 		}
 		alias += fmt.Sprintf("%d", typeAndIndex.Index)
+
 		if len(sev.propertiesPath) > 0 {
 			properties = []string{strings.Join(sev.propertiesPath, ".")}
 		}
@@ -199,7 +199,8 @@ func (sev *SQLExpressionVisitor) OnExitRelationshipsPattern(q query.QueryRelatio
 
 	// Build a SELECT query such as SELECT 1 FROM assets a0 WHERE a0.type = 'mytype'.
 	// This is then wrapped into an EXISTS SQL clause
-	query, err := buildBasicSingleSQLSelect(false, []string{"1"}, from, *whereExpressions)
+	query, err := buildBasicSingleSQLSelect(false, []SQLProjection{{Variable: "1"}}, from,
+		[]SQLInnerStructure{}, *whereExpressions, []int{}, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Unable to build SQL query for EXISTS query: %v", err)
 	}

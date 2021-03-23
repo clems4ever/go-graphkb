@@ -168,7 +168,7 @@ func queryFunc(cmd *cobra.Command, args []string) {
 
 	q := knowledge.NewQuerier(Database, Database)
 
-	r, err := q.Query(ctx, args[0])
+	r, err := q.Query(ctx, args[0], false)
 	if err != nil {
 		logrus.Fatal(err)
 	}

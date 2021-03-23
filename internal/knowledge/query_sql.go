@@ -31,116 +31,9 @@ type SQLTranslation struct {
 	ProjectionTypes []Projection
 }
 
-func (sqt *SQLQueryTranslator) buildSQLSelect(
-	distinct bool, projections []string, projectionTypes []Projection, fromTables []string,
-	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
-	var sqlQuery string
-
-	andExpressions, err := UnwindOrExpressions(whereExpressions)
-	if err != nil {
-		return "", err
-	}
-
-	if len(andExpressions) > 1 {
-		singleQueries := []string{}
-		for _, where := range andExpressions {
-			singleQuery, err := sqt.buildSingleSQLSelect(false, projections, fromTables, where, nil, 0, 0)
-			if err != nil {
-				return "", err
-			}
-			singleQueries = append(singleQueries, fmt.Sprintf("(%s)", singleQuery))
-		}
-		if distinct {
-			sqlQuery = strings.Join(singleQueries, "\nUNION\n")
-		} else {
-			sqlQuery = strings.Join(singleQueries, "\nUNION ALL\n")
-		}
-
-		if len(groupBy) > 0 {
-			groupByProjections := []string{}
-			for i := range groupBy {
-				groupByProjections = append(groupByProjections, projections[groupBy[i]])
-			}
-
-			sqlQuery = fmt.Sprintf("SELECT %s FROM\n(%s)\nGROUP BY %s",
-				strings.Join(projections, ", "), sqlQuery, strings.Join(groupByProjections, ","))
-		}
-
-		if limit > 0 {
-			sqlQuery += fmt.Sprintf("\nLIMIT %d", limit)
-		}
-
-		if offset > 0 {
-			sqlQuery += fmt.Sprintf("\nOFFSET %d", offset)
-		}
-
-	} else {
-		and := AndOrExpression{And: true, Children: andExpressions}
-		singleQuery, err := sqt.buildSingleSQLSelect(distinct, projections, fromTables, and, groupBy, limit, offset)
-		if err != nil {
-			return "", err
-		}
-		sqlQuery = singleQuery
-	}
-
-	return sqlQuery, nil
-}
-
-func buildBasicSingleSQLSelect(
-	distinct bool, projections []string, fromTables []string,
-	whereExpressions AndOrExpression) (string, error) {
-
-	projectionsStr := ""
-	if distinct {
-		projectionsStr += "DISTINCT "
-	}
-
-	projectionsStr += strings.Join(projections, ", ")
-	fromTablesStr := strings.Join(fromTables, ", ")
-
-	sqlQuery := fmt.Sprintf("SELECT %s FROM %s", projectionsStr, fromTablesStr)
-	whereExprStr, err := BuildAndOrExpression(whereExpressions)
-	if err != nil {
-		return "", err
-	}
-
-	if whereExprStr != "" {
-		sqlQuery += fmt.Sprintf("\nWHERE %s", whereExprStr)
-	}
-	return sqlQuery, nil
-}
-
-func (sqt *SQLQueryTranslator) buildSingleSQLSelect(
-	distinct bool, projections []string, fromTables []string,
-	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
-
-	sqlQuery, err := buildBasicSingleSQLSelect(distinct, projections, fromTables, whereExpressions)
-	if err != nil {
-		return "", err
-	}
-
-	if len(groupBy) > 0 {
-		groupByProjection := make([]string, len(groupBy))
-		for i := range groupBy {
-			groupByProjection[i] = projections[groupBy[i]]
-		}
-		sqlQuery += fmt.Sprintf("\nGROUP BY %s", strings.Join(groupByProjection, ", "))
-	}
-
-	if limit > 0 {
-		sqlQuery += fmt.Sprintf("\nLIMIT %d", limit)
-	}
-
-	if offset > 0 {
-		sqlQuery += fmt.Sprintf("\nOFFSET %d", offset)
-	}
-
-	return sqlQuery, nil
-}
-
-func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes map[int]bool, scope Scope) (*AndOrExpression, []string, error) {
+func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes map[int]bool, scope Scope) (*AndOrExpression, []SQLFrom, error) {
 	andExpressions := AndOrExpression{And: true}
-	from := make([]string, 0)
+	from := []SQLFrom{}
 
 	for i, n := range queryGraph.Nodes {
 		inScope := false
@@ -165,7 +58,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 		} else {
 			alias = fmt.Sprintf("a%d", i)
 		}
-		from = append(from, fmt.Sprintf("assets %s", alias))
+		from = append(from, SQLFrom{Value: "assets", Alias: alias})
 
 		// If the scope is WHERE and the asset is also in the MATCH clause, we make the link between them
 		if scope.Context == WhereContext && inMatchScope {
@@ -211,7 +104,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 			assetAliasPrefix = "a"
 		}
 		alias = fmt.Sprintf("%s%d", aliasPrefix, i)
-		from = append(from, fmt.Sprintf("relations %s", alias))
+		from = append(from, SQLFrom{Value: "relations", Alias: alias})
 
 		constraints := AndOrExpression{And: false}
 
@@ -314,11 +207,8 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 }
 
 // Translate a Cypher query into a SQL model
-func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslation, error) {
+func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher, includeDataSourceInResults bool) (*SQLTranslation, error) {
 	constrainedNodes := make(map[int]bool)
-
-	// The list of strings that will be concatenated with , in the top-level FROM clause
-	var from []string
 
 	filterExpressions := AndOrExpression{And: true}
 	whereExpressions := AndOrExpression{And: true}
@@ -332,7 +222,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		}
 
 		if x.Where != nil {
-			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph)
+			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph, includeDataSourceInResults)
 			whereExpression, err := whereVisitor.ParseExpression(x.Where)
 			if err != nil {
 				return nil, err
@@ -358,7 +248,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	if err != nil {
 		return nil, fmt.Errorf("Unable to build SQL constraints from patterns in the MATCH clause: %v", err)
 	}
-	from = f
+	from := f
 
 	if expr.Expression != "" || len(expr.Children) > 0 {
 		filterExpressions.Children = append(filterExpressions.Children, *expr)
@@ -368,11 +258,11 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		filterExpressions.Children = append(filterExpressions.Children, whereExpressions)
 	}
 
-	projections := make([]string, 0)
+	projections := make([]SQLProjection, 0)
 	projectionTypes := make([]Projection, 0)
-
-	unaggregatedProjectionItems := []int{}
-	aggregationRequired := false
+	groupByIndices := []int{}
+	groupByRequired := false
+	variableIndices := []int{}
 
 	for i, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems {
 		projectionVisitor := NewProjectionVisitor(&sqt.QueryGraph)
@@ -381,26 +271,28 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 			return nil, err
 		}
 
-		projection, err := NewExpressionBuilder(&sqt.QueryGraph).Build(&p.Expression)
-		if err != nil {
-			return nil, err
+		for _, proj := range projectionVisitor.Projections {
+			if proj.Function != "" {
+				projections = append(projections, SQLProjection{
+					Function: &SQLFunction{Name: proj.Function, Distinct: proj.Distinct},
+					Variable: proj.Variable})
+				groupByRequired = true
+			} else if proj.Variable != "" {
+				projections = append(projections, SQLProjection{Variable: proj.Variable})
+				variableIndices = append(variableIndices, i)
+			} else {
+				return nil, fmt.Errorf("Unable to detect type of projection")
+			}
 		}
 
-		if !projectionVisitor.Aggregation {
-			unaggregatedProjectionItems = append(unaggregatedProjectionItems, i)
-		} else {
-			aggregationRequired = true
-		}
-
-		projections = append(projections, projection)
 		projectionTypes = append(projectionTypes, Projection{
 			Alias:          p.Alias,
 			ExpressionType: projectionVisitor.ExpressionType,
 		})
 	}
-
-	if !aggregationRequired {
-		unaggregatedProjectionItems = nil
+	// If group by is required, we group by all variables except the aggregation functions
+	if groupByRequired {
+		groupByIndices = variableIndices
 	}
 
 	limit := 0
@@ -428,14 +320,87 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		offset = int(skipVisitor.Skip)
 	}
 
-	sqlQuery, err := sqt.buildSQLSelect(
-		query.QuerySinglePartQuery.ProjectionBody.Distinct,
-		projections,
-		projectionTypes,
-		from,
-		filterExpressions,
-		unaggregatedProjectionItems,
-		limit, offset)
+	var sqlQuery string
+
+	innerSQL := SQLStructure{
+		Distinct:        query.QuerySinglePartQuery.ProjectionBody.Distinct,
+		Projections:     projections,
+		FromEntries:     from,
+		WhereExpression: filterExpressions,
+		GroupByIndices:  groupByIndices,
+		Limit:           limit,
+		Offset:          offset,
+	}
+
+	if includeDataSourceInResults {
+		from = []SQLFrom{}
+		whereExpr := AndOrExpression{
+			And:      true,
+			Children: []AndOrExpression{},
+		}
+
+		for i := range innerSQL.Projections {
+			if innerSQL.Projections[i].Function != nil {
+				innerSQL.Projections[i].Alias = fmt.Sprintf("%s_%s",
+					strings.ReplaceAll(innerSQL.Projections[i].Variable, ".", "_"), innerSQL.Projections[i].Function.Name)
+			} else {
+				innerSQL.Projections[i].Alias = strings.ReplaceAll(innerSQL.Projections[i].Variable, ".", "_")
+			}
+		}
+
+		var projItems []SQLProjection
+
+		projItems = append(projItems, SQLProjection{Variable: "s0.*"})
+
+		for i := range sqt.QueryGraph.Nodes {
+			alias := fmt.Sprintf("a%d", i)
+			sourceAlias := fmt.Sprintf("%s_s", alias)
+			from = append(from, SQLFrom{Value: "assets_by_source", Alias: fmt.Sprintf("%s_bs", alias)})
+			from = append(from, SQLFrom{Value: "sources", Alias: sourceAlias})
+
+			projItems = append(projItems, SQLProjection{Variable: fmt.Sprintf("%s.name", sourceAlias)})
+
+			whereExpr.Children = append(whereExpr.Children, AndOrExpression{
+				And: true,
+				Children: []AndOrExpression{
+					{Expression: fmt.Sprintf("%s_bs.asset_id = %s_id", alias, alias)},
+					{Expression: fmt.Sprintf("%s_bs.source_id = %s_s.id", alias, alias)},
+				},
+			})
+		}
+
+		for i := range sqt.QueryGraph.Relations {
+			alias := fmt.Sprintf("r%d", i)
+			sourceAlias := fmt.Sprintf("%s_s", alias)
+			from = append(from, SQLFrom{Value: "relations_by_source", Alias: fmt.Sprintf("%s_bs", alias)})
+			from = append(from, SQLFrom{Value: "sources", Alias: sourceAlias})
+
+			projItems = append(projItems, SQLProjection{Variable: fmt.Sprintf("%s.name", sourceAlias)})
+
+			whereExpr.Children = append(whereExpr.Children, AndOrExpression{
+				And: true,
+				Children: []AndOrExpression{
+					{Expression: fmt.Sprintf("%s_bs.relation_id = %s_id", alias, alias)},
+					{Expression: fmt.Sprintf("%s_bs.source_id = %s_s.id", alias, alias)},
+				},
+			})
+		}
+
+		sqlQuery, err = buildSQLSelect(SQLStructure{
+			Distinct:    false,
+			Projections: projItems,
+			FromEntries: from,
+			FromStructures: []SQLInnerStructure{
+				{
+					Alias:     "s0",
+					Structure: innerSQL,
+				},
+			},
+			WhereExpression: whereExpr,
+		})
+	} else {
+		sqlQuery, err = buildSQLSelect(innerSQL)
+	}
 
 	if err != nil {
 		return nil, err

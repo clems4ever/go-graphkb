@@ -34,7 +34,7 @@ type GraphDB interface {
 	CountRelations(ctx context.Context) (int64, error)
 	CountRelationsBySource(ctx context.Context, sourceName string) (int64, error)
 
-	Query(ctx context.Context, query SQLTranslation) (*GraphQueryResult, error)
+	Query(ctx context.Context, query SQLTranslation, includeDataSourceInResults bool) (*GraphQueryResult, error)
 }
 
 // Cursor is a cursor over the results
