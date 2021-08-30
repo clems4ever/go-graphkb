@@ -11,4 +11,4 @@ mariadb_database: graphkb
 concurrency: 32
 
 # The waiting time during graph query
-query_timewait: 30s
+query_max_time: 30s
