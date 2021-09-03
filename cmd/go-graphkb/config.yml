@@ -9,3 +9,6 @@ mariadb_database: graphkb
 
 # The level of concurrency allowed by the graph update API.
 concurrency: 32
+
+# The waiting time during graph query
+query_max_time: 30s
