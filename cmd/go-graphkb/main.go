@@ -95,7 +95,11 @@ func onInit() {
 	viper.SetConfigType("yaml")
 
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Errorf("Cannot read configuration file from %s", ConfigPath))
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			fmt.Printf("no configuration file %q, skipping and using env variable", ConfigPath)
+		} else {
+			panic(fmt.Errorf("cannot read configuration file from %s", ConfigPath))
+		}
 	}
 
 	logrus.Info("Using config file: ", viper.ConfigFileUsed())
