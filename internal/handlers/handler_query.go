@@ -57,7 +57,7 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer) h
 			return
 		}
 
-		QueryMaxTime := viper.GetDuration("query_timeout")
+		QueryMaxTime := viper.GetDuration("query_max_time")
 		if QueryMaxTime != 0 {
 			QueryMaxTime = 30 * time.Second
 		}
