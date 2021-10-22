@@ -184,8 +184,8 @@ func isUnknownTableError(err error) bool {
 }
 
 // resolveSourceIDFromDB resolve the source ID from the source name from the database
-func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
-	r, err := m.db.QueryContext(context.Background(), "SELECT id FROM sources WHERE name = ? LIMIT 1", sourceName)
+func (m *MariaDB) resolveSourceIDFromDB(ctx context.Context, sourceName string) (int, error) {
+	r, err := m.db.QueryContext(ctx, "SELECT id FROM sources WHERE name = ? LIMIT 1", sourceName)
 	if err != nil {
 		return 0, err
 	}
@@ -202,13 +202,13 @@ func (m *MariaDB) resolveSourceIDFromDB(sourceName string) (int, error) {
 }
 
 // resolveSourceID resolve the source ID from the source name from the cache first and then from the DB
-func (m *MariaDB) resolveSourceID(sourceName string) (int, error) {
+func (m *MariaDB) resolveSourceID(ctx context.Context, sourceName string) (int, error) {
 	// TODO(c.michaud): invalidate cache after some time.
 	if v, ok := m.sourcesCache[sourceName]; ok {
 		return v, nil
 	}
 
-	return m.resolveSourceIDFromDB(sourceName)
+	return m.resolveSourceIDFromDB(ctx, sourceName)
 }
 
 func writeAsset(w io.Writer, asset knowledge.Asset) error {
@@ -271,7 +271,7 @@ func InTransaction(db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
 
 // InsertAssets insert multiple assets into the graph of the given source
 func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
-	sourceID, err := m.resolveSourceID(source)
+	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting assets: %v", source, err)
 	}
@@ -307,7 +307,7 @@ func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []know
 
 // InsertRelations upsert one relation into the graph of the given source
 func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
-	sourceID, err := m.resolveSourceID(source)
+	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for inserting relations: %v", source, err)
 	}
@@ -346,7 +346,7 @@ func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations 
 
 // RemoveAssets remove one asset from the graph of the given source
 func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
-	sourceID, err := m.resolveSourceID(source)
+	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing assets: %v", source, err)
 	}
@@ -378,7 +378,7 @@ func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []know
 
 // RemoveRelations remove relations from the graph of the given source
 func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
-	sourceID, err := m.resolveSourceID(source)
+	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID of source %s for removing relations: %v", source, err)
 	}
@@ -408,7 +408,7 @@ func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations 
 // ReadGraph read source subgraph
 func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *knowledge.GraphEncoder) error {
 	logrus.Debugf("Start reading graph of data source with name %s", sourceName)
-	sourceID, err := m.resolveSourceID(sourceName)
+	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID from name %s: %v", sourceName, err)
 	}
@@ -560,7 +560,7 @@ func (m *MariaDB) CountAssets(ctx context.Context) (int64, error) {
 
 // CountAssetsBySource count the total number of assets in db by source
 func (m *MariaDB) CountAssetsBySource(ctx context.Context, sourceName string) (int64, error) {
-	sourceID, err := m.resolveSourceID(sourceName)
+	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
 		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
 	}
@@ -581,7 +581,7 @@ func (m *MariaDB) CountRelations(ctx context.Context) (int64, error) {
 
 // CountRelationsBySource count the total number of relations in db by source.
 func (m *MariaDB) CountRelationsBySource(ctx context.Context, sourceName string) (int64, error) {
-	sourceID, err := m.resolveSourceID(sourceName)
+	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
 		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
 	}
@@ -729,7 +729,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 		return fmt.Errorf("Unable to json encode schema: %v", err)
 	}
 
-	sourceID, err := m.resolveSourceID(sourceName)
+	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
 		return fmt.Errorf("Unable to resolve source ID for source name %s: %v", sourceName, err)
 	}
