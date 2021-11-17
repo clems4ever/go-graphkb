@@ -72,9 +72,12 @@ func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
 		}
 		gapi.currentGraph = g
 
-		quarter := int64(gapi.options.AntiEntropyDuration) / 4
-		randDelta := time.Duration(rand.Int63n(quarter*2) - quarter)
-		gapi.currentGraphStaleAfter = time.Now().Add(gapi.options.AntiEntropyDuration).Add(randDelta)
+		gapi.currentGraphStaleAfter = time.Now()
+		if gapi.options.AntiEntropyDuration != 0 {
+			quarter := int64(gapi.options.AntiEntropyDuration) / 4
+			randDelta := time.Duration(rand.Int63n(quarter*2) - quarter)
+			gapi.currentGraphStaleAfter.Add(gapi.options.AntiEntropyDuration).Add(randDelta)
+		}
 	}
 
 	var parallelization = gapi.options.Parallelization
