@@ -590,24 +590,23 @@ func (m *MariaDB) Close() error {
 }
 
 // Query the database with provided intermediate query representation
-func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*knowledge.GraphQueryResult, error) {
+func (m *MariaDB) Query(ctx context.Context, sqlTranslation knowledge.SQLTranslation) (*knowledge.GraphQueryResult, error) {
 	deadline, ok := ctx.Deadline()
 	// If there is a deadline, we make sure the query stops right after it has been reached.
 	if ok {
 		// Query can take 35 seconds max before being aborted...
-		sql.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sql.Query)
+		sqlTranslation.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sqlTranslation.Query)
 	}
-	logrus.Debug("Query to be executed: ", sql.Query)
+	logrus.Debug("Query to be executed: ", sqlTranslation.Query)
 
-	rows, err := m.db.QueryContext(ctx, sql.Query)
+	cursor, err := NewMariaDBCursor(ctx, m.db, sqlTranslation)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	res := new(knowledge.GraphQueryResult)
-	res.Cursor = NewMariaDBCursor(rows, sql.ProjectionTypes)
-	res.Projections = sql.ProjectionTypes
+	res.Cursor = cursor
+	res.Projections = sqlTranslation.ProjectionTypes
 	return res, nil
 }
 
@@ -812,22 +811,27 @@ func (m *MariaDB) ListSources(ctx context.Context) (map[string]string, error) {
 
 // MariaDBCursor is a cursor of data retrieved by MariaDB
 type MariaDBCursor struct {
-	*sql.Rows
+	rows *sql.Rows
 
 	Projections []knowledge.Projection
 }
 
 // NewMariaDBCursor create a new instance of MariaDBCursor
-func NewMariaDBCursor(rows *sql.Rows, projections []knowledge.Projection) *MariaDBCursor {
-	return &MariaDBCursor{
-		Rows:        rows,
-		Projections: projections,
+func NewMariaDBCursor(ctx context.Context, database *sql.DB, sqlTranslation knowledge.SQLTranslation) (*MariaDBCursor, error) {
+	rows, err := database.QueryContext(ctx, sqlTranslation.Query)
+	if err != nil {
+		return nil, err
 	}
+
+	return &MariaDBCursor{
+		rows:        rows,
+		Projections: sqlTranslation.ProjectionTypes,
+	}, nil
 }
 
 // HasMore tells whether there are more data to retrieve from the cursor
 func (mc *MariaDBCursor) HasMore() bool {
-	return mc.Rows.Next()
+	return mc.rows.Next()
 }
 
 // Read read one more item from the cursor
@@ -835,7 +839,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 	var err error
 	var fArr []string
 
-	if fArr, err = mc.Rows.Columns(); err != nil {
+	if fArr, err = mc.rows.Columns(); err != nil {
 		return fmt.Errorf("unable to retrieve row columns: %w", err)
 	}
 
@@ -845,7 +849,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 		valuesPtr[i] = &values[i]
 	}
 
-	if err := mc.Rows.Scan(valuesPtr...); err != nil {
+	if err := mc.rows.Scan(valuesPtr...); err != nil {
 		return fmt.Errorf("unable to scan row items: %w", err)
 	}
 
@@ -919,5 +923,5 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 
 // Close the cursor
 func (mc *MariaDBCursor) Close() error {
-	return mc.Rows.Close()
+	return mc.rows.Close()
 }
