@@ -65,6 +65,16 @@ func startGraphSizeMonitoring(interval time.Duration, database knowledge.GraphDB
 				metrics.GraphRelationsTotalGauge.With(prometheus.Labels{"source": s}).Set(float64(relationsCount))
 			}
 		}
+
+		m, err := database.CollectMetrics(ctx)
+		if err != nil {
+			logrus.Errorf("Unable to collect metrics from the database: %v", err)
+			metrics.DatabaseMetricsGauge.Reset()
+		} else {
+			for k, v := range m {
+				metrics.DatabaseMetricsGauge.With(prometheus.Labels{"name": k}).Set(float64(v))
+			}
+		}
 	}
 
 	logrus.Infof("Monitoring of the graph size will happen every %ds", int(interval/time.Second))

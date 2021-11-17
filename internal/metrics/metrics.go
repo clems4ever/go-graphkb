@@ -108,3 +108,9 @@ var LastSuccessfulDatasourceUpdateTimestampGauge = promauto.NewGaugeVec(promethe
 	Name: "go_graphkb_last_successful_datasource_update_timestamp_gauge",
 	Help: "The timestamp of the last successful operation of the data source",
 }, []string{"source"})
+
+// DatabaseMetricsGauge reports some technical metrics about the database (database implementation specific)
+var DatabaseMetricsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "go_graphkb_database_metrics_gauge",
+	Help: "Metrics gathered from the database",
+}, []string{"name"})
