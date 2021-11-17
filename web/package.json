@@ -22,7 +22,7 @@
     "@types/react-measure": "^2.0.6",
     "@types/react-router-dom": "^5.1.7",
     "@welldone-software/why-did-you-render": "^6.0.5",
-    "axios": "^0.21.1",
+    "axios": "^0.21.2",
     "classnames": "^2.2.6",
     "d3": "^6.5.0",
     "material-table": "^1.69.2",
