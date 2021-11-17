@@ -173,11 +173,6 @@ func (ar *AssetRegistry) Get(a knowledge.AssetKey) (int64, bool) {
 	return idx, ok
 }
 
-func isDuplicateEntryError(err error) bool {
-	driverErr, ok := err.(*mysql.MySQLError)
-	return ok && driverErr.Number == 1062
-}
-
 func isUnknownTableError(err error) bool {
 	driverErr, ok := err.(*mysql.MySQLError)
 	return ok && driverErr.Number == 1051
@@ -429,7 +424,6 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 			if err != nil {
 				return fmt.Errorf("Unable to retrieve relations: %v", err)
 			}
-
 			defer rows.Close()
 
 			for rows.Next() {
@@ -471,7 +465,6 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 			if err != nil {
 				return fmt.Errorf("Unable to retrieve assets: %v", err)
 			}
-
 			defer rows.Close()
 
 			for rows.Next() {
@@ -610,6 +603,7 @@ func (m *MariaDB) Query(ctx context.Context, sql knowledge.SQLTranslation) (*kno
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := new(knowledge.GraphQueryResult)
 	res.Cursor = NewMariaDBCursor(rows, sql.ProjectionTypes)
@@ -638,10 +632,13 @@ WHERE asset_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to prepare statement for retrieving asset sources: %w", err)
 		}
+		defer stmt.Close()
+
 		row, err := stmt.QueryContext(ctx, argsSlice...)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to retrieve sources for assets: %w", err)
 		}
+		defer row.Close()
 
 		var source string
 		var assetId uint64
@@ -681,10 +678,13 @@ func (m *MariaDB) GetRelationSources(ctx context.Context, ids []string) (map[str
 		if err != nil {
 			return nil, fmt.Errorf("Unable to prepare statement for retrieving relation sources: %w", err)
 		}
+		defer stmt.Close()
+
 		row, err := stmt.QueryContext(ctx, argsSlice...)
 		if err != nil {
 			return nil, fmt.Errorf("Unable to retrieve sources for relations: %w", err)
 		}
+		defer row.Close()
 
 		var source string
 		var relationId string
@@ -748,6 +748,7 @@ func (m *MariaDB) CollectMetrics(ctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to collect metrics from database: %v", err)
 	}
+	defer rows.Close()
 
 	var value int
 	var variableName string
