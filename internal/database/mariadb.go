@@ -743,6 +743,26 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 	return nil
 }
 
+func (m *MariaDB) CollectMetrics(ctx context.Context) (map[string]int, error) {
+	rows, err := m.db.QueryContext(ctx, "show global status like 'Com_stmt%'")
+	if err != nil {
+		return nil, fmt.Errorf("Unable to collect metrics from database: %v", err)
+	}
+
+	var value int
+	var variableName string
+	metrics := make(map[string]int)
+
+	for rows.Next() {
+		err := rows.Scan(&variableName, &value)
+		if err != nil {
+			return nil, err
+		}
+		metrics[variableName] = value
+	}
+	return metrics, nil
+}
+
 // LoadSchema load the schema graph of the source from DB
 func (m *MariaDB) LoadSchema(ctx context.Context, sourceName string) (schema.SchemaGraph, error) {
 	row := m.db.QueryRowContext(ctx, `
