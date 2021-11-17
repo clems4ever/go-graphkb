@@ -56,7 +56,7 @@ func (m *MariaDB) InitializeSchema() error {
 			UNIQUE unique_source (name, auth_token)
 		)`)
 	if err != nil {
-		return fmt.Errorf("Unable to create sources table: %v", err)
+		return fmt.Errorf("unable to create sources table: %v", err)
 	}
 
 	// type must be part of the primary key to be a partition key
@@ -71,7 +71,7 @@ func (m *MariaDB) InitializeSchema() error {
 			INDEX value_idx (value),
 			INDEX type_idx (type))`)
 	if err != nil {
-		return fmt.Errorf("Unable to create assets table: %v", err)
+		return fmt.Errorf("unable to create assets table: %v", err)
 	}
 
 	_, err = m.db.ExecContext(context.Background(), `
@@ -92,7 +92,7 @@ func (m *MariaDB) InitializeSchema() error {
 			INDEX full_relation_to_from_type_idx (to_id, from_id, type),
 			INDEX full_relation_to_type_from_idx (to_id, type, from_id))`)
 	if err != nil {
-		return fmt.Errorf("Unable to create relations table: %v", err)
+		return fmt.Errorf("unable to create relations table: %v", err)
 	}
 
 	_, err = m.db.ExecContext(context.Background(), `
@@ -107,7 +107,7 @@ func (m *MariaDB) InitializeSchema() error {
 
 			INDEX source_idx (source_id))`)
 	if err != nil {
-		return fmt.Errorf("Unable to create relations_by_source table: %v", err)
+		return fmt.Errorf("unable to create relations_by_source table: %v", err)
 	}
 
 	_, err = m.db.ExecContext(context.Background(), `
@@ -122,7 +122,7 @@ func (m *MariaDB) InitializeSchema() error {
 
 			INDEX source_idx (source_id))`)
 	if err != nil {
-		return fmt.Errorf("Unable to create assets_by_source tables: %v", err)
+		return fmt.Errorf("unable to create assets_by_source tables: %v", err)
 	}
 
 	// Create the table storing the schema graphs
@@ -136,7 +136,7 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT pk_schema PRIMARY KEY (id),
 			CONSTRAINT fk_schema_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE)`)
 	if err != nil {
-		return fmt.Errorf("Unable to create graph_schema tables: %v", err)
+		return fmt.Errorf("unable to create graph_schema tables: %v", err)
 	}
 
 	_, err = m.db.ExecContext(context.Background(), `
@@ -151,7 +151,7 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT pk_history PRIMARY KEY (id)
 		)`)
 	if err != nil {
-		return fmt.Errorf("Unable to create query_history tables: %v", err)
+		return fmt.Errorf("unable to create query_history tables: %v", err)
 	}
 
 	return nil
@@ -268,7 +268,7 @@ func InTransaction(db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
 func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID of source %s for inserting assets: %v", source, err)
+		return fmt.Errorf("unable to resolve source ID of source %s for inserting assets: %v", source, err)
 	}
 
 	return InTransaction(m.db, func(tx *sql.Tx) error {
@@ -282,7 +282,7 @@ func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []know
 				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 					// If the entry is duplicated, it's fine but we still need insert a line into assets_by_source.
 				} else {
-					return fmt.Errorf("Unable to insert asset %v (%d) in DB from source %s: %v", asset, h, source, err)
+					return fmt.Errorf("unable to insert asset %v (%d) in DB from source %s: %v", asset, h, source, err)
 				}
 			}
 
@@ -292,7 +292,7 @@ func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []know
 				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 					// TODO(c.michaud): update the update_time?
 				} else {
-					return fmt.Errorf("Unable to insert binding between asset %s (%d) and source %s: %v", asset, h, source, err)
+					return fmt.Errorf("unable to insert binding between asset %s (%d) and source %s: %v", asset, h, source, err)
 				}
 			}
 		}
@@ -304,7 +304,7 @@ func (m *MariaDB) InsertAssets(ctx context.Context, source string, assets []know
 func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID of source %s for inserting relations: %v", source, err)
+		return fmt.Errorf("unable to resolve source ID of source %s for inserting relations: %v", source, err)
 	}
 
 	return InTransaction(m.db, func(tx *sql.Tx) error {
@@ -321,7 +321,7 @@ func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations 
 				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 					// If the entry is duplicated, it's fine but we still need insert a line into relations_by_source.
 				} else {
-					return fmt.Errorf("Unable insert relation %v (%d) in DB from source %s: %v", relation, rH, source, err)
+					return fmt.Errorf("unable insert relation %v (%d) in DB from source %s: %v", relation, rH, source, err)
 				}
 			}
 
@@ -331,7 +331,7 @@ func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations 
 				if driverErr, ok := err.(*mysql.MySQLError); ok && driverErr.Number == mysqlerr.ER_DUP_ENTRY {
 					// TODO(c.michaud): update the update_time?
 				} else {
-					return fmt.Errorf("Unable to insert binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
+					return fmt.Errorf("unable to insert binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
 				}
 			}
 		}
@@ -343,7 +343,7 @@ func (m *MariaDB) InsertRelations(ctx context.Context, source string, relations 
 func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []knowledge.Asset) error {
 	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID of source %s for removing assets: %v", source, err)
+		return fmt.Errorf("unable to resolve source ID of source %s for removing assets: %v", source, err)
 	}
 
 	return InTransaction(m.db, func(tx *sql.Tx) error {
@@ -354,7 +354,7 @@ func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []know
 				`DELETE FROM assets_by_source WHERE asset_id = ? AND source_id = ?`,
 				h, sourceID)
 			if err != nil {
-				return fmt.Errorf("Unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
+				return fmt.Errorf("unable to remove binding between asset %v (%d) and source %s: %v", asset, h, source, err)
 			}
 
 			_, err = tx.ExecContext(ctx,
@@ -363,7 +363,7 @@ func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []know
 		)`,
 				h, h)
 			if err != nil {
-				return fmt.Errorf("Unable to remove asset %v (%d) from source %s: %v", asset, h, source, err)
+				return fmt.Errorf("unable to remove asset %v (%d) from source %s: %v", asset, h, source, err)
 			}
 
 		}
@@ -375,7 +375,7 @@ func (m *MariaDB) RemoveAssets(ctx context.Context, source string, assets []know
 func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations []knowledge.Relation) error {
 	sourceID, err := m.resolveSourceID(ctx, source)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID of source %s for removing relations: %v", source, err)
+		return fmt.Errorf("unable to resolve source ID of source %s for removing relations: %v", source, err)
 	}
 	return InTransaction(m.db, func(tx *sql.Tx) error {
 		for _, relation := range relations {
@@ -385,7 +385,7 @@ func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations 
 				`DELETE FROM relations_by_source WHERE relation_id = ? AND source_id = ?`,
 				rH, sourceID)
 			if err != nil {
-				return fmt.Errorf("Unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
+				return fmt.Errorf("unable to remove binding between relation %v (%d) and source %s: %v", relation, rH, source, err)
 			}
 
 			_, err = tx.ExecContext(ctx,
@@ -393,7 +393,7 @@ func (m *MariaDB) RemoveRelations(ctx context.Context, source string, relations 
 			SELECT * FROM relations_by_source WHERE relation_id = ?
 		)`, rH, rH)
 			if err != nil {
-				return fmt.Errorf("Unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
+				return fmt.Errorf("unable to remove relation %v (%d) from source %s: %v", relation, rH, source, err)
 			}
 		}
 		return nil
@@ -405,7 +405,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 	logrus.Debugf("Start reading graph of data source with name %s", sourceName)
 	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID from name %s: %v", sourceName, err)
+		return fmt.Errorf("unable to resolve source ID from name %s: %v", sourceName, err)
 	}
 
 	now := time.Now()
@@ -422,7 +422,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 		`, sourceID)
 
 			if err != nil {
-				return fmt.Errorf("Unable to retrieve relations: %v", err)
+				return fmt.Errorf("unable to retrieve relations: %v", err)
 			}
 			defer rows.Close()
 
@@ -448,7 +448,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 
 				err = encoder.EncodeRelation(relation)
 				if err != nil {
-					return fmt.Errorf("Unable to write relation %v: %v", relation, err)
+					return fmt.Errorf("unable to write relation %v: %v", relation, err)
 				}
 			}
 		}
@@ -463,14 +463,14 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 		`, sourceID)
 
 			if err != nil {
-				return fmt.Errorf("Unable to retrieve assets: %v", err)
+				return fmt.Errorf("unable to retrieve assets: %v", err)
 			}
 			defer rows.Close()
 
 			for rows.Next() {
 				var Key, Type string
 				if err := rows.Scan(&Type, &Key); err != nil {
-					return fmt.Errorf("Unable to read standalone asset: %v", err)
+					return fmt.Errorf("unable to read standalone asset: %v", err)
 				}
 
 				asset := knowledge.Asset{
@@ -480,7 +480,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 
 				err := encoder.EncodeAsset(asset)
 				if err != nil {
-					return fmt.Errorf("Unable to write asset %v: %v", asset, err)
+					return fmt.Errorf("unable to write asset %v: %v", asset, err)
 				}
 			}
 		}
@@ -488,7 +488,7 @@ func (m *MariaDB) ReadGraph(ctx context.Context, sourceName string, encoder *kno
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("Unable to handle transaction: %v", err)
+		return fmt.Errorf("unable to handle transaction: %v", err)
 	}
 
 	elapsed := time.Since(now)
@@ -555,7 +555,7 @@ func (m *MariaDB) CountAssets(ctx context.Context) (int64, error) {
 func (m *MariaDB) CountAssetsBySource(ctx context.Context, sourceName string) (int64, error) {
 	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
+		return 0, fmt.Errorf("unable to resolve source ID from name %s: %w", sourceName, err)
 	}
 
 	var count int64
@@ -576,7 +576,7 @@ func (m *MariaDB) CountRelations(ctx context.Context) (int64, error) {
 func (m *MariaDB) CountRelationsBySource(ctx context.Context, sourceName string) (int64, error) {
 	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to resolve source ID from name %s: %w", sourceName, err)
+		return 0, fmt.Errorf("unable to resolve source ID from name %s: %w", sourceName, err)
 	}
 
 	var count int64
@@ -630,13 +630,13 @@ SELECT asset_id, sources.name FROM sources
 INNER JOIN assets_by_source ON sources.id = assets_by_source.source_id
 WHERE asset_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to prepare statement for retrieving asset sources: %w", err)
+			return nil, fmt.Errorf("unable to prepare statement for retrieving asset sources: %w", err)
 		}
 		defer stmt.Close()
 
 		row, err := stmt.QueryContext(ctx, argsSlice...)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to retrieve sources for assets: %w", err)
+			return nil, fmt.Errorf("unable to retrieve sources for assets: %w", err)
 		}
 		defer row.Close()
 
@@ -646,7 +646,7 @@ WHERE asset_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		for row.Next() {
 			err = row.Scan(&assetId, &source)
 			if err != nil {
-				return nil, fmt.Errorf("Unable to scan row of asset source: %w", err)
+				return nil, fmt.Errorf("unable to scan row of asset source: %w", err)
 			}
 			assetIdStr := fmt.Sprintf("%d", assetId)
 			if _, ok := idsSet[assetIdStr]; !ok {
@@ -676,13 +676,13 @@ func (m *MariaDB) GetRelationSources(ctx context.Context, ids []string) (map[str
 		INNER JOIN relations_by_source ON sources.id = relations_by_source.source_id
 		WHERE relation_id IN (?`+strings.Repeat(",?", len(argsSlice)-1)+`)`)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to prepare statement for retrieving relation sources: %w", err)
+			return nil, fmt.Errorf("unable to prepare statement for retrieving relation sources: %w", err)
 		}
 		defer stmt.Close()
 
 		row, err := stmt.QueryContext(ctx, argsSlice...)
 		if err != nil {
-			return nil, fmt.Errorf("Unable to retrieve sources for relations: %w", err)
+			return nil, fmt.Errorf("unable to retrieve sources for relations: %w", err)
 		}
 		defer row.Close()
 
@@ -691,7 +691,7 @@ func (m *MariaDB) GetRelationSources(ctx context.Context, ids []string) (map[str
 		for row.Next() {
 			err = row.Scan(&relationId, &source)
 			if err != nil {
-				return nil, fmt.Errorf("Unable to scan row of relation source: %w", err)
+				return nil, fmt.Errorf("unable to scan row of relation source: %w", err)
 			}
 			if _, ok := idsSet[relationId]; !ok {
 				idsSet[relationId] = []string{}
@@ -726,18 +726,18 @@ func (m *MariaDB) SaveFailedQuery(ctx context.Context, cypher, sql string, err e
 func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema schema.SchemaGraph) error {
 	b, err := json.Marshal(schema)
 	if err != nil {
-		return fmt.Errorf("Unable to json encode schema: %v", err)
+		return fmt.Errorf("unable to json encode schema: %v", err)
 	}
 
 	sourceID, err := m.resolveSourceID(ctx, sourceName)
 	if err != nil {
-		return fmt.Errorf("Unable to resolve source ID for source name %s: %v", sourceName, err)
+		return fmt.Errorf("unable to resolve source ID for source name %s: %v", sourceName, err)
 	}
 
 	_, err = m.db.ExecContext(ctx, "INSERT INTO graph_schema (source_id, graph, timestamp) VALUES (?, ?, CURRENT_TIMESTAMP())",
 		sourceID, string(b))
 	if err != nil {
-		return fmt.Errorf("Unable to save schema in DB: %v", err)
+		return fmt.Errorf("unable to save schema in DB: %v", err)
 	}
 
 	return nil
@@ -746,7 +746,7 @@ func (m *MariaDB) SaveSchema(ctx context.Context, sourceName string, schema sche
 func (m *MariaDB) CollectMetrics(ctx context.Context) (map[string]int, error) {
 	rows, err := m.db.QueryContext(ctx, "show global status like 'Com_stmt%'")
 	if err != nil {
-		return nil, fmt.Errorf("Unable to collect metrics from database: %v", err)
+		return nil, fmt.Errorf("unable to collect metrics from database: %v", err)
 	}
 	defer rows.Close()
 
@@ -794,7 +794,7 @@ func (m *MariaDB) ListSources(ctx context.Context) (map[string]string, error) {
 	rows, err := m.db.QueryContext(ctx, "SELECT name, auth_token FROM sources")
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to read sources from database: %v", err)
+		return nil, fmt.Errorf("unable to read sources from database: %v", err)
 	}
 	defer rows.Close()
 
@@ -836,7 +836,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 	var fArr []string
 
 	if fArr, err = mc.Rows.Columns(); err != nil {
-		return fmt.Errorf("Unable to retrieve row columns: %w", err)
+		return fmt.Errorf("unable to retrieve row columns: %w", err)
 	}
 
 	values := make([]interface{}, len(fArr))
@@ -846,12 +846,12 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 	}
 
 	if err := mc.Rows.Scan(valuesPtr...); err != nil {
-		return fmt.Errorf("Unable to scan row items: %w", err)
+		return fmt.Errorf("unable to scan row items: %w", err)
 	}
 
 	val := reflect.ValueOf(doc)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
-		return fmt.Errorf("Output parameter should be a pointer")
+		return fmt.Errorf("output parameter should be a pointer")
 	}
 
 	q := queue.New(int64(len(fArr)))
@@ -864,7 +864,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			err = q.Put(b)
 		}
 		if err != nil {
-			return fmt.Errorf("Unable to enqueue item: %w", err)
+			return fmt.Errorf("unable to enqueue item: %w", err)
 		}
 	}
 
@@ -877,7 +877,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			var itemCount int64 = 3
 			items, err := q.Get(itemCount)
 			if err != nil {
-				return fmt.Errorf("Unable to get %d items to build a node: %v", itemCount, err)
+				return fmt.Errorf("unable to get %d items to build a node: %v", itemCount, err)
 			}
 
 			asset := knowledge.Asset{
@@ -894,7 +894,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			var itemCount int64 = 4
 			items, err := q.Get(itemCount)
 			if err != nil {
-				return fmt.Errorf("Unable to get %d items to build an edge: %v", itemCount, err)
+				return fmt.Errorf("unable to get %d items to build an edge: %v", itemCount, err)
 			}
 
 			r := knowledge.RelationWithID{
@@ -907,7 +907,7 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 		case knowledge.PropertyExprType:
 			items, err := q.Get(1)
 			if err != nil {
-				return fmt.Errorf("Unable to get 1 property item: %v", err)
+				return fmt.Errorf("unable to get 1 property item: %v", err)
 			}
 			output[i] = items[0]
 		}
