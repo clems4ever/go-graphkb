@@ -67,7 +67,7 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer, c
 			response = res
 		}
 
-		err = json.NewEncoder(w).Encode(response)
+		_, err = w.Write(response)
 		if err != nil {
 			ReplyWithInternalError(w, err)
 		}
