@@ -154,7 +154,7 @@ func StartServer(listenInterface string,
 	listSourcesHandler := listSources(sourcesRegistry)
 	getSourceGraphHandler := getSourceGraph(sourcesRegistry, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
-	postQueryHandler := handlers.PostQuery(database, queryHistorizer)
+	postQueryHandler := handlers.PostQuery(database, queryHistorizer, viper.GetDuration("query_cache_ttl"))
 	flushDatabaseHandler := flushDatabase(database)
 
 	if viper.GetString("password") != "" {
