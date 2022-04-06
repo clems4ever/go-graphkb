@@ -63,7 +63,7 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer, c
 				ReplyWithInternalError(w, err)
 				return
 			}
-			cache.SetDefault(cacheKey, res)
+			cache.Set(cacheKey, res, cacheTTL)
 			response = res
 		}
 
