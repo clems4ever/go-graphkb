@@ -148,13 +148,17 @@ func StartServer(listenInterface string,
 	writeConcurrency int64) {
 
 	r := mux.NewRouter()
+	cacheTTL := viper.GetDuration("query_cache_ttl")
+	if cacheTTL == 0 {
+		cacheTTL = 10 * time.Minute
+	}
 
 	graphUpdater := knowledge.NewGraphUpdater(database, schemaPersistor)
 
 	listSourcesHandler := listSources(sourcesRegistry)
 	getSourceGraphHandler := getSourceGraph(sourcesRegistry, schemaPersistor)
 	getDatabaseDetailsHandler := getDatabaseDetails(database)
-	postQueryHandler := handlers.PostQuery(database, queryHistorizer, viper.GetDuration("query_cache_ttl"))
+	postQueryHandler := handlers.PostQuery(database, queryHistorizer, cacheTTL)
 	flushDatabaseHandler := flushDatabase(database)
 
 	if viper.GetString("password") != "" {
