@@ -3,7 +3,7 @@ import { Dialog, useTheme, makeStyles, List, ListItem, ListItemIcon, Checkbox, L
 import SchemaGraphExplorer from "./SchemaGraphExplorer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
-
+import { IconProp } from "@fortawesome/fontawesome-svg-core";
 export interface Props {
     sources: string[];
 
@@ -48,7 +48,7 @@ export default function SchemaGraphDialog (props: Props) {
                     </div>
                 </div>
                 <FontAwesomeIcon
-                    icon={faTimes}
+                    icon={faTimes as IconProp}
                     className={styles.closeIcon}
                     size="2x" onClick={props.onClose}
                     style={{ width: 32 }} />
@@ -149,4 +149,4 @@ function SourcesList(props: SourcesListProps) {
             {items}
         </List >
     )
-} 
+}
