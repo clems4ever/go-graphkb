@@ -14,6 +14,8 @@ import DatabaseDialog from '../components/DatabaseDialog';
 import SearchField from '../components/SearchField';
 import MuiAlert from '@material-ui/lab/Alert';
 import { useQueryParam, StringParam, withDefault } from 'use-query-params';
+import { IconProp } from "@fortawesome/fontawesome-svg-core";
+
 
 function Alert(props: any) {
   return <MuiAlert elevation={6} variant="filled" {...props} />;
@@ -269,7 +271,7 @@ function ButtonGroup(props: ButtonGroupProps) {
                 elevation={2}
                 onClick={b.onClick}
                 key={`button-${i}`}>
-                <FontAwesomeIcon icon={b.icon} size={b.size} />
+                <FontAwesomeIcon icon={b.icon as IconProp} size={b.size} />
             </Paper>
         )
     });
