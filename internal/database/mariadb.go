@@ -69,7 +69,8 @@ func (m *MariaDB) InitializeSchema() error {
 			CONSTRAINT pk_asset PRIMARY KEY (id),
 
 			INDEX value_idx (value),
-			INDEX type_idx (type))`)
+			INDEX type_idx (type),
+			UNIQUE KEY type_value (type, value))`)
 	if err != nil {
 		return fmt.Errorf("unable to create assets table: %v", err)
 	}
