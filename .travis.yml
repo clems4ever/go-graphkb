@@ -1,9 +1,7 @@
-language: go
+language: generic
 
-go:
-  - 1.13.x
-node_js:
-  - 14
+services:
+  - docker
 
 script:
   - .travis/run.sh

@@ -51,7 +51,7 @@ func startGraphSizeMonitoring(interval time.Duration, database knowledge.GraphDB
 		for s := range sources {
 			assetsCount, err := database.CountAssetsBySource(ctx, s)
 			if err != nil {
-				logrus.Errorf("Unable to count assets of source %s for monitoring: %w", s, err)
+				logrus.Errorf("Unable to count assets of source %s for monitoring: %s", s, err)
 				metrics.GraphAssetsTotalGauge.Reset()
 			} else {
 				metrics.GraphAssetsTotalGauge.With(prometheus.Labels{"source": s}).Set(float64(assetsCount))
@@ -59,7 +59,7 @@ func startGraphSizeMonitoring(interval time.Duration, database knowledge.GraphDB
 
 			relationsCount, err := database.CountRelationsBySource(ctx, s)
 			if err != nil {
-				logrus.Errorf("Unable to count relations of source %s for monitoring: %w", s, err)
+				logrus.Errorf("Unable to count relations of source %s for monitoring: %s", s, err)
 				metrics.GraphRelationsTotalGauge.Reset()
 			} else {
 				metrics.GraphRelationsTotalGauge.With(prometheus.Labels{"source": s}).Set(float64(relationsCount))

@@ -85,7 +85,7 @@ func logLevelParamToSeverity(level string) logrus.Level {
 	case "error":
 		return logrus.ErrorLevel
 	}
-	logrus.Fatal("Provided level %s is not a valid option", level)
+	logrus.Fatalf("Provided level %s is not a valid option", level)
 	// This should never be reached but needed by the compiler
 	return logrus.InfoLevel
 }
