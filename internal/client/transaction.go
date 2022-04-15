@@ -38,6 +38,8 @@ type Transaction struct {
 	retryDelay         time.Duration
 	retryBackoffFactor float64
 
+	err error
+
 	onSuccess func(*knowledge.Graph)
 	onError   func(error)
 }
@@ -45,14 +47,20 @@ type Transaction struct {
 // Relate create a relation between two assets
 func (cgt *Transaction) Relate(from string, relationType schema.RelationType, to string) {
 	cgt.mutex.Lock()
-	cgt.binder.Relate(from, relationType, to)
+	err := cgt.binder.Relate(from, relationType, to)
+	if err != nil && cgt.err == nil {
+		cgt.err = fmt.Errorf("tx: %w", err)
+	}
 	cgt.mutex.Unlock()
 }
 
 // Bind bind one asset to an asset type from the schema
 func (cgt *Transaction) Bind(asset string, assetType schema.AssetType) {
 	cgt.mutex.Lock()
-	cgt.binder.Bind(asset, assetType)
+	err := cgt.binder.Bind(asset, assetType)
+	if err != nil && cgt.err == nil {
+		cgt.err = fmt.Errorf("tx: %w", err)
+	}
 	cgt.mutex.Unlock()
 }
 
@@ -78,6 +86,10 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 
 // Commit commit the transaction and gives ownership to the source for caching.
 func (cgt *Transaction) Commit() error {
+	if cgt.err != nil {
+		return fmt.Errorf("tx: commit: %w", cgt.err)
+	}
+
 	sg := cgt.newGraph.ExtractSchema()
 
 	logrus.Debug("Start uploading the schema of the graph...")
