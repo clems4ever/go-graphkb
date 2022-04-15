@@ -64,7 +64,7 @@ func withRetryOnTooManyRequests(fn func() error, backoffFactor float64, maxRetri
 		if err != nil {
 			logrus.Error(err)
 			backoffTime := time.Duration(int(math.Pow(backoffFactor, float64(trials)))) * delay
-			logrus.Info("Sleeping for %f seconds", backoffTime/time.Second)
+			logrus.Infof("Sleeping for %s", backoffTime)
 			time.Sleep(backoffTime)
 		} else {
 			return nil

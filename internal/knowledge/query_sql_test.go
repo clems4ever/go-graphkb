@@ -10,12 +10,11 @@ import (
 )
 
 type QueryCase struct {
-	Description                string
-	Cypher                     string
-	SQL                        string
-	Error                      string
-	Selected                   bool
-	IncludeDataSourceInResults bool
+	Description string
+	Cypher      string
+	SQL         string
+	Error       string
+	Selected    bool
 }
 
 func TestQueryTranslation(t *testing.T) {
@@ -107,7 +106,7 @@ LIMIT 10`,
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.value, COUNT(n.value)",
 			SQL: `
-SELECT a0_value, SUM(a1_value_COUNT) FROM 
+SELECT a0_value, SUM(a1_value_COUNT) FROM
 ((SELECT a0.value AS a0_value, COUNT(a1.value) AS a1_value_COUNT
 FROM assets a0, assets a1, relations r0 WHERE a0.type = 'variable' AND a1.type = 'name' AND r0.from_id = a0.id AND r0.to_id = a1.id GROUP BY a0_value)
 UNION ALL
@@ -168,32 +167,6 @@ WHERE a0.type = 'variable' AND a1.type = 'name' AND r0.type = 'has' AND r0.from_
 SELECT a0.id, a0.value, a0.type, r0.id, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type
 FROM assets a0, assets a1, relations r0
 WHERE a0.type = 'variable' AND a1.type = 'name' AND r0.type = 'has' AND r0.from_id = a1.id AND r0.to_id = a0.id`,
-		},
-		{
-			Cypher: "MATCH (v:variable)<-[r:has]-(n:name) RETURN v, r, n",
-			SQL: `
-SELECT s0.*, a0_s.name, a1_s.name, r0_s.name
-FROM assets_by_source a0_bs, sources a0_s, assets_by_source a1_bs, sources a1_s, relations_by_source r0_bs, sources r0_s, (
-	SELECT a0.id AS a0_id, a0.value AS a0_value, a0.type AS a0_type, r0.id AS r0_id, r0.from_id AS r0_from_id,
-			r0.to_id AS r0_to_id, r0.type AS r0_type, a1.id AS a1_id, a1.value AS a1_value, a1.type AS a1_type
-	FROM assets a0, assets a1, relations r0
-	WHERE a0.type = 'variable' AND a1.type = 'name' AND r0.type = 'has' AND r0.from_id = a1.id AND r0.to_id = a0.id
-) AS s0
-WHERE a0_bs.asset_id = a0_id AND a0_bs.source_id = a0_s.id AND a1_bs.asset_id = a1_id AND a1_bs.source_id = a1_s.id AND r0_bs.relation_id = r0_id AND r0_bs.source_id = r0_s.id`,
-			IncludeDataSourceInResults: true,
-		},
-		{
-			Cypher: "MATCH (v:variable)<-[r:has]-(n:name) WHERE v.value = 'abc' RETURN v, r, n",
-			SQL: `
-SELECT s0.*, a0_s.name, a1_s.name, r0_s.name
-FROM assets_by_source a0_bs, sources a0_s, assets_by_source a1_bs, sources a1_s, relations_by_source r0_bs, sources r0_s, (
-	SELECT a0.id AS a0_id, a0.value AS a0_value, a0.type AS a0_type, r0.id AS r0_id, r0.from_id AS r0_from_id, r0.to_id AS r0_to_id,
-			r0.type AS r0_type, a1.id AS a1_id, a1.value AS a1_value, a1.type AS a1_type
-	FROM assets a0, assets a1, relations r0
-	WHERE a0.type = 'variable' AND a1.type = 'name' AND r0.type = 'has' AND r0.from_id = a1.id AND r0.to_id = a0.id AND a0.value = 'abc'
-) AS s0
-WHERE a0_bs.asset_id = a0_id AND a0_bs.source_id = a0_s.id AND a1_bs.asset_id = a1_id AND a1_bs.source_id = a1_s.id AND r0_bs.relation_id = r0_id AND r0_bs.source_id = r0_s.id`,
-			IncludeDataSourceInResults: true,
 		},
 		{
 			Cypher: "MATCH (v:variable)<-[r]-(n) RETURN v, r, n",
