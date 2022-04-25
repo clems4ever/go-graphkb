@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/schema"
 
@@ -56,10 +57,17 @@ func NewGraph() *Graph {
 }
 
 // AddAsset add an asset to the graph
-func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) AssetKey {
+func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) (AssetKey, error) {
+	validators, _ := schema.AssetValidationRegistry.Get(assetType)
+	for _, v := range validators {
+		if !v(assetKey) {
+			return AssetKey{}, fmt.Errorf("asset value %q does not match the type %q validators", assetKey, assetType)
+		}
+	}
+
 	asset := Asset{Type: assetType, Key: assetKey}
 	g.assets.Add(asset)
-	return AssetKey(asset)
+	return AssetKey(asset), nil
 }
 
 // AddRelation add a relation to the graph

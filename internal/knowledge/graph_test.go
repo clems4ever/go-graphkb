@@ -13,8 +13,10 @@ type GraphSuite struct {
 func (s *GraphSuite) TestShouldTestGraphsAreEqual() {
 	g := NewGraph()
 
-	ip1 := g.AddAsset("ip", "127.0.0.1")
-	ip2 := g.AddAsset("ip", "127.0.0.2")
+	ip1, err := g.AddAsset("ip", "127.0.0.1")
+	s.Require().NoError(err)
+	ip2, err := g.AddAsset("ip", "127.0.0.2")
+	s.Require().NoError(err)
 	g.AddRelation(ip1, "linked", ip2)
 
 	s.Assert().True(g.Equal(g))
@@ -23,8 +25,10 @@ func (s *GraphSuite) TestShouldTestGraphsAreEqual() {
 func (s *GraphSuite) TestShouldTestCopiedGraphsAreEqual() {
 	g := NewGraph()
 
-	ip1 := g.AddAsset("ip", "127.0.0.1")
-	ip2 := g.AddAsset("ip", "127.0.0.2")
+	ip1, err := g.AddAsset("ip", "127.0.0.1")
+	s.Require().NoError(err)
+	ip2, err := g.AddAsset("ip", "127.0.0.2")
+	s.Require().NoError(err)
 	g.AddRelation(ip1, "linked", ip2)
 
 	g2 := g.Copy()
@@ -36,8 +40,10 @@ func (s *GraphSuite) TestShouldTestCopiedGraphsAreEqual() {
 func (s *GraphSuite) TestShouldTestGraphsAreDifferent() {
 	g := NewGraph()
 
-	ip1 := g.AddAsset("ip", "127.0.0.1")
-	ip2 := g.AddAsset("ip", "127.0.0.2")
+	ip1, err := g.AddAsset("ip", "127.0.0.1")
+	s.Require().NoError(err)
+	ip2, err := g.AddAsset("ip", "127.0.0.2")
+	s.Require().NoError(err)
 	g.AddRelation(ip1, "linked", ip2)
 
 	g2 := g.Copy()
@@ -50,8 +56,10 @@ func (s *GraphSuite) TestShouldTestGraphsAreDifferent() {
 func (s *GraphSuite) TestShouldTestGraphsHasAsset() {
 	g := NewGraph()
 
-	ip1 := g.AddAsset("ip", "127.0.0.1")
-	ip2 := g.AddAsset("ip", "127.0.0.2")
+	ip1, err := g.AddAsset("ip", "127.0.0.1")
+	s.Require().NoError(err)
+	ip2, err := g.AddAsset("ip", "127.0.0.2")
+	s.Require().NoError(err)
 	g.AddRelation(ip1, "linked", ip2)
 
 	s.Assert().True(g.HasAsset(Asset(ip1)))
@@ -61,8 +69,10 @@ func (s *GraphSuite) TestShouldTestGraphsHasAsset() {
 func (s *GraphSuite) TestShouldTestGraphsHasRelation() {
 	g := NewGraph()
 
-	ip1 := g.AddAsset("ip", "127.0.0.1")
-	ip2 := g.AddAsset("ip", "127.0.0.2")
+	ip1, err := g.AddAsset("ip", "127.0.0.1")
+	s.Require().NoError(err)
+	ip2, err := g.AddAsset("ip", "127.0.0.2")
+	s.Require().NoError(err)
 	rel := g.AddRelation(ip1, "linked", ip2)
 
 	s.Assert().True(g.HasRelation(Relation(rel)))
