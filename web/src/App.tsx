@@ -1,5 +1,6 @@
 import React from 'react';
-import { createMuiTheme, ThemeProvider } from '@material-ui/core';
+import { ThemeProvider } from '@material-ui/core';
+import { createTheme } from '@material-ui/core';
 import ExplorerView from './views/ExplorerView';
 import { BrowserRouter as Router, Route } from 'react-router-dom';
 import { QueryParamProvider } from 'use-query-params';
@@ -10,7 +11,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const App: React.FC = () => {
-  const darkTheme = createMuiTheme({
+  const darkTheme = createTheme({
     palette: {
       type: 'dark',
     },
