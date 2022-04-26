@@ -13,7 +13,7 @@ RUN cd cmd/go-graphkb && GOOS=linux GOARCH=amd64 go build -o datasource-csv main
 
 
 
-FROM node:14-alpine AS node-builder
+FROM node:16-alpine AS node-builder
 
 WORKDIR /node/src/
 
