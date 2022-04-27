@@ -1,31 +1,30 @@
-import React from 'react';
-import { ThemeProvider } from '@material-ui/core';
-import { createTheme } from '@material-ui/core';
-import ExplorerView from './views/ExplorerView';
-import { BrowserRouter as Router, Route } from 'react-router-dom';
-import { QueryParamProvider } from 'use-query-params';
+import React from "react";
+import { ThemeProvider } from "@material-ui/core";
+import { createTheme } from "@material-ui/core";
+import ExplorerView from "./views/ExplorerView";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 
-if (process.env.NODE_ENV !== 'production') {
-  const whyDidYouRender = require('@welldone-software/why-did-you-render');
+if (process.env.NODE_ENV !== "production") {
+  const whyDidYouRender = require("@welldone-software/why-did-you-render");
   whyDidYouRender(React);
 }
 
 const App: React.FC = () => {
   const darkTheme = createTheme({
     palette: {
-      type: 'dark',
+      type: "dark",
     },
   });
 
   return (
     <ThemeProvider theme={darkTheme}>
       <Router>
-        <QueryParamProvider ReactRouterRoute={Route}>
-          <ExplorerView />
-        </QueryParamProvider>  
+        <Routes>
+          <Route path="" element={<ExplorerView />} />
+        </Routes>
       </Router>
-    </ThemeProvider >
+    </ThemeProvider>
   );
-}
+};
 
 export default App;

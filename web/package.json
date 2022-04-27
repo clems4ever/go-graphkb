@@ -31,8 +31,7 @@
     "react-measure": "^2.5.2",
     "react-router-dom": "^6.3.0",
     "react-scripts": "4.0.1",
-    "typescript": "~4.1.3",
-    "use-query-params": "^1.1.9"
+    "typescript": "~4.1.3"
   },
   "scripts": {
     "start": "react-scripts start",
