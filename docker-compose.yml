@@ -30,7 +30,7 @@ services:
       args:
         USER_ID: ${USER_ID}
         GROUP_ID: ${GROUP_ID}
-    command: "sh -c 'npm ci && npm run start'"
+    command: "sh -c 'yarn install --frozen-lockfile && yarn start'"
     working_dir: "/app"
     volumes:
       - ./web:/app
