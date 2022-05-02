@@ -35,3 +35,40 @@ type DeleteGraphAssetRequestBody struct {
 type DeleteGraphRelationRequestBody struct {
 	Relations []knowledge.Relation `json:"relations"`
 }
+
+type QueryRequestBody struct {
+	Q              string `json:"q"`
+	IncludeSources bool   `json:"include_sources"`
+}
+
+type QueryResponse struct {
+	Columns []Column
+	Items   [][]Item
+}
+
+// Column a column as returned by the graphdb api.
+type Column struct {
+	Name string `json:"name"`
+	Type string `json:"type,omitempty"`
+}
+
+type Item map[string]string
+
+func (ra Item) Asset() knowledge.AssetWithID {
+	return knowledge.AssetWithID{
+		ID: ra["_id"],
+		Asset: knowledge.Asset{
+			Type: schema.AssetType(ra["type"]),
+			Key:  ra["key"],
+		},
+	}
+}
+
+func (ra Item) Relation() knowledge.RelationWithID {
+	return knowledge.RelationWithID{
+		ID:   ra["_id"],
+		From: ra["from_id"],
+		To:   ra["to_id"],
+		Type: schema.RelationKeyType(ra["type"]),
+	}
+}
