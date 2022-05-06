@@ -19,11 +19,9 @@ import (
 type Transaction struct {
 	client *GraphClient
 
-	currentGraph *knowledge.Graph
-
 	// The graph being updated
-	newGraph *knowledge.Graph
-	binder   *knowledge.GraphBinder
+	graph  *knowledge.Graph
+	binder *knowledge.GraphBinder
 
 	// Lock used when binding or relating assets
 	mutex sync.Mutex
@@ -90,7 +88,7 @@ func (cgt *Transaction) Commit() error {
 		return fmt.Errorf("tx: commit: %w", cgt.err)
 	}
 
-	sg := cgt.newGraph.ExtractSchema()
+	sg := cgt.graph.ExtractSchema()
 
 	logrus.Debug("Start uploading the schema of the graph...")
 	if err := cgt.client.UpdateSchema(sg); err != nil {
@@ -101,7 +99,7 @@ func (cgt *Transaction) Commit() error {
 
 	logrus.Debug("Finished uploading the schema of the graph...")
 
-	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
+	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.graph)
 
 	logrus.Debug("Start uploading the graph...")
 
@@ -212,7 +210,7 @@ func (cgt *Transaction) Commit() error {
 
 	logrus.Debugf("Finished uploading the graph in %f seconds...", elapsed.Seconds())
 
-	cgt.onSuccess(cgt.newGraph)
-	cgt.newGraph = knowledge.NewGraph()
+	cgt.onSuccess(cgt.graph)
+	cgt.graph = knowledge.NewGraph()
 	return nil
 }

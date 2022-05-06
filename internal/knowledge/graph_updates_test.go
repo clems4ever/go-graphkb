@@ -21,7 +21,7 @@ func (s *SourceUpdatesSuite) TestShouldUpsertForCreatingGraph() {
 
 	rel := g.AddRelation(ip1, "linked", ip2)
 
-	bulk := GenerateGraphUpdatesBulk(nil, g)
+	bulk := GenerateGraphUpdatesBulk(g)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 2)
 	s.Require().Len(bulk.GetRelationUpserts(), 1)
@@ -40,19 +40,19 @@ func (s *SourceUpdatesSuite) TestShouldUpsertAssets() {
 	s.Require().NoError(err)
 
 	g1.AddRelation(ip1, "linked", ip2)
-	g2 := g1.Copy()
+	g1.Clean()
 
-	ip3, err := g2.AddAsset("ip", "10.0.0.1")
+	ip3, err := g1.AddAsset("ip", "10.0.0.1")
 	s.Require().NoError(err)
-	ip4, err := g2.AddAsset("ip", "10.0.0.2")
+	ip4, err := g1.AddAsset("ip", "10.0.0.2")
 	s.Require().NoError(err)
 
-	bulk := GenerateGraphUpdatesBulk(g1, g2)
+	bulk := GenerateGraphUpdatesBulk(g1)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 2)
 	s.Require().Len(bulk.GetRelationUpserts(), 0)
-	s.Require().Len(bulk.GetAssetRemovals(), 0)
-	s.Require().Len(bulk.GetRelationRemovals(), 0)
+	s.Require().Len(bulk.GetAssetRemovals(), 2)
+	s.Require().Len(bulk.GetRelationRemovals(), 1)
 
 	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip3), Asset(ip4)})
 }
@@ -65,19 +65,19 @@ func (s *SourceUpdatesSuite) TestShouldUpsertRelations() {
 	s.Require().NoError(err)
 
 	g1.AddRelation(ip1, "linked", ip2)
-	g2 := g1.Copy()
+	g1.Clean()
 
-	ip3, err := g2.AddAsset("ip", "10.0.0.1")
+	ip3, err := g1.AddAsset("ip", "10.0.0.1")
 	s.Require().NoError(err)
-	r1 := g2.AddRelation(ip3, "linked", ip1)
-	r2 := g2.AddRelation(ip3, "linked", ip2)
+	r1 := g1.AddRelation(ip3, "linked", ip1)
+	r2 := g1.AddRelation(ip3, "linked", ip2)
 
-	bulk := GenerateGraphUpdatesBulk(g1, g2)
+	bulk := GenerateGraphUpdatesBulk(g1)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 1)
 	s.Require().Len(bulk.GetRelationUpserts(), 2)
-	s.Require().Len(bulk.GetAssetRemovals(), 0)
-	s.Require().Len(bulk.GetRelationRemovals(), 0)
+	s.Require().Len(bulk.GetAssetRemovals(), 2)
+	s.Require().Len(bulk.GetRelationRemovals(), 1)
 
 	s.Assert().ElementsMatch(bulk.GetAssetUpserts(), []Asset{Asset(ip3)})
 	s.Assert().ElementsMatch(bulk.GetRelationUpserts(), []Relation{r1, r2})
@@ -90,8 +90,9 @@ func (s *SourceUpdatesSuite) TestShouldRemoveGraph() {
 	ip2, err := g1.AddAsset("ip", "192.168.0.1")
 	s.Require().NoError(err)
 	r := g1.AddRelation(ip1, "linked", ip2)
+	g1.Clean()
 
-	bulk := GenerateGraphUpdatesBulk(g1, nil)
+	bulk := GenerateGraphUpdatesBulk(g1)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 0)
 	s.Require().Len(bulk.GetRelationUpserts(), 0)
@@ -110,11 +111,11 @@ func (s *SourceUpdatesSuite) TestShouldGenerateBulkOfSubgraph() {
 	s.Require().NoError(err)
 	r := g1.AddRelation(ip1, "linked", ip2)
 
-	g2 := NewGraph()
-	_, err = g2.AddAsset("ip", "127.0.0.1")
+	g1.Clean()
+	_, err = g1.AddAsset("ip", "127.0.0.1")
 	s.Require().NoError(err)
 
-	bulk := GenerateGraphUpdatesBulk(g1, g2)
+	bulk := GenerateGraphUpdatesBulk(g1)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 0)
 	s.Require().Len(bulk.GetRelationUpserts(), 0)
@@ -133,14 +134,14 @@ func (s *SourceUpdatesSuite) TestShouldGenerateBulkForMixedAdditionsAndRemovals(
 	s.Require().NoError(err)
 	r := g1.AddRelation(ip1, "linked", ip2)
 
-	g2 := NewGraph()
-	_, err = g2.AddAsset("ip", "127.0.0.1")
+	g1.Clean()
+	_, err = g1.AddAsset("ip", "127.0.0.1")
 	s.Require().NoError(err)
-	ip3, err := g2.AddAsset("ip", "10.0.0.1")
+	ip3, err := g1.AddAsset("ip", "10.0.0.1")
 	s.Require().NoError(err)
-	r2 := g2.AddRelation(ip3, "linked", ip2)
+	r2 := g1.AddRelation(ip3, "linked", ip2)
 
-	bulk := GenerateGraphUpdatesBulk(g1, g2)
+	bulk := GenerateGraphUpdatesBulk(g1)
 
 	s.Require().Len(bulk.GetAssetUpserts(), 1)
 	s.Require().Len(bulk.GetRelationUpserts(), 1)
@@ -170,7 +171,12 @@ func (s *SourceUpdatesSuite) TestAssetValidation() {
 
 	_, err = g.AddAsset(asset, "foo")
 	s.Require().NoError(err)
-	s.Require().Equal([]Asset{{Type: asset, Key: "foo"}}, g.Assets())
+
+	assets := []Asset{}
+	for a := range g.Assets() {
+		assets = append(assets, a)
+	}
+	s.Require().Equal([]Asset{{Type: asset, Key: "foo"}}, assets)
 }
 
 func TestGraphUpdatesSuite(t *testing.T) {

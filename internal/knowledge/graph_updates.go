@@ -171,41 +171,29 @@ func (gub *GraphUpdatesBulk) UnmarshalJSON(bytes []byte) error {
 
 // GenerateGraphUpdatesBulk generate a graph update bulk by taking the difference between new graph
 // and previous graph. It means the updates would transform previous graph into new graph.
-func GenerateGraphUpdatesBulk(previousGraph *Graph, newGraph *Graph) *GraphUpdatesBulk {
-	if previousGraph == nil {
-		previousGraph = NewGraph()
-	}
-
+func GenerateGraphUpdatesBulk(newGraph *Graph) *GraphUpdatesBulk {
 	if newGraph == nil {
 		newGraph = NewGraph()
 	}
 
 	bulk := NewGraphUpdatesBulk()
 
-	// upsert new assets
-	for _, a := range newGraph.Assets() {
-		if found := previousGraph.HasAsset(a); !found {
+	// upsert / delete assets
+	for a, action := range newGraph.Assets() {
+		switch action {
+		case graphEntryAdd:
 			bulk.UpsertAsset(a)
-		}
-	}
-
-	// Upsert new relations
-	for _, r := range newGraph.Relations() {
-		if found := previousGraph.HasRelation(r); !found {
-			bulk.UpsertRelation(r)
-		}
-	}
-
-	// Remove dead assets
-	for _, a := range previousGraph.Assets() {
-		if found := newGraph.HasAsset(a); !found {
+		case graphEntryRemove:
 			bulk.RemoveAsset(a)
 		}
 	}
 
-	// Remove dead relations
-	for _, r := range previousGraph.Relations() {
-		if found := newGraph.HasRelation(r); !found {
+	// upsert / delete relations
+	for r, action := range newGraph.Relations() {
+		switch action {
+		case graphEntryAdd:
+			bulk.UpsertRelation(r)
+		case graphEntryRemove:
 			bulk.RemoveRelation(r)
 		}
 	}
