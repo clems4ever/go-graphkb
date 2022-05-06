@@ -7,12 +7,12 @@ import (
 	"github.com/clems4ever/go-graphkb/internal/schema"
 )
 
-type graphEntryAction uint8
+type GraphEntryAction uint8
 
 const (
-	graphEntryRemove graphEntryAction = iota
-	graphEntryAdd
-	graphEntryNone
+	GraphEntryRemove GraphEntryAction = iota
+	GraphEntryAdd
+	GraphEntryNone
 )
 
 // AssetKey represent the key of the asset
@@ -44,8 +44,8 @@ type Relation RelationKey
 
 // Graph represent a Graph
 type Graph struct {
-	assets    map[Asset]graphEntryAction
-	relations map[Relation]graphEntryAction
+	assets    map[Asset]GraphEntryAction
+	relations map[Relation]GraphEntryAction
 }
 
 // GraphJSON is the json representation of a graph
@@ -57,8 +57,8 @@ type GraphJSON struct {
 // NewGraph create a graph
 func NewGraph() *Graph {
 	return &Graph{
-		assets:    map[Asset]graphEntryAction{},
-		relations: map[Relation]graphEntryAction{},
+		assets:    map[Asset]GraphEntryAction{},
+		relations: map[Relation]GraphEntryAction{},
 	}
 }
 
@@ -72,10 +72,10 @@ func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) (AssetKey,
 	}
 
 	asset := Asset{Type: assetType, Key: assetKey}
-	if action, ok := g.assets[asset]; ok && action != graphEntryAdd {
-		g.assets[asset] = graphEntryNone
+	if action, ok := g.assets[asset]; ok && action != GraphEntryAdd {
+		g.assets[asset] = GraphEntryNone
 	} else {
-		g.assets[asset] = graphEntryAdd
+		g.assets[asset] = GraphEntryAdd
 	}
 	return AssetKey(asset), nil
 }
@@ -87,21 +87,21 @@ func (g *Graph) AddRelation(from AssetKey, relationType schema.RelationKeyType, 
 		From: from,
 		To:   to,
 	}
-	if action, ok := g.relations[relation]; ok && action != graphEntryAdd {
-		g.relations[relation] = graphEntryNone
+	if action, ok := g.relations[relation]; ok && action != GraphEntryAdd {
+		g.relations[relation] = GraphEntryNone
 	} else {
-		g.relations[relation] = graphEntryAdd
+		g.relations[relation] = GraphEntryAdd
 	}
 	return relation
 }
 
 // Assets return the assets in the graph
-func (g *Graph) Assets() map[Asset]graphEntryAction {
+func (g *Graph) Assets() map[Asset]GraphEntryAction {
 	return g.assets
 }
 
 // Relations return the relations in the graph
-func (g *Graph) Relations() map[Relation]graphEntryAction {
+func (g *Graph) Relations() map[Relation]GraphEntryAction {
 	return g.relations
 }
 
@@ -171,17 +171,17 @@ func (g *Graph) ExtractSchema() schema.SchemaGraph {
 
 func (g *Graph) Clean() {
 	for k, v := range g.assets {
-		if v == graphEntryRemove {
+		if v == GraphEntryRemove {
 			delete(g.assets, k)
 		} else {
-			g.assets[k] = graphEntryRemove
+			g.assets[k] = GraphEntryRemove
 		}
 	}
 	for k, v := range g.relations {
-		if v == graphEntryRemove {
+		if v == GraphEntryRemove {
 			delete(g.relations, k)
 		} else {
-			g.relations[k] = graphEntryRemove
+			g.relations[k] = GraphEntryRemove
 		}
 	}
 }
@@ -210,15 +210,15 @@ func (g *Graph) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	g.assets = map[Asset]graphEntryAction{}
-	g.relations = map[Relation]graphEntryAction{}
+	g.assets = map[Asset]GraphEntryAction{}
+	g.relations = map[Relation]GraphEntryAction{}
 
 	for _, v := range j.Assets {
-		g.assets[v] = graphEntryRemove
+		g.assets[v] = GraphEntryRemove
 	}
 
 	for _, e := range j.Relations {
-		g.relations[e] = graphEntryRemove
+		g.relations[e] = GraphEntryRemove
 	}
 	return nil
 }
