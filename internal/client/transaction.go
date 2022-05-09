@@ -6,11 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/cheggaaa/pb.v2"
-
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
-	"github.com/clems4ever/go-graphkb/internal/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,11 +16,9 @@ import (
 type Transaction struct {
 	client *GraphClient
 
-	currentGraph *knowledge.Graph
-
 	// The graph being updated
-	newGraph *knowledge.Graph
-	binder   *knowledge.GraphBinder
+	graph  *knowledge.Graph
+	binder *knowledge.GraphBinder
 
 	// Lock used when binding or relating assets
 	mutex sync.Mutex
@@ -90,7 +85,7 @@ func (cgt *Transaction) Commit() error {
 		return fmt.Errorf("tx: commit: %w", cgt.err)
 	}
 
-	sg := cgt.newGraph.ExtractSchema()
+	sg := cgt.graph.ExtractSchema()
 
 	logrus.Debug("Start uploading the schema of the graph...")
 	if err := cgt.client.UpdateSchema(sg); err != nil {
@@ -101,118 +96,128 @@ func (cgt *Transaction) Commit() error {
 
 	logrus.Debug("Finished uploading the schema of the graph...")
 
-	bulk := knowledge.GenerateGraphUpdatesBulk(cgt.currentGraph, cgt.newGraph)
-
 	logrus.Debug("Start uploading the graph...")
-
-	progress := pb.New(len(bulk.GetAssetRemovals()) + len(bulk.GetAssetUpserts()) + len(bulk.GetRelationRemovals()) + len(bulk.GetRelationUpserts()))
-
-	progress.Start()
-	defer progress.Finish()
-
-	p := utils.NewWorkerPool(cgt.parallelization)
-	defer p.Close()
-
-	futures := make([]chan error, 0)
-
-	chunkSize := cgt.chunkSize
-
-	logrus.Debugf("Assets to be inserted=%d removed=%d, Relations to be inserted=%d removed=%d",
-		len(bulk.GetAssetUpserts()), len(bulk.GetAssetRemovals()),
-		len(bulk.GetRelationUpserts()), len(bulk.GetRelationRemovals()))
-
-	relationRemovalsChunks := utils.ChunkSlice(bulk.GetRelationRemovals(), chunkSize).([][]interface{})
-	relationInsertionChunks := utils.ChunkSlice(bulk.GetRelationUpserts(), chunkSize).([][]interface{})
-	assetRemovalsChunks := utils.ChunkSlice(bulk.GetAssetRemovals(), chunkSize).([][]interface{})
-	assetInsertionChunks := utils.ChunkSlice(bulk.GetAssetUpserts(), chunkSize).([][]interface{})
-
 	now := time.Now()
 
-	for _, rels := range relationRemovalsChunks {
-		relations := []knowledge.Relation{}
-		for _, r := range rels {
-			relations = append(relations, r.(knowledge.Relation))
-		}
-		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to remove the relations: %v", err)
-			}
-			progress.Add(len(relations))
-			return nil
-		})
-		futures = append(futures, f)
+	count, err := chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Relations(),
+		knowledge.GraphEntryRemove,
+		cgt.client.DeleteRelations,
+	)
+	if err != nil {
+		return err
 	}
+	logrus.Debugf("Deleted %d old relations", count)
 
-	for _, ass := range assetInsertionChunks {
-		assets := []knowledge.Asset{}
-		for _, a := range ass {
-			assets = append(assets, a.(knowledge.Asset))
-		}
-		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to upsert the assets: %v", err)
-			}
-			progress.Add(len(assets))
-			return nil
-		})
-		futures = append(futures, f)
+	count, err = chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Assets(),
+		knowledge.GraphEntryRemove,
+		cgt.client.DeleteAssets,
+	)
+	if err != nil {
+		return err
 	}
+	logrus.Debugf("Deleted %d old assets", count)
 
-	// Wait for all futures to complete
-	for _, f := range futures {
-		err := <-f
-		if err != nil {
-			cgt.onError(err)
-			return err
-		}
+	count, err = chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Assets(),
+		knowledge.GraphEntryAdd,
+		cgt.client.InsertAssets,
+	)
+	if err != nil {
+		return err
 	}
+	logrus.Debugf("Inserted %d new assets", count)
 
-	futures = make([]chan error, 0)
-
-	for _, ass := range assetRemovalsChunks {
-		assets := []knowledge.Asset{}
-		for _, a := range ass {
-			assets = append(assets, a.(knowledge.Asset))
-		}
-		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.DeleteAssets(assets) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to remove the assets: %v", err)
-			}
-			progress.Add(len(assets))
-			return nil
-		})
-		futures = append(futures, f)
+	count, err = chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Relations(),
+		knowledge.GraphEntryAdd,
+		cgt.client.InsertRelations,
+	)
+	if err != nil {
+		return err
 	}
-
-	for _, rels := range relationInsertionChunks {
-		relations := []knowledge.Relation{}
-		for _, r := range rels {
-			relations = append(relations, r.(knowledge.Relation))
-		}
-		f := p.Exec(func() error {
-			if err := withRetryOnTooManyRequests(func() error { return cgt.client.InsertRelations(relations) }, cgt.retryBackoffFactor, cgt.retryCount, cgt.retryDelay); err != nil {
-				return fmt.Errorf("Unable to upsert the relations: %v", err)
-			}
-			progress.Add(len(relations))
-			return nil
-		})
-		futures = append(futures, f)
-	}
-
-	// Wait for all futures to complete
-	for _, f := range futures {
-		err := <-f
-		if err != nil {
-			cgt.onError(err)
-			return err
-		}
-	}
+	logrus.Debugf("Inserted %d new relations", count)
 
 	elapsed := time.Since(now)
 
 	logrus.Debugf("Finished uploading the graph in %f seconds...", elapsed.Seconds())
 
-	cgt.onSuccess(cgt.newGraph)
-	cgt.newGraph = knowledge.NewGraph()
+	cgt.onSuccess(cgt.graph)
+	cgt.graph = knowledge.NewGraph()
 	return nil
+}
+
+func chunkedTransfer[T comparable](
+	parallelization,
+	chunkSize int,
+	in map[T]knowledge.GraphEntryAction,
+	actionMatch knowledge.GraphEntryAction,
+	do func([]T) error,
+) (int, error) {
+	tasks := make(chan func() error)
+	stop := make(chan struct{})
+
+	var err error
+	var wg sync.WaitGroup
+	var stopOnce sync.Once
+
+	wg.Add(parallelization)
+	for i := 0; i < parallelization; i++ {
+		go func() {
+			defer wg.Done()
+
+			for task := range tasks {
+				if e := task(); e != nil {
+					stopOnce.Do(func() {
+						err = e
+						close(stop)
+					})
+				}
+			}
+		}()
+	}
+
+	count := 0
+	chunk := make([]T, 0, chunkSize)
+	for el, action := range in {
+		select {
+		case <-stop:
+			fmt.Println("stop")
+			goto Done
+		default:
+		}
+
+		if action == actionMatch {
+			chunk = append(chunk, el)
+			count++
+		}
+		if len(chunk) == chunkSize {
+			func(chunk []T) {
+				tasks <- func() error {
+					return do(chunk)
+				}
+			}(chunk)
+			chunk = make([]T, 0, chunkSize)
+		}
+	}
+	if len(chunk) > 0 {
+		tasks <- func() error {
+			return do(chunk)
+		}
+	}
+
+Done:
+	close(tasks)
+
+	wg.Wait()
+	return count, err
 }

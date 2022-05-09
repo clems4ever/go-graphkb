@@ -22,9 +22,9 @@ func TestShouldRelateAssets(t *testing.T) {
 	assert.Len(t, g.Assets(), 2)
 	assert.Len(t, g.Relations(), 1)
 
-	assert.ElementsMatch(t, g.Assets(), []Asset{
-		{Type: "from_type", Key: "from"},
-		{Type: "to_type", Key: "to"},
+	assert.Equal(t, g.Assets(), map[Asset]GraphEntryAction{
+		{Type: "from_type", Key: "from"}: GraphEntryAdd,
+		{Type: "to_type", Key: "to"}:     GraphEntryAdd,
 	})
 }
 
@@ -37,7 +37,7 @@ func TestShouldBindAsset(t *testing.T) {
 	assert.Len(t, g.Assets(), 1)
 	assert.Len(t, g.Relations(), 0)
 
-	assert.ElementsMatch(t, g.Assets(), []Asset{
-		{Type: "from_type", Key: "from"},
+	assert.Equal(t, g.Assets(), map[Asset]GraphEntryAction{
+		{Type: "from_type", Key: "from"}: GraphEntryAdd,
 	})
 }

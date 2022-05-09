@@ -5,8 +5,14 @@ import (
 	"fmt"
 
 	"github.com/clems4ever/go-graphkb/internal/schema"
+)
 
-	mapset "github.com/deckarep/golang-set"
+type GraphEntryAction uint8
+
+const (
+	GraphEntryRemove GraphEntryAction = iota
+	GraphEntryAdd
+	GraphEntryNone
 )
 
 // AssetKey represent the key of the asset
@@ -38,8 +44,8 @@ type Relation RelationKey
 
 // Graph represent a Graph
 type Graph struct {
-	assets    mapset.Set
-	relations mapset.Set
+	assets    map[Asset]GraphEntryAction
+	relations map[Relation]GraphEntryAction
 }
 
 // GraphJSON is the json representation of a graph
@@ -51,8 +57,8 @@ type GraphJSON struct {
 // NewGraph create a graph
 func NewGraph() *Graph {
 	return &Graph{
-		assets:    mapset.NewSet(),
-		relations: mapset.NewSet(),
+		assets:    map[Asset]GraphEntryAction{},
+		relations: map[Relation]GraphEntryAction{},
 	}
 }
 
@@ -66,7 +72,11 @@ func (g *Graph) AddAsset(assetType schema.AssetType, assetKey string) (AssetKey,
 	}
 
 	asset := Asset{Type: assetType, Key: assetKey}
-	g.assets.Add(asset)
+	if action, ok := g.assets[asset]; ok && action != GraphEntryAdd {
+		g.assets[asset] = GraphEntryNone
+	} else {
+		g.assets[asset] = GraphEntryAdd
+	}
 	return AssetKey(asset), nil
 }
 
@@ -77,69 +87,70 @@ func (g *Graph) AddRelation(from AssetKey, relationType schema.RelationKeyType, 
 		From: from,
 		To:   to,
 	}
-	g.relations.Add(relation)
+	if action, ok := g.relations[relation]; ok && action != GraphEntryAdd {
+		g.relations[relation] = GraphEntryNone
+	} else {
+		g.relations[relation] = GraphEntryAdd
+	}
 	return relation
 }
 
 // Assets return the assets in the graph
-func (g *Graph) Assets() []Asset {
-	assets := make([]Asset, 0)
-	for a := range g.assets.Iter() {
-		assets = append(assets, a.(Asset))
-	}
-	return assets
+func (g *Graph) Assets() map[Asset]GraphEntryAction {
+	return g.assets
 }
 
 // Relations return the relations in the graph
-func (g *Graph) Relations() []Relation {
-	relations := make([]Relation, 0)
-	for r := range g.relations.Iter() {
-		relations = append(relations, r.(Relation))
-	}
-	return relations
+func (g *Graph) Relations() map[Relation]GraphEntryAction {
+	return g.relations
 }
 
 // HasAsset return true if the asset is in the graph, false otherwise.
 func (g *Graph) HasAsset(asset Asset) bool {
-	return g.assets.Contains(asset)
+	_, ok := g.assets[asset]
+	return ok
 }
 
 // HasRelation return true if the relation is in the graph, false otherwise.
 func (g *Graph) HasRelation(relation Relation) bool {
-	return g.relations.Contains(relation)
-}
-
-// Merge merge other graph into the current graph
-func (g *Graph) Merge(other *Graph) {
-	for a := range other.assets.Iter() {
-		g.assets.Add(a)
-	}
-	for r := range other.relations.Iter() {
-		g.relations.Add(r)
-	}
+	_, ok := g.relations[relation]
+	return ok
 }
 
 // Copy perform a deep copy of the graph
 func (g *Graph) Copy() *Graph {
 	graph := NewGraph()
-	for v := range g.assets.Iter() {
-		graph.assets.Add(v)
+	for k, v := range g.assets {
+		graph.assets[k] = v
 	}
-	for v := range g.relations.Iter() {
-		graph.relations.Add(v)
+	for k, v := range g.relations {
+		graph.relations[k] = v
 	}
 	return graph
 }
 
 // Equal return true if graphs are equal, otherwise return false
 func (g *Graph) Equal(other *Graph) bool {
-	if !g.assets.Equal(other.assets) {
+	if len(g.assets) != len(other.assets) {
 		return false
 	}
 
-	if !g.relations.Equal(other.relations) {
+	for a := range g.assets {
+		if _, ok := other.assets[a]; !ok {
+			return false
+		}
+	}
+
+	if len(g.relations) != len(other.relations) {
 		return false
 	}
+
+	for r := range g.relations {
+		if _, ok := other.relations[r]; !ok {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -147,15 +158,32 @@ func (g *Graph) Equal(other *Graph) bool {
 func (g *Graph) ExtractSchema() schema.SchemaGraph {
 	sg := schema.NewSchemaGraph()
 
-	for _, a := range g.Assets() {
+	for a := range g.Assets() {
 		sg.AddAsset(string(a.Type))
 	}
 
-	for _, r := range g.Relations() {
+	for r := range g.Relations() {
 		sg.AddRelation(r.From.Type, string(r.Type), r.To.Type)
 	}
 
 	return sg
+}
+
+func (g *Graph) Clean() {
+	for k, v := range g.assets {
+		if v == GraphEntryRemove {
+			delete(g.assets, k)
+		} else {
+			g.assets[k] = GraphEntryRemove
+		}
+	}
+	for k, v := range g.relations {
+		if v == GraphEntryRemove {
+			delete(g.relations, k)
+		} else {
+			g.relations[k] = GraphEntryRemove
+		}
+	}
 }
 
 // MarshalJSON marshall the graph in JSON
@@ -164,12 +192,12 @@ func (g *Graph) MarshalJSON() ([]byte, error) {
 	schemaJSON.Assets = []Asset{}
 	schemaJSON.Relations = []Relation{}
 
-	for v := range g.assets.Iter() {
-		schemaJSON.Assets = append(schemaJSON.Assets, v.(Asset))
+	for v := range g.assets {
+		schemaJSON.Assets = append(schemaJSON.Assets, v)
 	}
 
-	for e := range g.relations.Iter() {
-		schemaJSON.Relations = append(schemaJSON.Relations, e.(Relation))
+	for e := range g.relations {
+		schemaJSON.Relations = append(schemaJSON.Relations, e)
 	}
 
 	return json.Marshal(schemaJSON)
@@ -182,15 +210,15 @@ func (g *Graph) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	g.assets = mapset.NewSet()
-	g.relations = mapset.NewSet()
+	g.assets = map[Asset]GraphEntryAction{}
+	g.relations = map[Relation]GraphEntryAction{}
 
 	for _, v := range j.Assets {
-		g.assets.Add(v)
+		g.assets[v] = GraphEntryRemove
 	}
 
 	for _, e := range j.Relations {
-		g.relations.Add(e)
+		g.relations[e] = GraphEntryRemove
 	}
 	return nil
 }

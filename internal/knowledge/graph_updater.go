@@ -10,9 +10,8 @@ import (
 
 // SourceSubGraphUpdates represents the updates to perform on a source subgraph
 type SourceSubGraphUpdates struct {
-	Updates GraphUpdatesBulk
-	Schema  schema.SchemaGraph
-	Source  string
+	Schema schema.SchemaGraph
+	Source string
 }
 
 // GraphUpdater represents the updater of graph

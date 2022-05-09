@@ -105,11 +105,12 @@ func (gapi *GraphAPI) CreateTransaction() (*Transaction, error) {
 		retryBackoff = 1.01
 	}
 
+	gapi.currentGraph.Clean()
+
 	transaction := new(Transaction)
-	transaction.newGraph = knowledge.NewGraph()
-	transaction.binder = knowledge.NewGraphBinder(transaction.newGraph)
+	transaction.graph = gapi.currentGraph
+	transaction.binder = knowledge.NewGraphBinder(transaction.graph)
 	transaction.client = gapi.client
-	transaction.currentGraph = gapi.currentGraph
 	transaction.parallelization = parallelization
 	transaction.chunkSize = chunkSize
 
