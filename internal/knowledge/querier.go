@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/history"
+	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/sirupsen/logrus"
 )
@@ -72,7 +73,12 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 		return nil, translation.Query, err
 	}
 
-	logrus.Debugf("Found results in %dms", s.Execution/time.Millisecond)
+	execution_time := s.Execution / time.Millisecond
+
+	logrus.Debugf("Found results in %dms", execution_time)
+
+	metrics.GraphQueryTimeExecution.
+		WithLabelValues().Observe(float64(execution_time))
 
 	result := &QuerierResult{
 		Cursor:      res.Cursor,
