@@ -99,6 +99,8 @@ func (cgt *Transaction) Commit() error {
 	logrus.Debug("Start uploading the graph...")
 	now := time.Now()
 
+	totalCount := 0
+
 	count, err := chunkedTransfer(
 		cgt.parallelization,
 		cgt.chunkSize,
@@ -110,6 +112,7 @@ func (cgt *Transaction) Commit() error {
 		return err
 	}
 	logrus.Debugf("Deleted %d old relations", count)
+	totalCount += count
 
 	count, err = chunkedTransfer(
 		cgt.parallelization,
@@ -122,6 +125,7 @@ func (cgt *Transaction) Commit() error {
 		return err
 	}
 	logrus.Debugf("Deleted %d old assets", count)
+	totalCount += count
 
 	count, err = chunkedTransfer(
 		cgt.parallelization,
@@ -134,6 +138,7 @@ func (cgt *Transaction) Commit() error {
 		return err
 	}
 	logrus.Debugf("Inserted %d new assets", count)
+	totalCount += count
 
 	count, err = chunkedTransfer(
 		cgt.parallelization,
@@ -146,10 +151,19 @@ func (cgt *Transaction) Commit() error {
 		return err
 	}
 	logrus.Debugf("Inserted %d new relations", count)
+	totalCount += count
+
+	if totalCount == 0 {
+		// if there were no operations to perform, make an empty
+		// call so the server knows that we ran
+		err = cgt.client.InsertAssets(nil)
+		if err != nil {
+			return err
+		}
+	}
 
 	elapsed := time.Since(now)
-
-	logrus.Debugf("Finished uploading the graph in %f seconds...", elapsed.Seconds())
+	logrus.Debugf("Finished uploading the graph (%d operations) in %s...", totalCount, elapsed)
 
 	cgt.onSuccess(cgt.graph)
 	cgt.graph = knowledge.NewGraph()
