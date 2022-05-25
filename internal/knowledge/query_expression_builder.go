@@ -192,15 +192,15 @@ func (sev *SQLExpressionVisitor) OnExitRelationshipsPattern(q query.QueryRelatio
 	scope := Scope{Context: WhereContext, ID: id}
 
 	// Build the constraints for the patterns in the WHERE clause
-	whereExpressions, from, err := buildSQLConstraintsFromPatterns(sev.queryGraph, nil, scope)
+	joins, from, err := buildSQLConstraintsFromPatterns(sev.queryGraph, nil, scope)
 	if err != nil {
 		return fmt.Errorf("Unable to deduce SQL constraints for EXISTS query")
 	}
 
 	// Build a SELECT query such as SELECT 1 FROM assets a0 WHERE a0.type = 'mytype'.
 	// This is then wrapped into an EXISTS SQL clause
-	query, err := buildBasicSingleSQLSelect(false, []SQLProjection{{Variable: "1"}}, from,
-		[]SQLInnerStructure{}, *whereExpressions, []int{}, 0, 0)
+	query, err := buildBasicSingleSQLSelect(false, []SQLProjection{{Variable: "1"}}, from, joins[0],
+		[]SQLInnerStructure{}, AndOrExpression{}, []int{}, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Unable to build SQL query for EXISTS query: %v", err)
 	}

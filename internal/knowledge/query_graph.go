@@ -199,6 +199,39 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 	return &qr, newIdx, nil
 }
 
+// GetRelationsByNode get a node's relations.
+func (qg *QueryGraph) GetRelationsByNodeId(nodeId int) ([]*QueryRelation, []int) {
+
+	var relations []*QueryRelation
+	var idx []int
+
+	for i, relation := range qg.Relations {
+
+		if nodeId == relation.LeftIdx || nodeId == relation.RightIdx {
+			idx = append(idx, i)
+			relations = append(relations, &qg.Relations[i])
+		}
+	}
+
+	return relations, idx
+}
+
+// GetNodesByRelation get nodes attached to a relation
+func (qg *QueryGraph) GetNodesByRelation(relation *QueryRelation) (*QueryNode, *QueryNode, error) {
+
+	l, err := qg.GetNodeByID(relation.LeftIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r, err := qg.GetNodeByID(relation.RightIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return l, r, nil
+}
+
 // FindVariable find a variable by its name
 func (qg *QueryGraph) FindVariable(name string) (TypeAndIndex, error) {
 	v, ok := qg.VariablesIndex[name]
