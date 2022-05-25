@@ -94,6 +94,29 @@ func NewQueryGraph() QueryGraph {
 	}
 }
 
+func (qg *QueryGraph) Clone() *QueryGraph {
+
+	relationsCopy := make([]QueryRelation, len(qg.Relations))
+	nodesCopy := make([]QueryNode, len(qg.Nodes))
+	variableIndexCopy := make(map[string]TypeAndIndex)
+
+	for k, v := range qg.VariablesIndex {
+		variableIndexCopy[k] = v
+	}
+
+	copy(relationsCopy, qg.Relations)
+	copy(nodesCopy, qg.Nodes)
+
+	queryGraphClone := QueryGraph{
+		Nodes:          nodesCopy,
+		Relations:      relationsCopy,
+		VariablesIndex: variableIndexCopy,
+	}
+
+	return &queryGraphClone
+
+}
+
 // PushNode push a node into the registry
 func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNode, int, error) {
 	// If pattern comes with a variable name, search in the index if it does not already exist
@@ -197,6 +220,39 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 	}
 
 	return &qr, newIdx, nil
+}
+
+// GetRelationsByNode get a node's relations.
+func (qg *QueryGraph) GetRelationsByNodeId(nodeId int) ([]*QueryRelation, []int) {
+
+	var relations []*QueryRelation
+	var idx []int
+
+	for i, relation := range qg.Relations {
+
+		if nodeId == relation.LeftIdx || nodeId == relation.RightIdx {
+			idx = append(idx, i)
+			relations = append(relations, &qg.Relations[i])
+		}
+	}
+
+	return relations, idx
+}
+
+// GetNodesByRelation get nodes attached to a relation
+func (qg *QueryGraph) GetNodesByRelation(relation *QueryRelation) (*QueryNode, *QueryNode, error) {
+
+	l, err := qg.GetNodeByID(relation.LeftIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r, err := qg.GetNodeByID(relation.RightIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return l, r, nil
 }
 
 // FindVariable find a variable by its name
