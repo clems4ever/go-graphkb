@@ -88,7 +88,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 			continue
 		}
 
-		relations, relationsIdx := queryGraph.GetRelationsByNodeId(i)
+		relations := queryGraph.GetRelationsByNodeId(i)
 
 		var processedRelations []ProcessedRelationTuple
 
@@ -202,7 +202,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 		}
 
 		// For each node, visit each of its relationship
-		for j, relation := range relations {
+		for _, relation := range relations {
 			_, relationExists = relationSet[relation]
 			if relationExists {
 				continue
@@ -258,7 +258,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 					queryGraphClone := queryGraph.Clone()
 
 					// Calculate the join if the graph was directed to the right
-					queryGraphClone.Relations[relationsIdx[j]].Direction = Right
+					queryGraphClone.Relations[relation.id].Direction = Right
 					forkedJoinCollection, _, err := buildSQLConstraintsFromPatterns(queryGraphClone, constrainedNodes, scope)
 					if err != nil {
 						return nil, nil, err

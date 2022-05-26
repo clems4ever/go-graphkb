@@ -38,12 +38,13 @@ func (s *QueryGraphSuite) TestShouldPushUnamedUntypedNode() {
 		MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryNode{Scopes: ScopeSetWithMatchScope}
+	qn0 := QueryNode{Scopes: ScopeSetWithMatchScope, id: 0}
+	qn1 := QueryNode{Scopes: ScopeSetWithMatchScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 }
 
@@ -59,12 +60,13 @@ func (s *QueryGraphSuite) TestShouldPushNodeWithWhereScope() {
 		WhereScope)
 	s.Require().NoError(err)
 
-	qn := QueryNode{Scopes: ScopeSetWithWhereScope}
+	qn0 := QueryNode{Scopes: ScopeSetWithWhereScope, id: 0}
+	qn1 := QueryNode{Scopes: ScopeSetWithWhereScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 }
 
@@ -109,12 +111,13 @@ func (s *QueryGraphSuite) TestShouldPushNamedUntypedNode() {
 	}, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryNode{Scopes: ScopeSetWithMatchScope}
+	qn0 := QueryNode{Scopes: ScopeSetWithMatchScope, id: 0}
+	qn1 := QueryNode{Scopes: ScopeSetWithMatchScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 
 	s.Assert().Equal(n0, n2)
@@ -135,8 +138,8 @@ func (s *QueryGraphSuite) TestShouldPushUnamedTypedNode() {
 	}, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope}
-	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope}
+	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope, id: 0}
+	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope, id: 1}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -174,8 +177,8 @@ func (s *QueryGraphSuite) TestShouldPushNamedTypedNode() {
 	}, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope}
-	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope}
+	q0 := QueryNode{Labels: []string{"t1", "t2"}, Scopes: ScopeSetWithMatchScope, id: 0}
+	q1 := QueryNode{Labels: []string{"t1", "t3"}, Scopes: ScopeSetWithMatchScope, id: 1}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -208,12 +211,13 @@ func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelation() {
 	n1, idx1, err := g.PushRelation(pattern, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope}
+	qn0 := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope, id: 0}
+	qn1 := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 }
 
@@ -232,12 +236,13 @@ func (s *QueryGraphSuite) TestShouldPushUnamedUntypedRelationWithWhereScope() {
 	n1, idx1, err := g.PushRelation(pattern, 0, 0, WhereScope)
 	s.Require().NoError(err)
 
-	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithWhereScope}
+	qn0 := QueryRelation{Direction: Either, Scopes: ScopeSetWithWhereScope, id: 0}
+	qn1 := QueryRelation{Direction: Either, Scopes: ScopeSetWithWhereScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 }
 
@@ -285,12 +290,13 @@ func (s *QueryGraphSuite) TestShouldPushNamedUntypedRelation() {
 	n2, idx2, err := g.PushRelation(pattern0, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	qn := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope}
+	qn0 := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope, id: 0}
+	qn1 := QueryRelation{Direction: Either, Scopes: ScopeSetWithMatchScope, id: 1}
 
-	s.Assert().Equal(&qn, n0)
+	s.Assert().Equal(&qn0, n0)
 	s.Assert().Equal(0, idx0)
 
-	s.Assert().Equal(&qn, n1)
+	s.Assert().Equal(&qn1, n1)
 	s.Assert().Equal(1, idx1)
 
 	s.Assert().Equal(n0, n2)
@@ -314,8 +320,8 @@ func (s *QueryGraphSuite) TestShouldPushUnamedTypedRelation() {
 	n1, idx1, err := g.PushRelation(pattern1, 0, 0, MatchScope)
 	s.Require().NoError(err)
 
-	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either, Scopes: ScopeSetWithMatchScope}
-	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either, Scopes: ScopeSetWithMatchScope}
+	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either, Scopes: ScopeSetWithMatchScope, id: 0}
+	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either, Scopes: ScopeSetWithMatchScope, id: 1}
 
 	s.Assert().Equal(n0, &q0)
 	s.Assert().Equal(0, idx0)
@@ -360,10 +366,10 @@ func (s *QueryGraphSuite) TestShouldPushNamedTypedRelation() {
 
 	q0 := QueryRelation{Labels: []string{"t1", "t2"}, Direction: Either, Scopes: map[Scope]struct{}{
 		MatchScope: {},
-	}}
+	}, id: 0}
 	q1 := QueryRelation{Labels: []string{"t1", "t3"}, Direction: Either, Scopes: map[Scope]struct{}{
 		MatchScope: {},
-	}}
+	}, id: 1}
 
 	s.Assert().Equal(&q0, n0)
 	s.Assert().Equal(0, idx0)

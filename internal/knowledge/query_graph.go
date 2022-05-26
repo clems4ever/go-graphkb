@@ -29,6 +29,8 @@ type QueryNode struct {
 
 	// The scopes this node belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
+
+	id int
 }
 
 // QueryRelation represent a relation and its constraints
@@ -43,6 +45,8 @@ type QueryRelation struct {
 
 	// The scopes this relations belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
+
+	id int
 }
 
 // VariableType represent the type of a variable in the cypher query.
@@ -138,9 +142,10 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNod
 		}
 	}
 
-	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{})}
-	qn.Scopes[scope] = struct{}{}
 	newIdx := len(qg.Nodes)
+
+	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{}), id: newIdx}
+	qn.Scopes[scope] = struct{}{}
 
 	qg.Nodes = append(qg.Nodes, qn)
 	if q.Variable != "" {
@@ -201,15 +206,17 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 		return nil, -1, fmt.Errorf("Unable to detection the direction of the relation")
 	}
 
+	newIdx := len(qg.Relations)
+
 	qr := QueryRelation{
 		Labels:    labels,
 		LeftIdx:   leftIdx,
 		RightIdx:  rightIdx,
 		Direction: direction,
 		Scopes:    make(map[Scope]struct{}),
+		id:        newIdx,
 	}
 	qr.Scopes[scope] = struct{}{}
-	newIdx := len(qg.Relations)
 
 	qg.Relations = append(qg.Relations, qr)
 	if varName != "" {
@@ -223,20 +230,18 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 }
 
 // GetRelationsByNode get a node's relations.
-func (qg *QueryGraph) GetRelationsByNodeId(nodeId int) ([]*QueryRelation, []int) {
+func (qg *QueryGraph) GetRelationsByNodeId(nodeId int) []*QueryRelation {
 
 	var relations []*QueryRelation
-	var idx []int
 
 	for i, relation := range qg.Relations {
 
 		if nodeId == relation.LeftIdx || nodeId == relation.RightIdx {
-			idx = append(idx, i)
 			relations = append(relations, &qg.Relations[i])
 		}
 	}
 
-	return relations, idx
+	return relations
 }
 
 // GetNodesByRelation get nodes attached to a relation
