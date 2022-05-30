@@ -26,6 +26,12 @@ type SQLFrom struct {
 	Value string
 }
 
+type SQLJoin struct {
+	Table string
+	Alias string
+	On    string
+}
+
 // SQLInnerStructure represent a SQL inner structure with an optional alias name
 type SQLInnerStructure struct {
 	// If alias is empty there won't be any aliasing with AS keyword.
@@ -40,6 +46,7 @@ type SQLStructure struct {
 	FromEntries     []SQLFrom
 	FromStructures  []SQLInnerStructure
 	WhereExpression AndOrExpression
+	JoinEntries     [][]SQLJoin
 	GroupByIndices  []int
 	Limit           int
 	Offset          int
@@ -54,6 +61,7 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 	}
 
 	andExpressions := []AndOrExpression{}
+	// Expression strings are filled up here
 	for _, e := range unwoundAndExpressions {
 		exp, err := FlattenAndOrExpressions(e)
 		if err != nil {
@@ -62,8 +70,8 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 		andExpressions = append(andExpressions, exp)
 	}
 
-	// If we end up with multiple and expressions after unwind, this means that we had or expressions within and we must derive a union query.
-	if len(andExpressions) > 1 {
+	// If we end up with multiple and expressions after unwind or we have forked JOINs, we must derive an union query.
+	if len(andExpressions) > 1 || len(structure.JoinEntries) > 1 {
 		singleQueries := []string{}
 		for _, where := range andExpressions {
 			// If groupBy is required, we need aliases for all columns
@@ -78,13 +86,43 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 			}
 
 			// In that case, groupBy, limit and offset should be applied to the union instead of to all queries in the global query.
-			singleQuery, err := buildBasicSingleSQLSelect(false, structure.Projections, structure.FromEntries,
+			joinEntries := []SQLJoin{}
+			if len(structure.JoinEntries) > 0 {
+				joinEntries = structure.JoinEntries[0]
+			}
+			singleQuery, err := buildBasicSingleSQLSelect(false, structure.Projections, structure.FromEntries, joinEntries,
 				structure.FromStructures, where, structure.GroupByIndices, 0, 0)
 			if err != nil {
 				return "", err
 			}
 			singleQueries = append(singleQueries, fmt.Sprintf("(%s)", singleQuery))
 		}
+
+		for _, join := range structure.JoinEntries {
+
+			if len(structure.GroupByIndices) > 0 {
+				for i, p := range structure.Projections {
+					if p.Function != nil {
+						structure.Projections[i].Alias = fmt.Sprintf("%s_%s", strings.ReplaceAll(p.Variable, ".", "_"), p.Function.Name)
+					} else {
+						structure.Projections[i].Alias = strings.ReplaceAll(p.Variable, ".", "_")
+					}
+				}
+			}
+
+			where := AndOrExpression{}
+			if len(andExpressions) > 0 {
+				where = andExpressions[0]
+			}
+			// In that case, groupBy, limit and offset should be applied to the union instead of to all queries in the global query.
+			singleQuery, err := buildBasicSingleSQLSelect(false, structure.Projections, structure.FromEntries, join,
+				structure.FromStructures, where, structure.GroupByIndices, 0, 0)
+			if err != nil {
+				return "", err
+			}
+			singleQueries = append(singleQueries, fmt.Sprintf("(%s)", singleQuery))
+		}
+
 		if structure.Distinct {
 			sqlQuery = strings.Join(singleQueries, "\nUNION\n")
 		} else {
@@ -127,8 +165,16 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 		}
 
 	} else { // We don't need union since there were only and expressions in the constraints
+		where := AndOrExpression{}
+		if len(andExpressions) > 0 {
+			where = andExpressions[0]
+		}
+		joinEntries := []SQLJoin{}
+		if len(structure.JoinEntries) > 0 {
+			joinEntries = structure.JoinEntries[0]
+		}
 		singleQuery, err := buildBasicSingleSQLSelect(structure.Distinct, structure.Projections, structure.FromEntries,
-			structure.FromStructures, andExpressions[0], structure.GroupByIndices, structure.Limit, structure.Offset)
+			joinEntries, structure.FromStructures, where, structure.GroupByIndices, structure.Limit, structure.Offset)
 		if err != nil {
 			return "", err
 		}
@@ -139,7 +185,7 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 }
 
 func buildBasicSingleSQLSelect(
-	distinct bool, projections []SQLProjection, fromEntries []SQLFrom, fromStructures []SQLInnerStructure,
+	distinct bool, projections []SQLProjection, fromEntries []SQLFrom, joinEntries []SQLJoin, fromStructures []SQLInnerStructure,
 	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
 
 	projectionsStr := ""
@@ -193,7 +239,14 @@ func buildBasicSingleSQLSelect(
 
 	fromTablesStr := strings.Join(fromTablesSQL, ", ")
 
-	sqlQuery := fmt.Sprintf("SELECT %s\nFROM %s", projectionsStr, fromTablesStr)
+	var sb strings.Builder
+	for _, j := range joinEntries {
+		sb.WriteString(fmt.Sprintf("\nJOIN %s %s ON %s", j.Table, j.Alias, j.On))
+	}
+
+	joins := sb.String()
+
+	sqlQuery := fmt.Sprintf("SELECT %s\nFROM (%s)%s", projectionsStr, fromTablesStr, joins)
 	whereExprStr := whereExpressions.String()
 
 	if whereExprStr != "" {

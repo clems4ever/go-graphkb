@@ -29,6 +29,8 @@ type QueryNode struct {
 
 	// The scopes this node belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
+
+	id int
 }
 
 // QueryRelation represent a relation and its constraints
@@ -43,6 +45,8 @@ type QueryRelation struct {
 
 	// The scopes this relations belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
+
+	id int
 }
 
 // VariableType represent the type of a variable in the cypher query.
@@ -94,6 +98,29 @@ func NewQueryGraph() QueryGraph {
 	}
 }
 
+func (qg *QueryGraph) Clone() *QueryGraph {
+
+	relationsCopy := make([]QueryRelation, len(qg.Relations))
+	nodesCopy := make([]QueryNode, len(qg.Nodes))
+	variableIndexCopy := make(map[string]TypeAndIndex)
+
+	for k, v := range qg.VariablesIndex {
+		variableIndexCopy[k] = v
+	}
+
+	copy(relationsCopy, qg.Relations)
+	copy(nodesCopy, qg.Nodes)
+
+	queryGraphClone := QueryGraph{
+		Nodes:          nodesCopy,
+		Relations:      relationsCopy,
+		VariablesIndex: variableIndexCopy,
+	}
+
+	return &queryGraphClone
+
+}
+
 // PushNode push a node into the registry
 func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNode, int, error) {
 	// If pattern comes with a variable name, search in the index if it does not already exist
@@ -115,9 +142,10 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNod
 		}
 	}
 
-	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{})}
-	qn.Scopes[scope] = struct{}{}
 	newIdx := len(qg.Nodes)
+
+	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{}), id: newIdx}
+	qn.Scopes[scope] = struct{}{}
 
 	qg.Nodes = append(qg.Nodes, qn)
 	if q.Variable != "" {
@@ -178,15 +206,17 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 		return nil, -1, fmt.Errorf("Unable to detection the direction of the relation")
 	}
 
+	newIdx := len(qg.Relations)
+
 	qr := QueryRelation{
 		Labels:    labels,
 		LeftIdx:   leftIdx,
 		RightIdx:  rightIdx,
 		Direction: direction,
 		Scopes:    make(map[Scope]struct{}),
+		id:        newIdx,
 	}
 	qr.Scopes[scope] = struct{}{}
-	newIdx := len(qg.Relations)
 
 	qg.Relations = append(qg.Relations, qr)
 	if varName != "" {
@@ -197,6 +227,37 @@ func (qg *QueryGraph) PushRelation(q query.QueryRelationshipPattern, leftIdx, ri
 	}
 
 	return &qr, newIdx, nil
+}
+
+// GetRelationsByNode get a node's relations.
+func (qg *QueryGraph) GetRelationsByNodeId(nodeId int) []*QueryRelation {
+
+	var relations []*QueryRelation
+
+	for i, relation := range qg.Relations {
+
+		if nodeId == relation.LeftIdx || nodeId == relation.RightIdx {
+			relations = append(relations, &qg.Relations[i])
+		}
+	}
+
+	return relations
+}
+
+// GetNodesByRelation get nodes attached to a relation
+func (qg *QueryGraph) GetNodesByRelation(relation *QueryRelation) (*QueryNode, *QueryNode, error) {
+
+	l, err := qg.GetNodeByID(relation.LeftIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	r, err := qg.GetNodeByID(relation.RightIdx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return l, r, nil
 }
 
 // FindVariable find a variable by its name

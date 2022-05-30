@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/clems4ever/go-graphkb/internal/query"
 )
@@ -30,26 +31,105 @@ type SQLTranslation struct {
 	ProjectionTypes []Projection
 }
 
-func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes map[int]bool, scope Scope) (*AndOrExpression, []SQLFrom, error) {
-	andExpressions := AndOrExpression{And: true}
-	from := []SQLFrom{}
+// ProcessedRelationTuple tuple for existing relationships
+type ProcessedRelationTuple struct {
+	processedRelation      *QueryRelation
+	processedRelationAlias string
+}
 
+func isRelationOptimizable(queryGraph *QueryGraph, r QueryRelation) (bool, error) {
+
+	if len(queryGraph.Relations) > 1 {
+		return false, nil
+	}
+
+	nodesConstrained := false
+
+	n, err := queryGraph.GetNodeByID(r.LeftIdx)
+	if err != nil {
+		return false, err
+	}
+
+	// if the node has a variable name bound to it, it is considered constrained
+	if len(n.Labels) > 0 {
+		nodesConstrained = true
+	}
+
+	n, err = queryGraph.GetNodeByID(r.RightIdx)
+	if err != nil {
+		return false, err
+	}
+
+	// if the node has a variable name bound to it, it is considered constrained
+	if len(n.Labels) > 0 {
+		nodesConstrained = true
+	}
+
+	return !nodesConstrained, nil
+}
+
+func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes map[int]bool, scope Scope) ([][]SQLJoin, []SQLFrom, error) {
+	from := []SQLFrom{}
+	relationSet := make(map[*QueryRelation]string)
+	assetSet := make(map[*QueryNode]struct{ alias string })
+	joinCollections := [][]SQLJoin{}
+	joins := []SQLJoin{}
+	relationCount := 0
+
+	// Process every node as it is encountered in the query
 	for i, n := range queryGraph.Nodes {
 		inScope := false
-		inMatchScope := false
 		for s := range n.Scopes {
 			if s == scope {
 				inScope = true
-			}
-			if s == MatchScope {
-				inMatchScope = true
 			}
 		}
 		if !inScope {
 			continue
 		}
 
-		constraints := AndOrExpression{And: false}
+		relations := queryGraph.GetRelationsByNodeId(i)
+
+		var processedRelations []ProcessedRelationTuple
+
+		relationExists := false
+		var existingRelationAlias string
+		relationToAssetExists := false
+
+		// Look for already visited relationships to link them in each JOIN
+		for _, relation := range relations {
+			existingRelationAlias, relationExists = relationSet[relation]
+			if !relationExists {
+				continue
+			}
+			// Get the node at the other side of the relationship to link them together
+			if relation.LeftIdx == i {
+				neighbor, err := queryGraph.GetNodeByID(relation.RightIdx)
+				if err != nil {
+					return nil, nil, err
+				}
+				_, relationToAssetExists = assetSet[neighbor]
+				if relationToAssetExists {
+					processedRelations = append(processedRelations, struct {
+						processedRelation      *QueryRelation
+						processedRelationAlias string
+					}{processedRelation: relation, processedRelationAlias: existingRelationAlias})
+				}
+			} else {
+				neighbor, err := queryGraph.GetNodeByID(relation.LeftIdx)
+				if err != nil {
+					return nil, nil, err
+				}
+				_, relationToAssetExists = assetSet[neighbor]
+				if relationToAssetExists {
+					processedRelations = append(processedRelations, struct {
+						processedRelation      *QueryRelation
+						processedRelationAlias string
+					}{processedRelation: relation, processedRelationAlias: existingRelationAlias})
+				}
+			}
+
+		}
 
 		var alias string
 		if scope.Context == WhereContext {
@@ -57,152 +137,163 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 		} else {
 			alias = fmt.Sprintf("a%d", i)
 		}
-		from = append(from, SQLFrom{Value: "assets", Alias: alias})
 
-		// If the scope is WHERE and the asset is also in the MATCH clause, we make the link between them
-		if scope.Context == WhereContext && inMatchScope {
-			constraints.Children = append(constraints.Children, AndOrExpression{
-				Expression: fmt.Sprintf("%s.id = %s.id", alias, fmt.Sprintf("a%d", i)),
-			})
-		} else { // otherwise we don't make the link but simply check the types
+		// If no relationship of this node has been visited yet, then we have no information on this node.
+		// Scan the assets table again for this particular node.
+		if !relationToAssetExists {
+
+			if len(n.Labels) == 0 {
+				from = append(from, SQLFrom{Value: "assets", Alias: alias})
+			}
+
 			for _, label := range n.Labels {
-				constraints.Children = append(constraints.Children, AndOrExpression{
-					Expression: fmt.Sprintf("%s.type = '%s'", alias, label),
-				})
-			}
-		}
+				from = append(from, SQLFrom{Value: "assets", Alias: label})
 
-		if len(constraints.Children) > 0 {
-			// Append assets constraints
-			andExpressions.Children = append(andExpressions.Children, constraints)
-		}
-	}
+				if scope.Context == WhereContext {
+					joins = append(joins, SQLJoin{
+						Table: "assets",
+						Alias: alias,
+						On:    fmt.Sprintf("%s.type = '%s' AND %s.id = %s.id", alias, label, alias, strings.ReplaceAll(alias, "w", "")),
+					})
+				} else {
+					joins = append(joins, SQLJoin{
+						Table: "assets",
+						Alias: alias,
+						On:    fmt.Sprintf("%s.type = '%s' AND %s.id = %s.id", alias, label, alias, label),
+					})
+				}
 
-	for i, r := range queryGraph.Relations {
-		inScope := false
-		inMatchScope := false
-		for s := range r.Scopes {
-			if s == scope {
-				inScope = true
-				break
 			}
-			if s == MatchScope {
-				inMatchScope = true
-			}
-		}
-		if !inScope {
-			continue
-		}
-
-		var alias, aliasPrefix, assetAliasPrefix string
-		if scope.Context == WhereContext {
-			aliasPrefix = "rw"
-			assetAliasPrefix = "aw"
+			// If a relationship exists, we link this asset to it in the JOIN.
 		} else {
-			aliasPrefix = "r"
-			assetAliasPrefix = "a"
-		}
-		alias = fmt.Sprintf("%s%d", aliasPrefix, i)
-		from = append(from, SQLFrom{Value: "relations", Alias: alias})
+			var exp []string
 
-		constraints := AndOrExpression{And: false}
+			if len(n.Labels) > 0 {
+				for _, label := range n.Labels {
+					exp = append(exp, fmt.Sprintf("%s.type = '%s'", alias, label))
+				}
+			}
 
-		// If the scope is WHERE and the asset is also in the MATCH clause, we make the link between them
-		if scope.Context == WhereContext && inMatchScope {
-			constraints.Children = append(constraints.Children, AndOrExpression{
-				Expression: fmt.Sprintf("%s.id = %s.id", alias, fmt.Sprintf("r%d", i)),
+			for _, processedRelationStruct := range processedRelations {
+
+				processedRelation := processedRelationStruct.processedRelation
+				processedRelationAlias := processedRelationStruct.processedRelationAlias
+				if (processedRelation.Direction == Right && processedRelation.LeftIdx == i) || (processedRelation.Direction == Left && processedRelation.RightIdx == i) {
+					exp = append(exp, fmt.Sprintf("%s.from_id = %s.id", processedRelationAlias, alias))
+				} else if (processedRelation.Direction == Right && processedRelation.RightIdx == i) || (processedRelation.Direction == Left && processedRelation.LeftIdx == i) {
+					exp = append(exp, fmt.Sprintf("%s.to_id = %s.id", processedRelationAlias, alias))
+				} else {
+					// If the relationship has no direction, we assume it is a left directed relationship
+					// Previously we assumed the relationship was to the left and forked the same relation to the right.
+					if processedRelation.RightIdx == i {
+						exp = append(exp, fmt.Sprintf("%s.from_id = %s.id", processedRelationAlias, alias))
+					} else {
+						exp = append(exp, fmt.Sprintf("%s.to_id = %s.id", processedRelationAlias, alias))
+					}
+
+				}
+			}
+			joins = append(joins, SQLJoin{
+				Table: "assets",
+				Alias: alias,
+				On:    strings.Join(exp, " AND "),
 			})
-		} else { // otherwise we don't make the link but simply check the types
-			for _, label := range r.Labels {
-				constraints.Children = append(constraints.Children, AndOrExpression{
-					Expression: fmt.Sprintf("%s.type = '%s'", alias, label),
-				})
+
+		}
+
+		// For each node, visit each of its relationship
+		for _, relation := range relations {
+			_, relationExists = relationSet[relation]
+			if relationExists {
+				continue
 			}
-		}
-
-		if len(constraints.Children) > 0 {
-			andExpressions.Children = append(andExpressions.Children, constraints)
-		}
-
-		out := AndOrExpression{
-			And: true,
-			Children: []AndOrExpression{
-				{
-					Expression: fmt.Sprintf("%s.from_id = %s%d.id", alias, assetAliasPrefix, r.LeftIdx),
-				},
-				{
-					Expression: fmt.Sprintf("%s.to_id = %s%d.id", alias, assetAliasPrefix, r.RightIdx),
-				},
-			},
-		}
-
-		in := AndOrExpression{
-			And: true,
-			Children: []AndOrExpression{
-				{
-					Expression: fmt.Sprintf("%s.from_id = %s%d.id", alias, assetAliasPrefix, r.RightIdx),
-				},
-				{
-					Expression: fmt.Sprintf("%s.to_id = %s%d.id", alias, assetAliasPrefix, r.LeftIdx),
-				},
-			},
-		}
-
-		if r.Direction == Right {
-			andExpressions.Children = append(andExpressions.Children, out)
-		} else if r.Direction == Left {
-			andExpressions.Children = append(andExpressions.Children, in)
-		} else if r.Direction == Either {
-			oneDirectionOptimization := false
-			// Optimization: in this case, finding in any direction is sufficient.
-			if len(queryGraph.Relations) == 1 {
-				nodesConstrained := false
-				for idx := range constrainedNodes {
-					if idx == r.LeftIdx {
-						nodesConstrained = true
-					}
-					if idx == r.RightIdx {
-						nodesConstrained = true
-					}
+			inScope := false
+			for s := range relation.Scopes {
+				if s == scope {
+					inScope = true
+					break
 				}
-				if !nodesConstrained {
-					n, err := queryGraph.GetNodeByID(r.LeftIdx)
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// if the node has a variable name bound to it, it is considered constrained
-					if len(n.Labels) > 0 {
-						nodesConstrained = true
-					}
-
-					n, err = queryGraph.GetNodeByID(r.RightIdx)
-					if err != nil {
-						return nil, nil, err
-					}
-
-					// if the node has a variable name bound to it, it is considered constrained
-					if len(n.Labels) > 0 {
-						nodesConstrained = true
-					}
-				}
-				oneDirectionOptimization = !nodesConstrained
+			}
+			if !inScope {
+				continue
 			}
 
-			// This optimization is possible because (x)--(y) <=> (y)--(x)
-			if oneDirectionOptimization {
-				andExpressions.Children = append(andExpressions.Children, out)
+			var ralias, aliasPrefix, assetAliasPrefix string
+			if scope.Context == WhereContext {
+				aliasPrefix = "rw"
+				assetAliasPrefix = "aw"
 			} else {
-				// otherwise we need to have an OR expression which is later translated into a union of queries.
-				orExpression := AndOrExpression{
-					And:      false,
-					Children: []AndOrExpression{out, in},
-				}
-				andExpressions.Children = append(andExpressions.Children, orExpression)
+				aliasPrefix = "r"
+				assetAliasPrefix = "a"
 			}
+			ralias = fmt.Sprintf("%s%d", aliasPrefix, relationCount)
+			relationCount++
+			var exps []string
+
+			if len(relation.Labels) > 0 {
+				for _, label := range relation.Labels {
+					exps = append(exps, fmt.Sprintf("%s.type = '%s'", ralias, label))
+				}
+			}
+
+			if relation.Direction == Right && relation.LeftIdx == i {
+				exps = append(exps, fmt.Sprintf("%s.from_id = %s%d.id", ralias, assetAliasPrefix, relation.LeftIdx))
+			} else if relation.Direction == Right && relation.RightIdx == i {
+				exps = append(exps, fmt.Sprintf("%s.to_id = %s%d.id", ralias, assetAliasPrefix, relation.RightIdx))
+			} else if relation.Direction == Left && relation.LeftIdx == i {
+				exps = append(exps, fmt.Sprintf("%s.to_id = %s%d.id", ralias, assetAliasPrefix, relation.LeftIdx))
+			} else if relation.Direction == Left && relation.RightIdx == i {
+				exps = append(exps, fmt.Sprintf("%s.from_id = %s%d.id", ralias, assetAliasPrefix, relation.RightIdx))
+			} else {
+				// If a relationship is undirected
+				optimize, err := isRelationOptimizable(queryGraph, *relation)
+
+				if err != nil {
+					return nil, nil, err
+				}
+
+				if !optimize { // if this relation is optimizable, then just on direction is needed as (v) -- (q) <==> (q) -- (v)
+					// if not, we need to fork a join to translate it into an UNION when building the SQL query
+
+					queryGraphClone := queryGraph.Clone()
+
+					// Calculate the join if the graph was directed to the right
+					queryGraphClone.Relations[relation.id].Direction = Right
+					forkedJoinCollection, _, err := buildSQLConstraintsFromPatterns(queryGraphClone, constrainedNodes, scope)
+					if err != nil {
+						return nil, nil, err
+					}
+					joinCollections = append(joinCollections, forkedJoinCollection...)
+
+				}
+
+				// Assume a left directed relationship
+				if relation.LeftIdx == i {
+					exps = append(exps, fmt.Sprintf("%s.to_id = %s%d.id", ralias, assetAliasPrefix, relation.LeftIdx))
+				} else if relation.RightIdx == i {
+					exps = append(exps, fmt.Sprintf("%s.from_id = %s%d.id", ralias, assetAliasPrefix, relation.RightIdx))
+				}
+
+			}
+
+			// Hash the relationship so we know if we've seen it before
+			relationSet[relation] = ralias
+
+			joins = append(joins, SQLJoin{
+				Table: "relations",
+				Alias: ralias,
+				On:    strings.Join(exps, " AND "),
+			})
+
 		}
+		// Hash the node so we can make sure we've processed its relationship
+		assetSet[&queryGraph.Nodes[i]] = struct{ alias string }{alias: alias}
+
 	}
-	return &andExpressions, from, nil
+
+	joinCollections = append(joinCollections, joins)
+
+	return joinCollections, from, nil
 }
 
 // Translate a Cypher query into a SQL model
@@ -221,7 +312,7 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		}
 
 		if x.Where != nil {
-			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph)
+			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph) // where conditions of cql
 			whereExpression, err := whereVisitor.ParseExpression(x.Where)
 			if err != nil {
 				return nil, err
@@ -243,18 +334,15 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	}
 
 	// Build the constraints for the patterns in MATCH clause
-	expr, f, err := buildSQLConstraintsFromPatterns(&sqt.QueryGraph, constrainedNodes, MatchScope)
+	//TODO returns a set of where expressions that matches a list of from expressions -> (WHERE a0.type = 'subnet'...... from a0 assets)
+	joins, f, err := buildSQLConstraintsFromPatterns(&sqt.QueryGraph, constrainedNodes, MatchScope)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to build SQL constraints from patterns in the MATCH clause: %v", err)
 	}
 	from := f
 
-	if expr.Expression != "" || len(expr.Children) > 0 {
-		filterExpressions.Children = append(filterExpressions.Children, *expr)
-	}
-
 	if whereExpressions.Expression != "" || len(whereExpressions.Children) > 0 {
-		filterExpressions.Children = append(filterExpressions.Children, whereExpressions)
+		filterExpressions.Children = append(filterExpressions.Children, whereExpressions) // CQL where conditions
 	}
 
 	projections := make([]SQLProjection, 0)
@@ -263,9 +351,9 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	groupByRequired := false
 	variableIndices := []int{}
 
-	for i, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems {
+	for i, p := range query.QuerySinglePartQuery.ProjectionBody.ProjectionItems { // Here's the select statement
 		projectionVisitor := NewProjectionVisitor(&sqt.QueryGraph)
-		err := projectionVisitor.ParseExpression(&p.Expression)
+		err := projectionVisitor.ParseExpression(&p.Expression) // Lots of interfaces, gets to the return statement (projection) and returns them to be parsed as the SELECT
 		if err != nil {
 			return nil, err
 		}
@@ -325,7 +413,8 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 		Distinct:        query.QuerySinglePartQuery.ProjectionBody.Distinct,
 		Projections:     projections,
 		FromEntries:     from,
-		WhereExpression: filterExpressions,
+		WhereExpression: whereExpressions,
+		JoinEntries:     joins,
 		GroupByIndices:  groupByIndices,
 		Limit:           limit,
 		Offset:          offset,
