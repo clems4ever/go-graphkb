@@ -23,6 +23,16 @@ import (
 
 var zeroBytes = []byte{0}
 
+type MariaDBConfig struct {
+	Username               string
+	Password               string
+	Host                   string
+	DatabaseName           string
+	AllowCleartextPassword bool
+	MaxIdleConns           int
+	MaxOpenConns           int
+}
+
 // MariaDB mariadb as graph storage backend
 type MariaDB struct {
 	db *sql.DB
@@ -31,14 +41,22 @@ type MariaDB struct {
 }
 
 // NewMariaDB create an instance of mariadb
-func NewMariaDB(username string, password string, host string, databaseName string, allowCleartextPassword bool) *MariaDB {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s", username, password,
-		host, databaseName, strconv.FormatBool(allowCleartextPassword)))
+func NewMariaDB(cfg MariaDBConfig) *MariaDB {
+	db, err := sql.Open(
+		"mysql",
+		fmt.Sprintf("%s:%s@(%s)/%s?allowCleartextPasswords=%s",
+			cfg.Username,
+			cfg.Password,
+			cfg.Host,
+			cfg.DatabaseName,
+			strconv.FormatBool(cfg.AllowCleartextPassword),
+		),
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	db.SetMaxIdleConns(10)
-	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
 	return &MariaDB{db: db}
 }
 

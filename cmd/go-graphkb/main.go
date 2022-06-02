@@ -93,6 +93,8 @@ func logLevelParamToSeverity(level string) logrus.Level {
 func onInit() {
 	viper.SetConfigFile(ConfigPath)
 	viper.SetConfigType("yaml")
+	viper.SetDefault("mariadb_max_idle_conns", 10)
+	viper.SetDefault("mariadb_max_open_conns", 10)
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -110,12 +112,16 @@ func onInit() {
 	if dbName == "" {
 		logrus.Fatal("Please provide database_name option in your configuration file")
 	}
-	Database = database.NewMariaDB(
-		viper.GetString("mariadb_username"),
-		viper.GetString("mariadb_password"),
-		viper.GetString("mariadb_host"),
-		dbName,
-		viper.GetBool("mariadb_allow_cleartext_password"))
+
+	Database = database.NewMariaDB(database.MariaDBConfig{
+		Username:               viper.GetString("mariadb_username"),
+		Password:               viper.GetString("mariadb_password"),
+		Host:                   viper.GetString("mariadb_host"),
+		DatabaseName:           dbName,
+		AllowCleartextPassword: viper.GetBool("mariadb_allow_cleartext_password"),
+		MaxIdleConns:           viper.GetInt("mariadb_max_idle_conns"),
+		MaxOpenConns:           viper.GetInt("mariadb_max_open_conns"),
+	})
 }
 
 func count(cmd *cobra.Command, args []string) {
