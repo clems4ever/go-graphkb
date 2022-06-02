@@ -15,7 +15,7 @@ var StartTimeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 var GraphQueryTimeExecution = promauto.NewHistogramVec(prometheus.HistogramOpts{
 	Name:    "go_graphkb_graph_query_execution_time_ms",
 	Help:    "The time execution in ms of queries.",
-	Buckets: []float64{1, 50, 75, 100, 500, 1000, 2500, 5000, 10000},
+	Buckets: prometheus.ExponentialBucketsRange(0.1, 1000*60*30, 15),
 }, []string{})
 
 // ********************* GRAPH METRICS ******************
