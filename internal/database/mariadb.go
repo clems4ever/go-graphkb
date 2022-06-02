@@ -553,17 +553,31 @@ func (m *MariaDB) CountAssets(ctx context.Context) (int64, error) {
 }
 
 // CountAssetsBySource count the total number of assets in db by source
-func (m *MariaDB) CountAssetsBySource(ctx context.Context, sourceName string) (int64, error) {
-	sourceID, err := m.resolveSourceID(ctx, sourceName)
+func (m *MariaDB) CountAssetsBySource(ctx context.Context) (map[string]int64, error) {
+	res := map[string]int64{}
+	rows, err := m.db.QueryContext(ctx, `
+		SELECT s.name, COUNT(*)
+		FROM assets_by_source r
+		JOIN sources s on r.source_id = s.id
+		GROUP BY (source_id);
+	`)
 	if err != nil {
-		return 0, fmt.Errorf("unable to resolve source ID from name %s: %w", sourceName, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		name := ""
+		count := int64(0)
+		err := rows.Scan(&name, &count)
+		if err != nil {
+			return nil, err
+		}
+
+		res[name] = count
 	}
 
-	var count int64
-	row := m.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM assets_by_source WHERE source_id = ?", sourceID)
-
-	return count, row.Scan(&count)
+	return res, nil
 }
 
 // CountRelations count the total number of relations in db.
@@ -574,15 +588,31 @@ func (m *MariaDB) CountRelations(ctx context.Context) (int64, error) {
 }
 
 // CountRelationsBySource count the total number of relations in db by source.
-func (m *MariaDB) CountRelationsBySource(ctx context.Context, sourceName string) (int64, error) {
-	sourceID, err := m.resolveSourceID(ctx, sourceName)
+func (m *MariaDB) CountRelationsBySource(ctx context.Context) (map[string]int64, error) {
+	res := map[string]int64{}
+	rows, err := m.db.QueryContext(ctx, `
+		SELECT s.name, COUNT(*)
+		FROM relations_by_source r
+		JOIN sources s on r.source_id = s.id
+		GROUP BY (source_id);
+	`)
 	if err != nil {
-		return 0, fmt.Errorf("unable to resolve source ID from name %s: %w", sourceName, err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		name := ""
+		count := int64(0)
+		err := rows.Scan(&name, &count)
+		if err != nil {
+			return nil, err
+		}
+
+		res[name] = count
 	}
 
-	var count int64
-	row := m.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM relations_by_source WHERE source_id = ?", sourceID)
-	return count, row.Scan(&count)
+	return res, nil
 }
 
 // Close close the connection to maria
