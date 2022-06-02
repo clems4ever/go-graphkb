@@ -141,7 +141,6 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 		// If no relationship of this node has been visited yet, then we have no information on this node.
 		// Scan the assets table again for this particular node.
 		if !relationToAssetExists {
-
 			if len(n.Labels) == 0 {
 				from = append(from, SQLFrom{Value: "assets", Alias: alias})
 			}
@@ -197,6 +196,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 				Table: "assets",
 				Alias: alias,
 				On:    strings.Join(exp, " AND "),
+				Index: "PRIMARY",
 			})
 
 		}
@@ -236,14 +236,20 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 				}
 			}
 
+			index := ""
+
 			if relation.Direction == Right && relation.LeftIdx == i {
 				exps = append(exps, fmt.Sprintf("%s.from_id = %s%d.id", ralias, assetAliasPrefix, relation.LeftIdx))
+				index = "full_relation_type_from_to_idx"
 			} else if relation.Direction == Right && relation.RightIdx == i {
 				exps = append(exps, fmt.Sprintf("%s.to_id = %s%d.id", ralias, assetAliasPrefix, relation.RightIdx))
+				index = "full_relation_type_to_from_idx"
 			} else if relation.Direction == Left && relation.LeftIdx == i {
 				exps = append(exps, fmt.Sprintf("%s.to_id = %s%d.id", ralias, assetAliasPrefix, relation.LeftIdx))
+				index = "full_relation_type_to_from_idx"
 			} else if relation.Direction == Left && relation.RightIdx == i {
 				exps = append(exps, fmt.Sprintf("%s.from_id = %s%d.id", ralias, assetAliasPrefix, relation.RightIdx))
+				index = "full_relation_type_from_to_idx"
 			} else {
 				// If a relationship is undirected
 				optimize, err := isRelationOptimizable(queryGraph, *relation)
@@ -283,6 +289,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 				Table: "relations",
 				Alias: ralias,
 				On:    strings.Join(exps, " AND "),
+				Index: index,
 			})
 
 		}
