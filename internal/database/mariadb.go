@@ -63,7 +63,7 @@ func (m *MariaDB) InitializeSchema() error {
 	_, err = m.db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS assets (
 			id BIGINT UNSIGNED NOT NULL,
-			value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+			value VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin NOT NULL,
 			type VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
 
 			CONSTRAINT pk_asset PRIMARY KEY (id),
