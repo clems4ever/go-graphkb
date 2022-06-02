@@ -2,7 +2,6 @@ package knowledge
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/history"
@@ -29,18 +28,9 @@ func NewQuerier(db GraphDB, historizer history.Historizer) *Querier {
 
 // Query run a query against the graph DB.
 func (q *Querier) Query(ctx context.Context, queryString string) (*QuerierResult, error) {
-	qr, sql, err := q.queryInternal(ctx, queryString)
+	qr, _, err := q.queryInternal(ctx, queryString)
 	if err != nil {
-		saveErr := q.historizer.SaveFailedQuery(ctx, queryString, sql, err)
-		if saveErr != nil {
-			return nil, fmt.Errorf("Unable to save query error in database: %v", saveErr)
-		}
 		return nil, err
-	}
-
-	saveErr := q.historizer.SaveSuccessfulQuery(ctx, queryString, sql, qr.Statistics.Execution/time.Millisecond)
-	if saveErr != nil {
-		return nil, fmt.Errorf("Unable to save query history in database: %v", saveErr)
 	}
 	return qr, nil
 }
