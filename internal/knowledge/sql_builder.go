@@ -30,6 +30,7 @@ type SQLJoin struct {
 	Table string
 	Alias string
 	On    string
+	Index string
 }
 
 // SQLInnerStructure represent a SQL inner structure with an optional alias name
@@ -241,7 +242,13 @@ func buildBasicSingleSQLSelect(
 
 	var sb strings.Builder
 	for _, j := range joinEntries {
-		sb.WriteString(fmt.Sprintf("\nJOIN %s %s ON %s", j.Table, j.Alias, j.On))
+		sb.WriteString(fmt.Sprintf("\nJOIN %s %s ", j.Table, j.Alias))
+
+		if j.Index != "" {
+			sb.WriteString(fmt.Sprintf("FORCE INDEX FOR JOIN (%s) ", j.Index))
+		}
+
+		sb.WriteString(fmt.Sprintf("ON %s", j.On))
 	}
 
 	joins := sb.String()
