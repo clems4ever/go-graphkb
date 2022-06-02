@@ -10,6 +10,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/clems4ever/go-graphkb/internal/database"
+	"github.com/clems4ever/go-graphkb/internal/history"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/server"
 	"github.com/sirupsen/logrus"
@@ -19,6 +20,9 @@ import (
 
 // Database the selected database
 var Database *database.MariaDB
+
+// Historizer handles the query history
+var Historizer history.Historizer
 
 // ConfigPath string
 var ConfigPath string
@@ -122,6 +126,11 @@ func onInit() {
 		MaxIdleConns:           viper.GetInt("mariadb_max_idle_conns"),
 		MaxOpenConns:           viper.GetInt("mariadb_max_open_conns"),
 	})
+
+	Historizer = Database
+	if viper.GetBool("no_query_history") {
+		Historizer = &history.NoopHistorizer{}
+	}
 }
 
 func count(cmd *cobra.Command, args []string) {
@@ -155,7 +164,7 @@ func listen(cmd *cobra.Command, args []string) {
 		concurrency = 32
 	}
 
-	server.StartServer(listenInterface, Database, Database, Database, Database, concurrency)
+	server.StartServer(listenInterface, Database, Database, Database, Historizer, concurrency)
 }
 
 func read(cmd *cobra.Command, args []string) {
