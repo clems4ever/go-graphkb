@@ -78,7 +78,7 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 	logrus.Debugf("Found results in %s", s.Execution)
 
 	metrics.GraphQueryTimeExecution.
-		WithLabelValues().Observe(float64(executionTime))
+		WithLabelValues(cypherQuery).Observe(float64(executionTime))
 
 	result := &QuerierResult{
 		Cursor:      res.Cursor,
