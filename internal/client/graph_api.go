@@ -30,6 +30,10 @@ type GraphAPIOptions struct {
 	URL string
 	// Auth token for this data source.
 	AuthToken string
+
+	BasicAuthUsername string
+	BasicAuthPassword string
+
 	// Skip verifying the certificate when using https
 	SkipVerify bool
 
@@ -56,7 +60,13 @@ type GraphAPIOptions struct {
 // NewGraphAPI create an emitter of graph
 func NewGraphAPI(options GraphAPIOptions) *GraphAPI {
 	return &GraphAPI{
-		client:  NewGraphClient(options.URL, options.AuthToken, options.SkipVerify),
+		client: NewGraphClient(
+			options.URL,
+			options.AuthToken,
+			options.BasicAuthUsername,
+			options.BasicAuthPassword,
+			options.SkipVerify,
+		),
 		options: options,
 	}
 }
