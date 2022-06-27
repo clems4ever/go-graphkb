@@ -20,23 +20,27 @@ var ErrTooManyRequests = fmt.Errorf("Too Many Requests")
 
 // GraphClient is a client of the GraphKB API
 type GraphClient struct {
-	url       string
-	authToken string
+	url           string
+	authToken     string
+	basicAuthUser string
+	basicAuthPass string
 
 	client *http.Client
 }
 
 // NewGraphClient create a client of the GraphKB API
-func NewGraphClient(URL, authToken string, skipVerify bool) *GraphClient {
+func NewGraphClient(URL, authToken, basicAuthUser, basicAuthPass string, skipVerify bool) *GraphClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipVerify},
 	}
 	client := &http.Client{Transport: tr}
 
 	return &GraphClient{
-		url:       URL,
-		authToken: authToken,
-		client:    client,
+		url:           URL,
+		authToken:     authToken,
+		basicAuthUser: basicAuthUser,
+		basicAuthPass: basicAuthPass,
+		client:        client,
 	}
 }
 
@@ -45,7 +49,12 @@ func (gc *GraphClient) newRequest(method, path string, body io.Reader) (*http.Re
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add(utils.XAuthTokenHeader, gc.authToken)
+	if gc.authToken != "" {
+		req.Header.Add(utils.XAuthTokenHeader, gc.authToken)
+	}
+	if gc.basicAuthUser != "" {
+		req.SetBasicAuth(gc.basicAuthUser, gc.basicAuthPass)
+	}
 	return req, nil
 }
 
