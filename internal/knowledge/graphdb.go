@@ -33,9 +33,9 @@ type GraphDB interface {
 	FlushAll(ctx context.Context) error
 
 	CountAssets(ctx context.Context) (int64, error)
-	CountAssetsBySource(ctx context.Context, sourceName string) (int64, error)
+	CountAssetsBySource(ctx context.Context) (map[string]int64, error)
 	CountRelations(ctx context.Context) (int64, error)
-	CountRelationsBySource(ctx context.Context, sourceName string) (int64, error)
+	CountRelationsBySource(ctx context.Context) (map[string]int64, error)
 
 	Query(ctx context.Context, query SQLTranslation) (*GraphQueryResult, error)
 

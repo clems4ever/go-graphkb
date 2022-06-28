@@ -87,29 +87,15 @@ func listSources(registry sources.Registry) http.HandlerFunc {
 	}
 }
 
-func getDatabaseDetails(database knowledge.GraphDB) http.HandlerFunc {
+func getDatabaseDetails(dbm *dbMonitor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		type DatabaseDetailsResponse struct {
+		err := json.NewEncoder(w).Encode(struct {
 			AssetsCount    int64 `json:"assets_count"`
 			RelationsCount int64 `json:"relations_count"`
-		}
-
-		assetsCount, err := database.CountAssets(r.Context())
-		if err != nil {
-			handlers.ReplyWithInternalError(w, err)
-			return
-		}
-
-		relationsCount, err := database.CountRelations(r.Context())
-		if err != nil {
-			handlers.ReplyWithInternalError(w, err)
-			return
-		}
-
-		response := DatabaseDetailsResponse{}
-		response.AssetsCount = assetsCount
-		response.RelationsCount = relationsCount
-		err = json.NewEncoder(w).Encode(response)
+		}{
+			AssetsCount:    dbm.AssetCount,
+			RelationsCount: dbm.RelationCount,
+		})
 		if err != nil {
 			handlers.ReplyWithInternalError(w, err)
 			return
@@ -147,6 +133,9 @@ func StartServer(listenInterface string,
 	queryHistorizer history.Historizer,
 	writeConcurrency int64) {
 
+	dbMonitor := newDBMonitor(database)
+	dbMonitor.Start()
+
 	r := mux.NewRouter()
 	cacheTTL := viper.GetDuration("query_cache_ttl")
 	if cacheTTL == 0 {
@@ -157,7 +146,7 @@ func StartServer(listenInterface string,
 
 	listSourcesHandler := listSources(sourcesRegistry)
 	getSourceGraphHandler := getSourceGraph(sourcesRegistry, schemaPersistor)
-	getDatabaseDetailsHandler := getDatabaseDetails(database)
+	getDatabaseDetailsHandler := getDatabaseDetails(dbMonitor)
 	postQueryHandler := handlers.PostQuery(database, queryHistorizer, cacheTTL)
 	flushDatabaseHandler := flushDatabase(database)
 
@@ -202,8 +191,6 @@ func StartServer(listenInterface string,
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/build/")))
 
 	metrics.StartTimeGauge.Set(float64(time.Now().Unix()))
-
-	startGraphSizeMonitoring(getMonitoringIntervalSeconds(), database, sourcesRegistry)
 
 	var err error
 	if viper.GetString("server_tls_cert") != "" {
