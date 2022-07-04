@@ -5,6 +5,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+const (
+	QUERY_ERROR       = "query_error"
+	TRANSLATION_ERROR = "translation_error"
+	SUCCESS           = "success"
+)
+
 // StartTimeGauge reports the start time of the instance
 var StartTimeGauge = promauto.NewGauge(prometheus.GaugeOpts{
 	Name: "go_graphkb_start_timestamp_gauge",
@@ -17,6 +23,11 @@ var GraphQueryTimeExecution = promauto.NewHistogramVec(prometheus.HistogramOpts{
 	Help:    "The time execution in ms of queries.",
 	Buckets: prometheus.ExponentialBucketsRange(0.1, 1000*60*30, 15),
 }, []string{})
+
+var GraphQueryStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "go_graphkb_query_status_counter",
+	Help: "The number of queries executed by status: (ERROR|SUCCESS)",
+}, []string{"status"})
 
 // ********************* GRAPH METRICS ******************
 
