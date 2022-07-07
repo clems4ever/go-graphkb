@@ -93,7 +93,7 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 	logrus.Debugf("Found results in %s for user %s", s.Execution, user)
 
 	metrics.GraphQueryTimeExecution.
-		WithLabelValues().Observe(float64(executionTime))
+		WithLabelValues(user).Observe(float64(executionTime))
 
 	metrics.GraphQueryStatusCounter.With(prometheus.Labels{
 		"status": metrics.SUCCESS,

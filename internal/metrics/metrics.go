@@ -22,7 +22,7 @@ var GraphQueryTimeExecution = promauto.NewHistogramVec(prometheus.HistogramOpts{
 	Name:    "go_graphkb_graph_query_execution_time_ms",
 	Help:    "The time execution in ms of queries.",
 	Buckets: prometheus.ExponentialBucketsRange(0.1, 1000*60*30, 15),
-}, []string{})
+}, []string{"user"})
 
 var GraphQueryStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "go_graphkb_query_status_counter",
