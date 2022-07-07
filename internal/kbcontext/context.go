@@ -15,7 +15,7 @@ func (c contextKey) String() string {
 }
 
 // XForwardedUser gets the service user from context
-func XForwardedUser(ctx context.Context) (string, bool) {
-	xForwardedUser, ok := ctx.Value(ContextKeyXForwardedUser).(string)
-	return xForwardedUser, ok
+func XForwardedUser(ctx context.Context) string {
+	xForwardedUser, _ := ctx.Value(ContextKeyXForwardedUser).(string)
+	return xForwardedUser
 }

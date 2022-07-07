@@ -649,7 +649,7 @@ func (m *MariaDB) Query(ctx context.Context, sqlTranslation knowledge.SQLTransla
 		sqlTranslation.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sqlTranslation.Query)
 	}
 
-	user, ok := kbcontext.XForwardedUser(ctx)
+	user := kbcontext.XForwardedUser(ctx)
 	if !ok {
 		user = ""
 	}

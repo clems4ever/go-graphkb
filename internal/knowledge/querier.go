@@ -60,11 +60,7 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 	if err != nil {
 		return nil, "", err
 	}
-	user, ok := kbcontext.XForwardedUser(ctx)
-
-	if !ok {
-		user = ""
-	}
+	user := kbcontext.XForwardedUser(ctx)
 
 	translation, err := NewSQLQueryTranslator().Translate(queryCypher)
 	if err != nil {
