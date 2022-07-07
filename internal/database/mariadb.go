@@ -650,9 +650,6 @@ func (m *MariaDB) Query(ctx context.Context, sqlTranslation knowledge.SQLTransla
 	}
 
 	user := kbcontext.XForwardedUser(ctx)
-	if !ok {
-		user = ""
-	}
 
 	logrus.Debugf("Query to be executed for user %s: %s", user, sqlTranslation.Query)
 
