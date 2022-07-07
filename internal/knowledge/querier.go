@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/history"
+	"github.com/clems4ever/go-graphkb/internal/kbcontext"
 	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/clems4ever/go-graphkb/internal/query"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,11 +60,17 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 	if err != nil {
 		return nil, "", err
 	}
+	user, ok := kbcontext.XForwardedUser(ctx)
+
+	if !ok {
+		user = ""
+	}
 
 	translation, err := NewSQLQueryTranslator().Translate(queryCypher)
 	if err != nil {
 		metrics.GraphQueryStatusCounter.With(prometheus.Labels{
 			"status": metrics.TRANSLATION_ERROR,
+			"user":   user,
 		}).Inc()
 		return nil, "", err
 	}
@@ -76,19 +83,21 @@ func (q *Querier) queryInternal(ctx context.Context, cypherQuery string) (*Queri
 	if err != nil {
 		metrics.GraphQueryStatusCounter.With(prometheus.Labels{
 			"status": metrics.QUERY_ERROR,
+			"user":   user,
 		}).Inc()
 		return nil, translation.Query, err
 	}
 
 	executionTime := s.Execution.Milliseconds()
 
-	logrus.Debugf("Found results in %s", s.Execution)
+	logrus.Debugf("Found results in %s for user %s", s.Execution, user)
 
 	metrics.GraphQueryTimeExecution.
 		WithLabelValues().Observe(float64(executionTime))
 
 	metrics.GraphQueryStatusCounter.With(prometheus.Labels{
 		"status": metrics.SUCCESS,
+		"user":   user,
 	}).Inc()
 
 	result := &QuerierResult{

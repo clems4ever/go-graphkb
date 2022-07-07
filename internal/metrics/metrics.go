@@ -27,7 +27,7 @@ var GraphQueryTimeExecution = promauto.NewHistogramVec(prometheus.HistogramOpts{
 var GraphQueryStatusCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "go_graphkb_query_status_counter",
 	Help: "The number of queries executed by status: (ERROR|SUCCESS)",
-}, []string{"status"})
+}, []string{"status", "user"})
 
 // ********************* GRAPH METRICS ******************
 
