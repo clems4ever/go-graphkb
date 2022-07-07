@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/mysqlerr"
+	"github.com/clems4ever/go-graphkb/internal/kbcontext"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
 	"github.com/clems4ever/go-graphkb/internal/schema"
 	"github.com/clems4ever/go-graphkb/internal/utils"
@@ -641,12 +642,16 @@ func (m *MariaDB) Close() error {
 // Query the database with provided intermediate query representation
 func (m *MariaDB) Query(ctx context.Context, sqlTranslation knowledge.SQLTranslation) (*knowledge.GraphQueryResult, error) {
 	deadline, ok := ctx.Deadline()
+
 	// If there is a deadline, we make sure the query stops right after it has been reached.
 	if ok {
 		// Query can take 35 seconds max before being aborted...
 		sqlTranslation.Query = fmt.Sprintf("SET STATEMENT max_statement_time=%f FOR %s", time.Until(deadline).Seconds()+5, sqlTranslation.Query)
 	}
-	logrus.Debug("Query to be executed: ", sqlTranslation.Query)
+
+	user := kbcontext.XForwardedUser(ctx)
+
+	logrus.Debugf("Query to be executed for user %s: %s", user, sqlTranslation.Query)
 
 	cursor, err := NewMariaDBCursor(ctx, m.db, sqlTranslation)
 	if err != nil {

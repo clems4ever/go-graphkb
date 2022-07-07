@@ -9,8 +9,11 @@ import (
 	"time"
 
 	"github.com/clems4ever/go-graphkb/internal/history"
+	"github.com/clems4ever/go-graphkb/internal/kbcontext"
 	"github.com/clems4ever/go-graphkb/internal/knowledge"
+	"github.com/clems4ever/go-graphkb/internal/metrics"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 )
 
@@ -55,10 +58,20 @@ func PostQuery(database knowledge.GraphDB, queryHistorizer history.Historizer, c
 
 		var response []byte
 
+		ctx := r.Context()
+		user := r.Header.Get("X-Forwarded-User")
+		if user != "" {
+			ctx = context.WithValue(ctx, kbcontext.ContextKeyXForwardedUser, user)
+		}
+
 		if res, ok := cache.Get(cacheKey); ok {
 			response = res.([]byte)
+			metrics.GraphQueryStatusCounter.With(prometheus.Labels{
+				"status": metrics.SUCCESS,
+				"user":   user,
+			}).Inc()
 		} else {
-			res, err := executeQuery(r.Context(), database, queryHistorizer, body)
+			res, err := executeQuery(ctx, database, queryHistorizer, body)
 			if err != nil {
 				ReplyWithInternalError(w, err)
 				return
@@ -91,7 +104,7 @@ func executeQuery(ctx context.Context, database knowledge.GraphDB, queryHistoriz
 		QueryMaxTime = 30 * time.Second
 	}
 	querier := knowledge.NewQuerier(database, queryHistorizer)
-	ctx, cancel := context.WithTimeout(context.Background(), QueryMaxTime)
+	ctx, cancel := context.WithTimeout(ctx, QueryMaxTime)
 	defer cancel()
 
 	res, err := querier.Query(ctx, requestBody.Query)
