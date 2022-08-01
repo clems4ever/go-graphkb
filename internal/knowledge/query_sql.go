@@ -146,8 +146,9 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 				from = append(from, SQLFrom{Value: "assets", Alias: alias})
 			}
 
-			for _, label := range n.Labels {
-				from = append(from, SQLFrom{Value: "assets", Alias: label})
+			for j, label := range n.Labels {
+				subAlias := fmt.Sprintf("%s_%d", alias, j)
+				from = append(from, SQLFrom{Value: "assets", Alias: subAlias})
 
 				if scope.Context == WhereContext {
 					joins = append(joins, SQLJoin{
@@ -159,7 +160,7 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 					joins = append(joins, SQLJoin{
 						Table: "assets",
 						Alias: alias,
-						On:    fmt.Sprintf("%s.type = '%s' AND %s.id = %s.id", alias, label, alias, label),
+						On:    fmt.Sprintf("%s.type = '%s' AND %s.id = %s.id", alias, label, alias, subAlias),
 					})
 				}
 
