@@ -21,7 +21,11 @@ func TestQueryTranslation(t *testing.T) {
 	cases := []QueryCase{
 		{
 			Cypher: "MATCH (n:ip) RETURN n",
-			SQL:    `SELECT a0.id, a0.value, a0.type FROM (assets ip) JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id`,
+			SQL:    `SELECT a0.id, a0.value, a0.type FROM (assets a0_0) JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id`,
+		},
+		{
+			Cypher: "MATCH (n:ip) MATCH (n2:ip) RETURN n, n2",
+			SQL:    `SELECT a0.id, a0.value, a0.type, a1.id, a1.value, a1.type FROM (assets a0_0, assets a1_0) JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id JOIN assets a1 ON a1.type = 'ip' AND a1.id = a1_0.id`,
 		},
 		{
 			Cypher: "MATCH (n:ip), (n:name) RETURN n",
@@ -29,7 +33,7 @@ func TestQueryTranslation(t *testing.T) {
 		},
 		{
 			Cypher: "MATCH (n:ip) RETURN n, n",
-			SQL:    `SELECT a0.id, a0.value, a0.type, a0.id, a0.value, a0.type FROM (assets ip) JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id`,
+			SQL:    `SELECT a0.id, a0.value, a0.type, a0.id, a0.value, a0.type FROM (assets a0_0) JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id`,
 		},
 		{
 			Cypher: "MATCH (n) WHERE n.value = 'prod' RETURN n",
@@ -58,119 +62,119 @@ func TestQueryTranslation(t *testing.T) {
 		{
 			Cypher: "MATCH (:variable)-[:has]->(n:name) RETURN n",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (v:variable)--(n:name) RETURN n",
 			SQL: `
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.from_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id) 
-			UNION ALL 
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.from_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id)
+			UNION ALL
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id)`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN n",
 			SQL: `
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable)
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.from_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id) 
-			UNION ALL 
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.from_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id)
+			UNION ALL
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id)`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN n LIMIT 10",
 			SQL: `
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable)
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.from_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id) 
-			UNION ALL 
-			(SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.from_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id)
+			UNION ALL
+			(SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id)
 			LIMIT 10`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.value, COUNT(n.value)",
 			SQL: `
-			SELECT a0_value, SUM(a1_value_COUNT) 
+			SELECT a0_value, SUM(a1_value_COUNT)
 			FROM (
-				(SELECT a0.value AS a0_value, COUNT(a1.value) AS a1_value_COUNT 
-				FROM (assets variable) 
-				JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-				JOIN relations r0 ON r0.from_id = a0.id 
-				JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id 
-				GROUP BY a0_value) 
-				UNION ALL 
-				(SELECT a0.value AS a0_value, COUNT(a1.value) AS a1_value_COUNT 
-				FROM (assets variable) 
-				JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-				JOIN relations r0 ON r0.to_id = a0.id 
-				JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id 
+				(SELECT a0.value AS a0_value, COUNT(a1.value) AS a1_value_COUNT
+				FROM (assets a0_0)
+				JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+				JOIN relations r0 ON r0.from_id = a0.id
+				JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id
+				GROUP BY a0_value)
+				UNION ALL
+				(SELECT a0.value AS a0_value, COUNT(a1.value) AS a1_value_COUNT
+				FROM (assets a0_0)
+				JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+				JOIN relations r0 ON r0.to_id = a0.id
+				JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id
 				GROUP BY a0_value)
 			) AS x GROUP BY x.a0_value`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN DISTINCT n.value LIMIT 10",
 			SQL: `
-			(SELECT a1.value 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.from_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id) 
-			UNION 
-			(SELECT a1.value 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
+			(SELECT a1.value
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.from_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id)
+			UNION
+			(SELECT a1.value
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id) LIMIT 10`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[r]-(n:name) RETURN v.value, COUNT(DISTINCT n.value)",
 			SQL: `
-			SELECT a0_value, SUM(a1_value_COUNT) 
+			SELECT a0_value, SUM(a1_value_COUNT)
 			FROM (
-				(SELECT a0.value AS a0_value, COUNT(DISTINCT a1.value) AS a1_value_COUNT 
-				FROM (assets variable) 
-				JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-				JOIN relations r0 ON r0.from_id = a0.id 
-				JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id 
-				GROUP BY a0_value) 
-				UNION ALL 
-				(SELECT a0.value AS a0_value, COUNT(DISTINCT a1.value) AS a1_value_COUNT 
-				FROM (assets variable) 
-				JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-				JOIN relations r0 ON r0.to_id = a0.id 
-				JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id 
+				(SELECT a0.value AS a0_value, COUNT(DISTINCT a1.value) AS a1_value_COUNT
+				FROM (assets a0_0)
+				JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+				JOIN relations r0 ON r0.from_id = a0.id
+				JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id
+				GROUP BY a0_value)
+				UNION ALL
+				(SELECT a0.value AS a0_value, COUNT(DISTINCT a1.value) AS a1_value_COUNT
+				FROM (assets a0_0)
+				JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+				JOIN relations r0 ON r0.to_id = a0.id
+				JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id
 				GROUP BY a0_value)
 			) AS x GROUP BY x.a0_value`,
 		},
@@ -182,46 +186,46 @@ func TestQueryTranslation(t *testing.T) {
 		{
 			Cypher: "MATCH (v:variable)<-[r]-(n:name), (v)-[r1]->(n) RETURN n",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
-			JOIN relations r1 ON r1.from_id = a0.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
+			JOIN relations r1 ON r1.from_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id AND r1.to_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n.value",
 			SQL: `
-			SELECT a1.value 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
+			SELECT a1.value
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (v:variable)<-[r:has]-(n:name) RETURN v, r, n",
 			SQL: `
-			SELECT a0.id, a0.value, a0.type, r0.id, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
+			SELECT a0.id, a0.value, a0.type, r0.id, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (v:variable)<-[r]-(n) RETURN v, r, n",
 			SQL: `
-			SELECT a0.id, a0.value, a0.type, r0.id, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.to_id = a0.id 
+			SELECT a0.id, a0.value, a0.type, r0.id, r0.from_id, r0.to_id, r0.type, a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.to_id = a0.id
 			JOIN assets a1 ON r0.from_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (v:variable)<-[:has]-(:name)-[:is_in]->(:program) RETURN v",
 			SQL: `
 			SELECT a0.id, a0.value, a0.type
-			FROM (assets variable)
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
 			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id
 			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id
@@ -232,15 +236,15 @@ func TestQueryTranslation(t *testing.T) {
 					MATCH (c)-[:is_in]->(e:environment) WHERE e.value = 'preprod'
 					RETURN c`,
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets port) 
-			JOIN assets a0 ON a0.type = 'port' AND a0.id = port.id 
-			JOIN relations r0 ON r0.type = 'bind' AND r0.to_id = a0.id  
-			JOIN assets a1 ON a1.type = 'consul_service' AND r0.from_id = a1.id 
-			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id 
-			JOIN relations r2 ON r2.type = 'is_in' AND r2.from_id = a1.id 
-			JOIN assets a2 ON a2.type = 'datacenter' AND r1.to_id = a2.id 
-			JOIN assets a3 ON a3.type = 'environment' AND r2.to_id = a3.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'port' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'bind' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'consul_service' AND r0.from_id = a1.id
+			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id
+			JOIN relations r2 ON r2.type = 'is_in' AND r2.from_id = a1.id
+			JOIN assets a2 ON a2.type = 'datacenter' AND r1.to_id = a2.id
+			JOIN assets a3 ON a3.type = 'environment' AND r2.to_id = a3.id
 			WHERE a2.value = 'pa4' AND a3.value = 'preprod'`,
 		},
 		{
@@ -248,45 +252,45 @@ func TestQueryTranslation(t *testing.T) {
 					MATCH (c)-[:is_in]->(e:environment) WHERE e.value <> 'preprod'
 					RETURN c`,
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets port) 
-			JOIN assets a0 ON a0.type = 'port' AND a0.id = port.id 
-			JOIN relations r0 ON r0.type = 'bind' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'consul_service' AND r0.from_id = a1.id 
-			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id 
-			JOIN relations r2 ON r2.type = 'is_in' AND r2.from_id = a1.id 
-			JOIN assets a2 ON a2.type = 'datacenter' AND r1.to_id = a2.id 
-			JOIN assets a3 ON a3.type = 'environment' AND r2.to_id = a3.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'port' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'bind' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'consul_service' AND r0.from_id = a1.id
+			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id
+			JOIN relations r2 ON r2.type = 'is_in' AND r2.from_id = a1.id
+			JOIN assets a2 ON a2.type = 'datacenter' AND r1.to_id = a2.id
+			JOIN assets a3 ON a3.type = 'environment' AND r2.to_id = a3.id
 			WHERE a2.value = 'pa4' AND a3.value <> 'preprod'`,
 		},
 		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n LIMIT 10",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id
 			LIMIT 10`,
 		},
 		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN n SKIP 20 LIMIT 10",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id 
-			LIMIT 10 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id
+			LIMIT 10
 			OFFSET 20`,
 		},
 		{
 			Cypher: "MATCH (:variable)<-[:has]-(n:name) RETURN DISTINCT n",
 			SQL: `
-			SELECT DISTINCT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id 
+			SELECT DISTINCT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'name' AND r0.from_id = a1.id`,
 		},
 		{
@@ -294,41 +298,41 @@ func TestQueryTranslation(t *testing.T) {
 					WHERE r.value = '01.04'
 					RETURN e.value, COUNT(d.value)`,
 			SQL: `
-			SELECT a2.value, COUNT(a1.value) 
-			FROM (assets rack) 
-			JOIN assets a0 ON a0.type = 'rack' AND a0.id = rack.id 
-			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id 
-			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id 
-			JOIN assets a2 ON a2.type = 'environment' AND r1.to_id = a2.id WHERE a0.value = '01.04' 
+			SELECT a2.value, COUNT(a1.value)
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'rack' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id
+			JOIN relations r1 ON r1.type = 'is_in' AND r1.from_id = a1.id
+			JOIN assets a2 ON a2.type = 'environment' AND r1.to_id = a2.id WHERE a0.value = '01.04'
 			GROUP BY a2.value`,
 		},
 		{
 			Cypher: `MATCH (r:rack)<-[:is_in]-(d:device) RETURN COUNT(d)`,
 			SQL: `
-			SELECT COUNT(a1.id) 
-			FROM (assets rack) 
-			JOIN assets a0 ON a0.type = 'rack' AND a0.id = rack.id 
-			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id 
+			SELECT COUNT(a1.id)
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'rack' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id`,
 		},
 		{
 			Cypher: `MATCH (r:rack)<-[:is_in]-(d:device) RETURN COUNT(d.value)`,
 			SQL: `
-			SELECT COUNT(a1.value) 
-			FROM (assets rack) 
-			JOIN assets a0 ON a0.type = 'rack' AND a0.id = rack.id 
-			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id 
+			SELECT COUNT(a1.value)
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'rack' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'is_in' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id`,
 		},
 		{
 			Cypher: "MATCH (v:variable)-[:has]->(n:name) WHERE v.value = '0x16' AND (n.value = 'myvar' OR n.value = 'myvar2') RETURN n",
 			SQL: `
-			SELECT a1.id, a1.value, a1.type 
-			FROM (assets variable) 
-			JOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id 
-			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id 
+			SELECT a1.id, a1.value, a1.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'variable' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id
+			JOIN assets a1 ON a1.type = 'name' AND r0.to_id = a1.id
 			WHERE (a0.value = '0x16' AND a1.value = 'myvar' OR a1.value = 'myvar2')`,
 		},
 		{
@@ -337,14 +341,14 @@ func TestQueryTranslation(t *testing.T) {
 			WHERE (ip)<-[:has]-(:mesos_task)
 			RETURN ip`,
 			SQL: `
-			SELECT a0.id, a0.value, a0.type 
-			FROM (assets ip) JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id 
-			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id 
+			SELECT a0.id, a0.value, a0.type
+			FROM (assets a0_0) JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id
 			WHERE EXISTS (
-				SELECT 1 FROM (assets ip) 
-				JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id 
-				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id 
+				SELECT 1 FROM (assets aw0_0)
+				JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id
+				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id
 				JOIN assets aw2 ON aw2.type = 'mesos_task' AND rw0.from_id = aw2.id
 			)`,
 		},
@@ -354,14 +358,14 @@ func TestQueryTranslation(t *testing.T) {
 			WHERE NOT (ip)<-[:has]-(:mesos_task)
 			RETURN ip`,
 			SQL: `
-			SELECT a0.id, a0.value, a0.type 
-			FROM (assets ip) 
-			JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id 
-			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id 
+			SELECT a0.id, a0.value, a0.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id
 			WHERE NOT EXISTS (
-				SELECT 1 FROM (assets ip) JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id 
-				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id 
+				SELECT 1 FROM (assets aw0_0) JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id
+				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id
 				JOIN assets aw2 ON aw2.type = 'mesos_task' AND rw0.from_id = aw2.id)`,
 		},
 		{
@@ -371,15 +375,15 @@ func TestQueryTranslation(t *testing.T) {
 			WHERE (ip)<-[:has]-(:mesos_task) AND ip.value = '10.244.117.16'
 			RETURN ip`,
 			SQL: `
-			SELECT a0.id, a0.value, a0.type 
-			FROM (assets ip) 
-			JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id 
-			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id 
+			SELECT a0.id, a0.value, a0.type
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'observed' AND r0.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'device' AND r0.from_id = a1.id
 			WHERE EXISTS (
-				SELECT 1 FROM (assets ip) 
-				JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id 
-				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id 
+				SELECT 1 FROM (assets aw0_0)
+				JOIN assets aw0 ON aw0.type = 'ip' AND aw0.id = a0.id
+				JOIN relations rw0 ON rw0.type = 'has' AND rw0.to_id = aw0.id
 				JOIN assets aw2 ON aw2.type = 'mesos_task' AND rw0.from_id = aw2.id) AND a0.value = '10.244.117.16'`,
 		},
 		{
@@ -390,17 +394,17 @@ func TestQueryTranslation(t *testing.T) {
 			RETURN DISTINCT f
 			`,
 			SQL: `
-			SELECT DISTINCT a3.id, a3.value, a3.type 
-			FROM (assets subnet, assets fqdn) 
-			JOIN assets a0 ON a0.type = 'subnet' AND a0.id = subnet.id 
-			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id 
-			JOIN relations r1 ON r1.type = 'is' AND r1.from_id = a0.id 
-			JOIN relations r2 ON r2.type = 'is_in' AND r2.to_id = a0.id 
-			JOIN assets a1 ON a1.type = 'role' AND r0.to_id = a1.id 
-			JOIN assets a2 ON a2.type = 'scope' AND r1.to_id = a2.id 
-			JOIN assets a3 ON a3.type = 'fqdn' AND a3.id = fqdn.id 
-			JOIN relations r3 ON r3.type = 'points_to' AND r3.from_id = a3.id 
-			JOIN assets a4 ON a4.type = 'ip' AND r3.to_id = a4.id AND r2.from_id = a4.id 
+			SELECT DISTINCT a3.id, a3.value, a3.type
+			FROM (assets a0_0, assets a3_0)
+			JOIN assets a0 ON a0.type = 'subnet' AND a0.id = a0_0.id
+			JOIN relations r0 ON r0.type = 'has' AND r0.from_id = a0.id
+			JOIN relations r1 ON r1.type = 'is' AND r1.from_id = a0.id
+			JOIN relations r2 ON r2.type = 'is_in' AND r2.to_id = a0.id
+			JOIN assets a1 ON a1.type = 'role' AND r0.to_id = a1.id
+			JOIN assets a2 ON a2.type = 'scope' AND r1.to_id = a2.id
+			JOIN assets a3 ON a3.type = 'fqdn' AND a3.id = a3_0.id
+			JOIN relations r3 ON r3.type = 'points_to' AND r3.from_id = a3.id
+			JOIN assets a4 ON a4.type = 'ip' AND r3.to_id = a4.id AND r2.from_id = a4.id
 			WHERE a1.value = 'LBVIP' AND a2.value = 'public'
 			`,
 		},
@@ -416,8 +420,8 @@ func TestQueryTranslation(t *testing.T) {
 			`,
 			SQL: `
 			SELECT a0.id, a0.value, a0.type, a2.id, a2.value, a2.type, a5.id, a5.value, a5.type
-			FROM (assets ip)
-			JOIN assets a0 ON a0.type = 'ip' AND a0.id = ip.id
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ip' AND a0.id = a0_0.id
 			JOIN relations r0 ON r0.type = 'has' AND r0.to_id = a0.id
 			JOIN assets a1 ON a1.type = 'mesos_task' AND r0.from_id = a1.id
 			JOIN relations r1 ON r1.type = 'has' AND r1.from_id = a1.id
@@ -427,7 +431,7 @@ func TestQueryTranslation(t *testing.T) {
 			JOIN relations r3 ON r3.type = 'runs_as' AND r3.from_id = a3.id
 			JOIN assets a4 ON a4.type = 'service_account' AND r3.to_id = a4.id
 			JOIN relations r4 ON r4.type = 'has_owner' AND r4.from_id = a4.id
-			JOIN assets a5 ON a5.type = 'ldap_group' AND r4.to_id = a5.id 
+			JOIN assets a5 ON a5.type = 'ldap_group' AND r4.to_id = a5.id
 			`,
 		},
 	}
