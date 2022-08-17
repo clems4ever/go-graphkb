@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -44,11 +45,13 @@ func NewGraphClient(URL, authToken, basicAuthUser, basicAuthPass string, skipVer
 	}
 }
 
-func (gc *GraphClient) newRequest(method, path string, body io.Reader) (*http.Request, error) {
+func (gc *GraphClient) newRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", gc.url, path), body)
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
+
 	if gc.authToken != "" {
 		req.Header.Add(utils.XAuthTokenHeader, gc.authToken)
 	}
@@ -60,7 +63,7 @@ func (gc *GraphClient) newRequest(method, path string, body io.Reader) (*http.Re
 
 // ReadCurrentGraph read the current graph stored in graph kb
 func (gc *GraphClient) ReadCurrentGraph() (*knowledge.Graph, error) {
-	req, err := gc.newRequest("GET", "/api/graph/read", nil)
+	req, err := gc.newRequest(context.Background(), "GET", "/api/graph/read", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +99,7 @@ func (gc *GraphClient) UpdateSchema(sg schema.SchemaGraph) error {
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gc.newRequest("PUT", "/api/graph/schema", bytes.NewBuffer(b))
+	req, err := gc.newRequest(context.Background(), "PUT", "/api/graph/schema", bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -127,7 +130,7 @@ func (gc *GraphClient) InsertAssets(assets []knowledge.Asset) error {
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gc.newRequest("PUT", "/api/graph/assets", bytes.NewBuffer(b))
+	req, err := gc.newRequest(context.Background(), "PUT", "/api/graph/assets", bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -158,7 +161,7 @@ func (gc *GraphClient) DeleteAssets(assets []knowledge.Asset) error {
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gc.newRequest("DELETE", "/api/graph/assets", bytes.NewBuffer(b))
+	req, err := gc.newRequest(context.Background(), "DELETE", "/api/graph/assets", bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -189,7 +192,7 @@ func (gc *GraphClient) InsertRelations(relations []knowledge.Relation) error {
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gc.newRequest("PUT", "/api/graph/relations", bytes.NewBuffer(b))
+	req, err := gc.newRequest(context.Background(), "PUT", "/api/graph/relations", bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}
@@ -220,7 +223,7 @@ func (gc *GraphClient) DeleteRelations(relations []knowledge.Relation) error {
 		return fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gc.newRequest("DELETE", "/api/graph/relations", bytes.NewBuffer(b))
+	req, err := gc.newRequest(context.Background(), "DELETE", "/api/graph/relations", bytes.NewBuffer(b))
 	if err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@ func (gapi *GraphAPI) Query(ctx context.Context, q string, includeSources bool) 
 		return nil, fmt.Errorf("Unable to marshall request body")
 	}
 
-	req, err := gapi.client.newRequest("POST", "/api/query", bytes.NewBuffer(b))
+	req, err := gapi.client.newRequest(ctx, "POST", "/api/query", bytes.NewBuffer(b))
 	if err != nil {
 		return nil, err
 	}
