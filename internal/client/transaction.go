@@ -104,32 +104,6 @@ func (cgt *Transaction) Commit() error {
 	count, err := chunkedTransfer(
 		cgt.parallelization,
 		cgt.chunkSize,
-		cgt.graph.Relations(),
-		knowledge.GraphEntryRemove,
-		cgt.client.DeleteRelations,
-	)
-	if err != nil {
-		return err
-	}
-	logrus.Debugf("Deleted %d old relations", count)
-	totalCount += count
-
-	count, err = chunkedTransfer(
-		cgt.parallelization,
-		cgt.chunkSize,
-		cgt.graph.Assets(),
-		knowledge.GraphEntryRemove,
-		cgt.client.DeleteAssets,
-	)
-	if err != nil {
-		return err
-	}
-	logrus.Debugf("Deleted %d old assets", count)
-	totalCount += count
-
-	count, err = chunkedTransfer(
-		cgt.parallelization,
-		cgt.chunkSize,
 		cgt.graph.Assets(),
 		knowledge.GraphEntryAdd,
 		cgt.client.InsertAssets,
@@ -151,6 +125,32 @@ func (cgt *Transaction) Commit() error {
 		return err
 	}
 	logrus.Debugf("Inserted %d new relations", count)
+	totalCount += count
+
+	count, err = chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Relations(),
+		knowledge.GraphEntryRemove,
+		cgt.client.DeleteRelations,
+	)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("Deleted %d old relations", count)
+	totalCount += count
+
+	count, err = chunkedTransfer(
+		cgt.parallelization,
+		cgt.chunkSize,
+		cgt.graph.Assets(),
+		knowledge.GraphEntryRemove,
+		cgt.client.DeleteAssets,
+	)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("Deleted %d old assets", count)
 	totalCount += count
 
 	if totalCount == 0 {
