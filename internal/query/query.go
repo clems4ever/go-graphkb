@@ -148,17 +148,20 @@ func (cl *BaseCypherVisitor) VisitOC_RegularQuery(c *parser.OC_RegularQueryConte
 
 func (cl *BaseCypherVisitor) VisitOC_SingleQuery(c *parser.OC_SingleQueryContext) interface{} {
 	if c.OC_SinglePartQuery() != nil {
-		return c.OC_SinglePartQuery().Accept(cl)
+		v := c.OC_SinglePartQuery().Accept(cl)
+		return v
 	}
 	if c.OC_MultiPartQuery() != nil {
-		return c.OC_MultiPartQuery().Accept(cl)
+		v := c.OC_MultiPartQuery().Accept(cl)
+		return v
 	}
 	return fmt.Errorf("Unable to parse single query")
 }
 
 type QuerySinglePartQuery struct {
-	QueryMatches   []QueryMatch
-	ProjectionBody QueryProjectionBody
+	QueryMatches    []QueryMatch
+	ProjectionBody  QueryProjectionBody
+	WithProjections []QueryWith
 }
 
 func (cl *BaseCypherVisitor) VisitOC_SinglePartQuery(c *parser.OC_SinglePartQueryContext) interface{} {
@@ -166,14 +169,57 @@ func (cl *BaseCypherVisitor) VisitOC_SinglePartQuery(c *parser.OC_SinglePartQuer
 	q.QueryMatches = make([]QueryMatch, 0)
 
 	for i := range c.AllOC_ReadingClause() {
-		q.QueryMatches = append(q.QueryMatches,
-			c.OC_ReadingClause(i).Accept(cl).(QueryMatch))
+		match := c.OC_ReadingClause(i).Accept(cl).(QueryMatch)
+		q.QueryMatches = append(q.QueryMatches, match)
 	}
 	switch v := c.OC_Return().Accept(cl).(type) {
 	case QueryProjectionBody:
 		q.ProjectionBody = v
 	case error:
 		return v
+	}
+	return q
+}
+
+func (cl *BaseCypherVisitor) VisitOC_MultiPartQuery(c *parser.OC_MultiPartQueryContext) interface{} {
+	q := QuerySinglePartQuery{}
+	q.QueryMatches = make([]QueryMatch, 0)
+
+	singlePartQueryContext := c.OC_SinglePartQuery().(*parser.OC_SinglePartQueryContext)
+	singlePartQuery := cl.VisitOC_SinglePartQuery(singlePartQueryContext).(QuerySinglePartQuery)
+
+	for i := range c.AllOC_ReadingClause() {
+		match := c.OC_ReadingClause(i).Accept(cl).(QueryMatch)
+		q.QueryMatches = append(q.QueryMatches, match)
+	}
+
+	q.QueryMatches = append(q.QueryMatches, singlePartQuery.QueryMatches...)
+	q.ProjectionBody = singlePartQuery.ProjectionBody
+
+	for i := range c.AllOC_With() {
+		v := c.OC_With(i).Accept(cl)
+		q.WithProjections = append(q.WithProjections,
+			v.(QueryWith))
+	}
+
+	return q
+}
+
+type QueryWith struct {
+	Where          *QueryExpression
+	ProjectionBody QueryProjectionBody
+}
+
+func (cl *BaseCypherVisitor) VisitOC_With(c *parser.OC_WithContext) interface{} {
+	q := QueryWith{}
+	q.ProjectionBody = c.OC_ProjectionBody().Accept(cl).(QueryProjectionBody)
+	if c.OC_Where() != nil {
+		switch v := c.OC_Where().Accept(cl).(type) {
+		case QueryExpression:
+			q.Where = &v
+		case error:
+			return v
+		}
 	}
 	return q
 }

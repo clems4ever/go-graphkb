@@ -434,6 +434,55 @@ func TestQueryTranslation(t *testing.T) {
 			JOIN assets a5 ON a5.type = 'ldap_group' AND r4.to_id = a5.id
 			`,
 		},
+		{
+			Cypher: `
+			MATCH (ldap_group:ldap_group)<-[r:member_of]-()
+			WITH COUNT(r) AS c WHERE c = 0
+			RETURN ldap_group`,
+			SQL: `
+			SELECT a0.id, a0.value, a0.type, COUNT(r0.id) AS c
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ldap_group' AND a0.id = a0_0.id
+			LEFT JOIN relations r0 ON r0.type = 'member_of' AND r0.to_id = a0.id
+			LEFT JOIN assets a1 ON r0.from_id = a1.id
+			GROUP BY a0.id, a0.value, a0.type
+			HAVING c = 0
+			`,
+		},
+		{
+			Cypher: `
+			MATCH (ldap_group:ldap_group)<-[r:member_of]-(:user)
+			WITH COUNT(r) AS c WHERE c = 0
+			RETURN ldap_group`,
+			SQL: `
+			SELECT a0.id, a0.value, a0.type, COUNT(r0.id) AS c
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ldap_group' AND a0.id = a0_0.id
+			LEFT JOIN relations r0 ON r0.type = 'member_of' AND r0.to_id = a0.id
+			LEFT JOIN assets a1 ON a1.type = 'user' AND r0.from_id = a1.id
+			GROUP BY a0.id, a0.value, a0.type
+			HAVING c = 0
+			`,
+		},
+		{
+			Cypher: `
+			MATCH (ldap_group:ldap_group)<-[r:member_of]-()
+			WHERE ldap_group.value <> "something"
+			WITH COUNT(r) AS c
+			WHERE c = 0
+			RETURN ldap_group
+			`,
+			SQL: `
+			SELECT a0.id, a0.value, a0.type, COUNT(r0.id) AS c
+			FROM (assets a0_0)
+			JOIN assets a0 ON a0.type = 'ldap_group' AND a0.id = a0_0.id
+			LEFT JOIN relations r0 ON r0.type = 'member_of' AND r0.to_id = a0.id
+			LEFT JOIN assets a1 ON r0.from_id = a1.id
+			WHERE a0.value <> 'something'
+			GROUP BY a0.id, a0.value, a0.type
+			HAVING c = 0
+			`,
+		},
 	}
 
 	selectionEnabled := false
