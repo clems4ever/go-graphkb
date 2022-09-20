@@ -16,7 +16,7 @@ func TestBuildBasicSingleSQLSelect_Distinct(t *testing.T) {
 				[]SQLJoin{},
 				[]SQLInnerStructure{},
 				AndOrExpression{},
-				[]int{}, 0, 0)
+				[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 			assert.NoError(t, err)
 			assert.Equal(t, expected, sql)
@@ -35,7 +35,7 @@ func TestBuildBasicSingleSQLSelect_FromAlias(t *testing.T) {
 		[]SQLJoin{},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset, relation r0)", sql)
@@ -49,7 +49,7 @@ func TestBuildBasicSingleSQLSelect_ProjectionAlias(t *testing.T) {
 		[]SQLJoin{},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT a0.id AS a0_id, a0.value\nFROM (asset a0)", sql)
@@ -68,7 +68,7 @@ func TestBuildBasicSingleSQLSelect_OrExpression(t *testing.T) {
 				{Expression: "a0_id = 'abc'"}, {Expression: "a0.type = 'mytype'"},
 			},
 		},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset a0)\nWHERE a0_id = 'abc' OR a0.type = 'mytype'", sql)
@@ -87,7 +87,7 @@ func TestBuildBasicSingleSQLSelect_AndExpression(t *testing.T) {
 				{Expression: "a0_id = 'abc'"}, {Expression: "a0.type = 'mytype'"},
 			},
 		},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset a0)\nWHERE a0_id = 'abc' AND a0.type = 'mytype'", sql)
@@ -109,7 +109,7 @@ func TestBuildBasicSingleSQLSelect_NestedExpressions(t *testing.T) {
 				},
 			},
 		},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset a0)\nWHERE a0_id = 'abc' OR (a0.type = 'mytype' AND a0.value = 'myvalue')", sql)
@@ -123,7 +123,7 @@ func TestBuildBasicSingleSQLSelect_LIMIT(t *testing.T) {
 		[]SQLJoin{},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 10, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 10, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset)\nLIMIT 10", sql)
@@ -137,7 +137,7 @@ func TestBuildBasicSingleSQLSelect_OFFSET(t *testing.T) {
 		[]SQLJoin{},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 10, 20)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 10, 20)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset)\nLIMIT 10\nOFFSET 20", sql)
@@ -151,10 +151,10 @@ func TestBuildBasicSingleSQLSelect_GroupBy(t *testing.T) {
 		[]SQLJoin{},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{0, 2}, 0, 0)
+		[]int{0, 2}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT id, name, key\nFROM (asset)\nGROUP BY id, key", sql)
+	assert.Equal(t, "SELECT id, name, key\nFROM (asset)\nGROUP BY id, name", sql)
 }
 
 func TestBuildSQLSelect_UnwindOrExprIntoUnion(t *testing.T) {
@@ -195,7 +195,7 @@ func TestBuildSQLSelect_GroupBy_Limit_Offset(t *testing.T) {
 		})
 
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT id, name, key\nFROM (asset)\nWHERE id == 56 AND name == 'myname'\nGROUP BY id, key\nLIMIT 10\nOFFSET 20", sql)
+	assert.Equal(t, "SELECT id, name, key\nFROM (asset)\nWHERE id == 56 AND name == 'myname'\nGROUP BY id, name\nLIMIT 10\nOFFSET 20", sql)
 }
 
 func TestBuildBasicSingleSQLSelect_InnerSELECT(t *testing.T) {
@@ -216,7 +216,7 @@ func TestBuildBasicSingleSQLSelect_InnerSELECT(t *testing.T) {
 			},
 		},
 		AndOrExpression{And: true, Children: []AndOrExpression{{Expression: "s0.r_id > 8"}, {Expression: "a0.id = s0.r_from_id"}}},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (asset a0, (SELECT id AS r_id, from_id AS r_from_id\nFROM (relations)\nWHERE type = 'mytype') AS s0)\nWHERE s0.r_id > 8 AND a0.id = s0.r_from_id", sql)
@@ -234,7 +234,7 @@ func TestBuildBasicSingleSQLSelect_JOIN(t *testing.T) {
 		}},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (assets variable)\nJOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id", sql)
@@ -264,7 +264,7 @@ func TestBuildBasicSingleSQLSelect_JOINs(t *testing.T) {
 		},
 		[]SQLInnerStructure{},
 		AndOrExpression{},
-		[]int{}, 0, 0)
+		[]int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT *\nFROM (assets variable)\nJOIN assets a0 ON a0.type = 'variable' AND a0.id = variable.id\nJOIN relations r0 ON r0.type = 'is' AND r0.from_id = a0.id\nJOIN assets a1 ON a1.type = 'scope' AND r0.to_id = a1.id", sql)

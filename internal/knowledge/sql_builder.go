@@ -42,15 +42,17 @@ type SQLInnerStructure struct {
 
 // SQLStructure represent a SQL structure for building the query string
 type SQLStructure struct {
-	Distinct        bool
-	Projections     []SQLProjection
-	FromEntries     []SQLFrom
-	FromStructures  []SQLInnerStructure
-	WhereExpression AndOrExpression
-	JoinEntries     [][]SQLJoin
-	GroupByIndices  []int
-	Limit           int
-	Offset          int
+	Distinct          bool
+	Projections       []SQLProjection
+	FromEntries       []SQLFrom
+	FromStructures    []SQLInnerStructure
+	WhereExpression   AndOrExpression
+	HavingExpression  AndOrExpression
+	FunctionedAliases map[string]struct{}
+	JoinEntries       [][]SQLJoin
+	GroupByIndices    []int
+	Limit             int
+	Offset            int
 }
 
 func buildSQLSelect(structure SQLStructure) (string, error) {
@@ -92,7 +94,7 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 				joinEntries = structure.JoinEntries[0]
 			}
 			singleQuery, err := buildBasicSingleSQLSelect(false, structure.Projections, structure.FromEntries, joinEntries,
-				structure.FromStructures, where, structure.GroupByIndices, 0, 0)
+				structure.FromStructures, where, structure.GroupByIndices, structure.HavingExpression, structure.FunctionedAliases, 0, 0)
 			if err != nil {
 				return "", err
 			}
@@ -117,7 +119,7 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 			}
 			// In that case, groupBy, limit and offset should be applied to the union instead of to all queries in the global query.
 			singleQuery, err := buildBasicSingleSQLSelect(false, structure.Projections, structure.FromEntries, join,
-				structure.FromStructures, where, structure.GroupByIndices, 0, 0)
+				structure.FromStructures, where, structure.GroupByIndices, structure.HavingExpression, structure.FunctionedAliases, 0, 0)
 			if err != nil {
 				return "", err
 			}
@@ -175,7 +177,8 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 			joinEntries = structure.JoinEntries[0]
 		}
 		singleQuery, err := buildBasicSingleSQLSelect(structure.Distinct, structure.Projections, structure.FromEntries,
-			joinEntries, structure.FromStructures, where, structure.GroupByIndices, structure.Limit, structure.Offset)
+			joinEntries, structure.FromStructures, where, structure.GroupByIndices, structure.HavingExpression,
+			structure.FunctionedAliases, structure.Limit, structure.Offset)
 		if err != nil {
 			return "", err
 		}
@@ -187,7 +190,8 @@ func buildSQLSelect(structure SQLStructure) (string, error) {
 
 func buildBasicSingleSQLSelect(
 	distinct bool, projections []SQLProjection, fromEntries []SQLFrom, joinEntries []SQLJoin, fromStructures []SQLInnerStructure,
-	whereExpressions AndOrExpression, groupBy []int, limit int, offset int) (string, error) {
+	whereExpressions AndOrExpression, groupBy []int, havingExpressions AndOrExpression, functionedAliases map[string]struct{},
+	limit int, offset int) (string, error) {
 
 	projectionsStr := ""
 	if distinct {
@@ -242,7 +246,12 @@ func buildBasicSingleSQLSelect(
 
 	var sb strings.Builder
 	for _, j := range joinEntries {
-		sb.WriteString(fmt.Sprintf("\nJOIN %s %s ", j.Table, j.Alias))
+		left := ""
+		_, ok := functionedAliases[j.Alias]
+		if ok {
+			left = "LEFT "
+		}
+		sb.WriteString(fmt.Sprintf("\n%sJOIN %s %s ", left, j.Table, j.Alias))
 
 		if j.Index != "" {
 			sb.WriteString(fmt.Sprintf("FORCE INDEX FOR JOIN (%s) ", j.Index))
@@ -269,10 +278,16 @@ func buildBasicSingleSQLSelect(
 				if projections[groupBy[i]].Function != nil {
 					return "", fmt.Errorf("Unable to group by function, there should be an alias")
 				}
-				groupByProjection[i] = projections[groupBy[i]].Variable
+				groupByProjection[i] = projections[i].Variable
 			}
 		}
 		sqlQuery += fmt.Sprintf("\nGROUP BY %s", strings.Join(groupByProjection, ", "))
+	}
+
+	havingExpressionsStr := havingExpressions.String()
+
+	if havingExpressionsStr != "" {
+		sqlQuery += fmt.Sprintf("\nHAVING %s", havingExpressionsStr)
 	}
 
 	if limit > 0 {
