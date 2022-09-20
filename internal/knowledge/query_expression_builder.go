@@ -124,11 +124,15 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 		case NodeType:
 			alias = "a"
 			properties = []string{"id", "value", "type"}
+			alias += fmt.Sprintf("%d", typeAndIndex.Index)
 		case RelationType:
 			alias = "r"
 			properties = []string{"id", "from_id", "to_id", "type"}
+			alias += fmt.Sprintf("%d", typeAndIndex.Index)
+		case PropertyType:
+			alias = *sev.variableName
+			properties = []string{""}
 		}
-		alias += fmt.Sprintf("%d", typeAndIndex.Index)
 
 		if len(sev.propertiesPath) > 0 {
 			properties = []string{strings.Join(sev.propertiesPath, ".")}
@@ -136,6 +140,10 @@ func (sev *SQLExpressionVisitor) OnExitPropertyOrLabelsExpression(e query.QueryP
 
 		projection := []string{}
 		for _, p := range properties {
+			if typeAndIndex.Type == PropertyType {
+				projection = append(projection, alias)
+				break
+			}
 			projection = append(projection, fmt.Sprintf("%s.%s", alias, p))
 		}
 
@@ -200,7 +208,7 @@ func (sev *SQLExpressionVisitor) OnExitRelationshipsPattern(q query.QueryRelatio
 	// Build a SELECT query such as SELECT 1 FROM assets a0 WHERE a0.type = 'mytype'.
 	// This is then wrapped into an EXISTS SQL clause
 	query, err := buildBasicSingleSQLSelect(false, []SQLProjection{{Variable: "1"}}, from, joins[0],
-		[]SQLInnerStructure{}, AndOrExpression{}, []int{}, 0, 0)
+		[]SQLInnerStructure{}, AndOrExpression{}, []int{}, AndOrExpression{}, map[string]struct{}{}, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Unable to build SQL query for EXISTS query: %v", err)
 	}

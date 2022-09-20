@@ -30,6 +30,8 @@ type QueryNode struct {
 	// The scopes this node belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
 
+	AssignedVariable string
+
 	id int
 }
 
@@ -46,6 +48,8 @@ type QueryRelation struct {
 	// The scopes this relations belongs to (MATCH or WHERE)
 	Scopes map[Scope]struct{}
 
+	AssignedVariable string
+
 	id int
 }
 
@@ -57,6 +61,8 @@ const (
 	NodeType VariableType = iota
 	// RelationType variable of type relation
 	RelationType VariableType = iota
+	// PropertyType variable of type property (neither a node or a relation)
+	PropertyType VariableType = iota
 )
 
 // TypeAndIndex type and index of a variable from the cypher query
@@ -144,7 +150,11 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNod
 
 	newIdx := len(qg.Nodes)
 
-	qn := QueryNode{Labels: q.Labels, Scopes: make(map[Scope]struct{}), id: newIdx}
+	qn := QueryNode{
+		Labels: q.Labels,
+		Scopes: make(map[Scope]struct{}),
+		id:     newIdx,
+	}
 	qn.Scopes[scope] = struct{}{}
 
 	qg.Nodes = append(qg.Nodes, qn)
@@ -156,6 +166,22 @@ func (qg *QueryGraph) PushNode(q query.QueryNodePattern, scope Scope) (*QueryNod
 	}
 
 	return &qn, newIdx, nil
+}
+
+func (qg *QueryGraph) PushProperty(property string) error {
+
+	_, ok := qg.VariablesIndex[property]
+
+	if ok {
+		return fmt.Errorf("repeated alias %s", property)
+	}
+
+	qg.VariablesIndex[property] = TypeAndIndex{
+		Type:  PropertyType,
+		Index: -1,
+	}
+
+	return nil
 }
 
 // PushRelation push a relation into the registry
