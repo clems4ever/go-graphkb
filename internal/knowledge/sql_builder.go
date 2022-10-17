@@ -253,10 +253,6 @@ func buildBasicSingleSQLSelect(
 		}
 		sb.WriteString(fmt.Sprintf("\n%sJOIN %s %s ", left, j.Table, j.Alias))
 
-		if j.Index != "" {
-			sb.WriteString(fmt.Sprintf("FORCE INDEX FOR JOIN (%s) ", j.Index))
-		}
-
 		sb.WriteString(fmt.Sprintf("ON %s", j.On))
 	}
 
