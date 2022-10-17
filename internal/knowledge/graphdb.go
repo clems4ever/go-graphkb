@@ -68,6 +68,11 @@ type RelationWithID struct {
 	Type schema.RelationKeyType `json:"type"`
 }
 
+type Property struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 func (r RelationWithID) String() string {
 	return fmt.Sprintf("Relation{id:%s, from:%s, to:%s, type:%s", r.ID, r.From, r.To, r.Type)
 }

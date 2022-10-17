@@ -967,7 +967,10 @@ func (mc *MariaDBCursor) Read(ctx context.Context, doc interface{}) error {
 			if err != nil {
 				return fmt.Errorf("unable to get 1 property item: %v", err)
 			}
-			output[i] = items[0]
+			p := knowledge.Property{
+				Value: reflect.ValueOf(items[0]).String(),
+			}
+			output[i] = p
 		}
 	}
 
