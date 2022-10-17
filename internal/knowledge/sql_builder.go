@@ -30,6 +30,7 @@ type SQLJoin struct {
 	Table string
 	Alias string
 	On    string
+	Index string
 }
 
 // SQLInnerStructure represent a SQL inner structure with an optional alias name
