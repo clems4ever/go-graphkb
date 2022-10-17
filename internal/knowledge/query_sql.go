@@ -138,6 +138,13 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 			alias = fmt.Sprintf("a%d", i)
 		}
 
+		queryGraphNode, err := queryGraph.GetNodeByID(n.id)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		queryGraphNode.AssignedVariable = alias
+
 		// If no relationship of this node has been visited yet, then we have no information on this node.
 		// Scan the assets table again for this particular node.
 		if !relationToAssetExists {
@@ -228,6 +235,9 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 				assetAliasPrefix = "a"
 			}
 			ralias = fmt.Sprintf("%s%d", aliasPrefix, relationCount)
+
+			relation.AssignedVariable = ralias
+
 			relationCount++
 			var exps []string
 
@@ -301,7 +311,6 @@ func buildSQLConstraintsFromPatterns(queryGraph *QueryGraph, constrainedNodes ma
 func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslation, error) {
 	constrainedNodes := make(map[int]bool)
 
-	filterExpressions := AndOrExpression{And: true}
 	whereExpressions := AndOrExpression{And: true}
 	for _, x := range query.QuerySinglePartQuery.QueryMatches {
 		parser := NewPatternParser(&sqt.QueryGraph)
@@ -342,12 +351,10 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	}
 	from := f
 
-	if whereExpressions.Expression != "" || len(whereExpressions.Children) > 0 {
-		filterExpressions.Children = append(filterExpressions.Children, whereExpressions) // CQL where conditions
-	}
-
 	projections := make([]SQLProjection, 0)
 	projectionTypes := make([]Projection, 0)
+	havingExpressions := AndOrExpression{And: true}
+	functionedAliases := make(map[string]struct{})
 	groupByIndices := []int{}
 	groupByRequired := false
 	variableIndices := []int{}
@@ -378,6 +385,83 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 			ExpressionType: projectionVisitor.ExpressionType,
 		})
 	}
+
+	// Project with statements
+
+	for _, w := range query.QuerySinglePartQuery.WithProjections {
+		for _, p := range w.ProjectionBody.ProjectionItems {
+			// Project variables
+			projectionVisitor := NewProjectionVisitor(&sqt.QueryGraph)
+			err := projectionVisitor.ParseExpression(&p.Expression)
+			if err != nil {
+				return nil, err
+			}
+			sqt.QueryGraph.PushProperty(p.Alias)
+			for _, proj := range projectionVisitor.Projections {
+				if proj.Function != "" {
+					projections = append(projections, SQLProjection{
+						Function: &SQLFunction{Name: proj.Function, Distinct: proj.Distinct},
+						Variable: proj.Variable,
+						Alias:    p.Alias})
+					functionedAliases[proj.Variable[:strings.IndexByte(proj.Variable, '.')]] = struct{}{}
+					groupByRequired = true
+				} else if proj.Variable != "" {
+					projections = append(projections, SQLProjection{Variable: proj.Variable})
+				} else {
+					return nil, fmt.Errorf("Unable to detect type of projection")
+				}
+			}
+
+			projectionTypes = append(projectionTypes, Projection{
+				Alias:          p.Alias,
+				ExpressionType: projectionVisitor.ExpressionType,
+			})
+		}
+
+		// Include where statements
+
+		if w.Where != nil {
+			whereVisitor := NewQueryWhereVisitor(&sqt.QueryGraph) // having conditions of the with statements
+			havingExpression, err := whereVisitor.ParseExpression(w.Where)
+			if err != nil {
+				return nil, err
+			}
+			for _, v := range whereVisitor.Variables {
+				typeAndIndex, err := sqt.QueryGraph.FindVariable(v)
+				if err != nil {
+					return nil, err
+				}
+				constrainedNodes[typeAndIndex.Index] = true
+			}
+
+			// We only append the expression if it's not empty
+			if havingExpression != "" {
+				havingExpressions.Children = append(havingExpressions.Children,
+					AndOrExpression{And: true, Expression: havingExpression})
+			}
+		}
+
+	}
+
+	// If a relationship projection is a functioned one, then we need to propragate a left join to it's later node to find null values
+	for _, relation := range sqt.QueryGraph.Relations {
+		_, ok := functionedAliases[relation.AssignedVariable]
+		if !ok {
+			continue
+		}
+
+		index := relation.LeftIdx
+		if relation.RightIdx > relation.LeftIdx {
+			index = relation.RightIdx
+		}
+
+		n, err := sqt.QueryGraph.GetNodeByID(index)
+		if err != nil {
+			return nil, err
+		}
+		functionedAliases[n.AssignedVariable] = struct{}{}
+	}
+
 	// If group by is required, we group by all variables except the aggregation functions
 	if groupByRequired {
 		groupByIndices = variableIndices
@@ -411,14 +495,16 @@ func (sqt *SQLQueryTranslator) Translate(query *query.QueryCypher) (*SQLTranslat
 	var sqlQuery string
 
 	innerSQL := SQLStructure{
-		Distinct:        query.QuerySinglePartQuery.ProjectionBody.Distinct,
-		Projections:     projections,
-		FromEntries:     from,
-		WhereExpression: whereExpressions,
-		JoinEntries:     joins,
-		GroupByIndices:  groupByIndices,
-		Limit:           limit,
-		Offset:          offset,
+		Distinct:          query.QuerySinglePartQuery.ProjectionBody.Distinct,
+		Projections:       projections,
+		FromEntries:       from,
+		WhereExpression:   whereExpressions,
+		HavingExpression:  havingExpressions,
+		FunctionedAliases: functionedAliases,
+		JoinEntries:       joins,
+		GroupByIndices:    groupByIndices,
+		Limit:             limit,
+		Offset:            offset,
 	}
 
 	sqlQuery, err = buildSQLSelect(innerSQL)
