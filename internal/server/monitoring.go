@@ -41,6 +41,8 @@ func (m *dbMonitor) Start() {
 				logrus.Errorf("db monitor: %s", err)
 			}
 			cancel()
+
+			time.Sleep(interval)
 		}
 	}()
 }
