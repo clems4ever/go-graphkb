@@ -1,6 +1,9 @@
 package graphkb
 
-import "github.com/clems4ever/go-graphkb/internal/client"
+import (
+	"github.com/clems4ever/go-graphkb/internal/client"
+	"github.com/clems4ever/go-graphkb/internal/knowledge"
+)
 
 // GraphAPI is the representation of the graphkb API exposed to data sources.
 type GraphAPI = client.GraphAPI
@@ -22,6 +25,12 @@ type Column = client.Column
 
 // Item is map with the members of a row item in the QueryResponse
 type Item = client.Item
+
+type AssetWithID = knowledge.AssetWithID
+
+type RelationWithID = knowledge.RelationWithID
+
+type Property = knowledge.Property
 
 // PutGraphSchemaRequestBody a request body for the schema update
 type PutGraphSchemaRequestBody = client.PutGraphSchemaRequestBody
