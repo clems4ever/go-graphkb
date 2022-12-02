@@ -67,6 +67,13 @@ func (ra Item) Relation() knowledge.RelationWithID {
 	}
 }
 
+func (ra Item) Property() knowledge.Property {
+	return knowledge.Property{
+		Type:  "string",
+		Value: ra["value"].(string),
+	}
+}
+
 func (ra Item) Sources() []string {
 	s, _ := ra["sources"].([]string)
 	return s
