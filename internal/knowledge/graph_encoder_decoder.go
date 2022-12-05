@@ -86,8 +86,7 @@ func (ge *GraphDecoder) Decode(graph *Graph) error {
 			if err != nil {
 				return err
 			}
-			graph.AddAsset(relation.From.Type, relation.From.Key)
-			graph.AddAsset(relation.To.Type, relation.To.Key)
+
 			graph.AddRelation(relation.From, relation.Type, relation.To)
 		}
 	}
