@@ -2,7 +2,7 @@
 
 package parser // Cypher
 
-import "github.com/antlr/antlr4/runtime/Go/antlr"
+import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 type BaseCypherVisitor struct {
 	*antlr.BaseParseTreeVisitor

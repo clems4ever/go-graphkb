@@ -1,8 +1,7 @@
-// Code generated from Cypher.g4 by ANTLR 4.7.2. DO NOT EDIT.
+// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
 
 package parser // Cypher
-
-import "github.com/antlr/antlr4/runtime/Go/antlr"
+import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 // BaseCypherListener is a complete listener for a parse tree produced by CypherParser.
 type BaseCypherListener struct{}
@@ -358,12 +357,10 @@ func (s *BaseCypherListener) EnterOC_AddOrSubtractExpression(ctx *OC_AddOrSubtra
 func (s *BaseCypherListener) ExitOC_AddOrSubtractExpression(ctx *OC_AddOrSubtractExpressionContext) {}
 
 // EnterOC_MultiplyDivideModuloExpression is called when production oC_MultiplyDivideModuloExpression is entered.
-func (s *BaseCypherListener) EnterOC_MultiplyDivideModuloExpression(ctx *OC_MultiplyDivideModuloExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_MultiplyDivideModuloExpression(ctx *OC_MultiplyDivideModuloExpressionContext) {}
 
 // ExitOC_MultiplyDivideModuloExpression is called when production oC_MultiplyDivideModuloExpression is exited.
-func (s *BaseCypherListener) ExitOC_MultiplyDivideModuloExpression(ctx *OC_MultiplyDivideModuloExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_MultiplyDivideModuloExpression(ctx *OC_MultiplyDivideModuloExpressionContext) {}
 
 // EnterOC_PowerOfExpression is called when production oC_PowerOfExpression is entered.
 func (s *BaseCypherListener) EnterOC_PowerOfExpression(ctx *OC_PowerOfExpressionContext) {}
@@ -372,20 +369,16 @@ func (s *BaseCypherListener) EnterOC_PowerOfExpression(ctx *OC_PowerOfExpression
 func (s *BaseCypherListener) ExitOC_PowerOfExpression(ctx *OC_PowerOfExpressionContext) {}
 
 // EnterOC_UnaryAddOrSubtractExpression is called when production oC_UnaryAddOrSubtractExpression is entered.
-func (s *BaseCypherListener) EnterOC_UnaryAddOrSubtractExpression(ctx *OC_UnaryAddOrSubtractExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_UnaryAddOrSubtractExpression(ctx *OC_UnaryAddOrSubtractExpressionContext) {}
 
 // ExitOC_UnaryAddOrSubtractExpression is called when production oC_UnaryAddOrSubtractExpression is exited.
-func (s *BaseCypherListener) ExitOC_UnaryAddOrSubtractExpression(ctx *OC_UnaryAddOrSubtractExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_UnaryAddOrSubtractExpression(ctx *OC_UnaryAddOrSubtractExpressionContext) {}
 
 // EnterOC_StringListNullOperatorExpression is called when production oC_StringListNullOperatorExpression is entered.
-func (s *BaseCypherListener) EnterOC_StringListNullOperatorExpression(ctx *OC_StringListNullOperatorExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_StringListNullOperatorExpression(ctx *OC_StringListNullOperatorExpressionContext) {}
 
 // ExitOC_StringListNullOperatorExpression is called when production oC_StringListNullOperatorExpression is exited.
-func (s *BaseCypherListener) ExitOC_StringListNullOperatorExpression(ctx *OC_StringListNullOperatorExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_StringListNullOperatorExpression(ctx *OC_StringListNullOperatorExpressionContext) {}
 
 // EnterOC_ListOperatorExpression is called when production oC_ListOperatorExpression is entered.
 func (s *BaseCypherListener) EnterOC_ListOperatorExpression(ctx *OC_ListOperatorExpressionContext) {}
@@ -394,12 +387,10 @@ func (s *BaseCypherListener) EnterOC_ListOperatorExpression(ctx *OC_ListOperator
 func (s *BaseCypherListener) ExitOC_ListOperatorExpression(ctx *OC_ListOperatorExpressionContext) {}
 
 // EnterOC_StringOperatorExpression is called when production oC_StringOperatorExpression is entered.
-func (s *BaseCypherListener) EnterOC_StringOperatorExpression(ctx *OC_StringOperatorExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_StringOperatorExpression(ctx *OC_StringOperatorExpressionContext) {}
 
 // ExitOC_StringOperatorExpression is called when production oC_StringOperatorExpression is exited.
-func (s *BaseCypherListener) ExitOC_StringOperatorExpression(ctx *OC_StringOperatorExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_StringOperatorExpression(ctx *OC_StringOperatorExpressionContext) {}
 
 // EnterOC_NullOperatorExpression is called when production oC_NullOperatorExpression is entered.
 func (s *BaseCypherListener) EnterOC_NullOperatorExpression(ctx *OC_NullOperatorExpressionContext) {}
@@ -408,12 +399,10 @@ func (s *BaseCypherListener) EnterOC_NullOperatorExpression(ctx *OC_NullOperator
 func (s *BaseCypherListener) ExitOC_NullOperatorExpression(ctx *OC_NullOperatorExpressionContext) {}
 
 // EnterOC_PropertyOrLabelsExpression is called when production oC_PropertyOrLabelsExpression is entered.
-func (s *BaseCypherListener) EnterOC_PropertyOrLabelsExpression(ctx *OC_PropertyOrLabelsExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_PropertyOrLabelsExpression(ctx *OC_PropertyOrLabelsExpressionContext) {}
 
 // ExitOC_PropertyOrLabelsExpression is called when production oC_PropertyOrLabelsExpression is exited.
-func (s *BaseCypherListener) ExitOC_PropertyOrLabelsExpression(ctx *OC_PropertyOrLabelsExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_PropertyOrLabelsExpression(ctx *OC_PropertyOrLabelsExpressionContext) {}
 
 // EnterOC_Atom is called when production oC_Atom is entered.
 func (s *BaseCypherListener) EnterOC_Atom(ctx *OC_AtomContext) {}
@@ -440,12 +429,10 @@ func (s *BaseCypherListener) EnterOC_ListLiteral(ctx *OC_ListLiteralContext) {}
 func (s *BaseCypherListener) ExitOC_ListLiteral(ctx *OC_ListLiteralContext) {}
 
 // EnterOC_PartialComparisonExpression is called when production oC_PartialComparisonExpression is entered.
-func (s *BaseCypherListener) EnterOC_PartialComparisonExpression(ctx *OC_PartialComparisonExpressionContext) {
-}
+func (s *BaseCypherListener) EnterOC_PartialComparisonExpression(ctx *OC_PartialComparisonExpressionContext) {}
 
 // ExitOC_PartialComparisonExpression is called when production oC_PartialComparisonExpression is exited.
-func (s *BaseCypherListener) ExitOC_PartialComparisonExpression(ctx *OC_PartialComparisonExpressionContext) {
-}
+func (s *BaseCypherListener) ExitOC_PartialComparisonExpression(ctx *OC_PartialComparisonExpressionContext) {}
 
 // EnterOC_ParenthesizedExpression is called when production oC_ParenthesizedExpression is entered.
 func (s *BaseCypherListener) EnterOC_ParenthesizedExpression(ctx *OC_ParenthesizedExpressionContext) {}
@@ -484,20 +471,16 @@ func (s *BaseCypherListener) EnterOC_FunctionName(ctx *OC_FunctionNameContext) {
 func (s *BaseCypherListener) ExitOC_FunctionName(ctx *OC_FunctionNameContext) {}
 
 // EnterOC_ExplicitProcedureInvocation is called when production oC_ExplicitProcedureInvocation is entered.
-func (s *BaseCypherListener) EnterOC_ExplicitProcedureInvocation(ctx *OC_ExplicitProcedureInvocationContext) {
-}
+func (s *BaseCypherListener) EnterOC_ExplicitProcedureInvocation(ctx *OC_ExplicitProcedureInvocationContext) {}
 
 // ExitOC_ExplicitProcedureInvocation is called when production oC_ExplicitProcedureInvocation is exited.
-func (s *BaseCypherListener) ExitOC_ExplicitProcedureInvocation(ctx *OC_ExplicitProcedureInvocationContext) {
-}
+func (s *BaseCypherListener) ExitOC_ExplicitProcedureInvocation(ctx *OC_ExplicitProcedureInvocationContext) {}
 
 // EnterOC_ImplicitProcedureInvocation is called when production oC_ImplicitProcedureInvocation is entered.
-func (s *BaseCypherListener) EnterOC_ImplicitProcedureInvocation(ctx *OC_ImplicitProcedureInvocationContext) {
-}
+func (s *BaseCypherListener) EnterOC_ImplicitProcedureInvocation(ctx *OC_ImplicitProcedureInvocationContext) {}
 
 // ExitOC_ImplicitProcedureInvocation is called when production oC_ImplicitProcedureInvocation is exited.
-func (s *BaseCypherListener) ExitOC_ImplicitProcedureInvocation(ctx *OC_ImplicitProcedureInvocationContext) {
-}
+func (s *BaseCypherListener) ExitOC_ImplicitProcedureInvocation(ctx *OC_ImplicitProcedureInvocationContext) {}
 
 // EnterOC_ProcedureResultField is called when production oC_ProcedureResultField is entered.
 func (s *BaseCypherListener) EnterOC_ProcedureResultField(ctx *OC_ProcedureResultFieldContext) {}
